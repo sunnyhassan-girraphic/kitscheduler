@@ -6,64 +6,74 @@
   <a class="btn" href="/admin/" target="_blank">Open Admin</a>
 {% endblock %}
 {% block extra_style %}
-  .settings-section { max-width: 640px; margin: 24px auto; padding: 0 24px; }
-  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+  .settings-grid {
+    max-width: 900px; margin: 24px auto; padding: 0 24px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;
+  }
+  @media (max-width: 760px) { .settings-grid { grid-template-columns: 1fr; } }
+  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
   .settings-card-head { padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border); font-weight: 600; font-size: 13px; }
   .settings-row { display:flex; align-items:center; gap:12px; padding:10px 16px; border-top:1px solid var(--border); font-size:13px; }
   .settings-row label { flex:1; color:var(--text-dim); }
   .color-input { width:36px; height:30px; padding:2px; border:1px solid var(--border-strong); border-radius:4px; background:var(--surface-2); cursor:pointer; }
   .color-hex { width:80px; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--text); border-radius:4px; padding:5px 8px; font-size:12px; font-family:var(--mono); }
-  .export-row { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; font-size:13px; }
+  .export-row { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; font-size:13px; gap: 12px; }
   .export-row p { margin:0; color:var(--text-dim); font-size:12px; }
 {% endblock %}
 {% block content %}
-<div class="settings-section">
-  <form method="post">
-    {% csrf_token %}
+<div class="settings-grid">
+
+  <div>
+    <form method="post">
+      {% csrf_token %}
+      <div class="settings-card">
+        <div class="settings-card-head">Category colors</div>
+        {% for value, label in categories %}
+        <div class="settings-row">
+          <label>{{ label }}</label>
+          <input class="color-input" type="color" name="color_{{ value }}" value="{{ colors|get_item:value|default:'#EAB308' }}"
+                 oninput="document.getElementById('hex_{{ value }}').value=this.value">
+          <input class="color-hex" type="text" id="hex_{{ value }}" value="{{ colors|get_item:value|default:'#EAB308' }}"
+                 oninput="document.querySelector('[name=color_{{ value }}]').value=this.value" maxlength="7">
+        </div>
+        {% endfor %}
+      </div>
+      <div style="text-align:right;">
+        <button class="btn btn-primary" type="submit">Save colors</button>
+      </div>
+    </form>
+  </div>
+
+  <div>
     <div class="settings-card">
-      <div class="settings-card-head">Category colors</div>
-      {% for value, label in categories %}
-      <div class="settings-row">
-        <label>{{ label }}</label>
-        <input class="color-input" type="color" name="color_{{ value }}" value="{{ colors|get_item:value|default:'#EAB308' }}"
-               oninput="document.getElementById('hex_{{ value }}').value=this.value">
-        <input class="color-hex" type="text" id="hex_{{ value }}" value="{{ colors|get_item:value|default:'#EAB308' }}"
-               oninput="document.querySelector('[name=color_{{ value }}]').value=this.value" maxlength="7">
+      <div class="settings-card-head">Ticketing</div>
+      <div class="export-row">
+        <div>
+          <strong>Public fault report form</strong>
+          <p>Share this link with anyone who needs to report broken or faulty equipment. No login required.</p>
+        </div>
+        <a class="btn" href="/report-issue/" target="_blank">Open form</a>
       </div>
-      {% endfor %}
+      <div class="export-row" style="border-top:1px solid var(--border);">
+        <div>
+          <strong>Manage tickets</strong>
+          <p>View and update fault reports (admin only).</p>
+        </div>
+        <a class="btn" href="/tickets/">View tickets</a>
+      </div>
     </div>
-    <div style="text-align:right;">
-      <button class="btn btn-primary" type="submit">Save colors</button>
-    </div>
-  </form>
 
-  <div class="settings-card" style="margin-top:24px;">
-    <div class="settings-card-head">Export</div>
-    <div class="export-row">
-      <div>
-        <strong>Download all data as CSV</strong>
-        <p>Assets, kits, and jobs exported as a zip of CSVs.</p>
+    <div class="settings-card">
+      <div class="settings-card-head">Export</div>
+      <div class="export-row">
+        <div>
+          <strong>Download all data as CSV</strong>
+          <p>Assets, kits, and jobs exported as a zip of CSVs.</p>
+        </div>
+        <a class="btn" href="/settings/export/">Download zip</a>
       </div>
-      <a class="btn" href="/settings/export/">Download zip</a>
     </div>
   </div>
 
-  <div class="settings-card" style="margin-top:24px;">
-    <div class="settings-card-head">Ticketing</div>
-    <div class="export-row">
-      <div>
-        <strong>Public fault report form</strong>
-        <p>Share this link with anyone who needs to report broken or faulty equipment. No login required.</p>
-      </div>
-      <a class="btn" href="/report-issue/" target="_blank">Open form</a>
-    </div>
-    <div class="export-row" style="border-top:1px solid var(--border);">
-      <div>
-        <strong>Manage tickets</strong>
-        <p>View and update fault reports (admin only).</p>
-      </div>
-      <a class="btn" href="/tickets/">View tickets</a>
-    </div>
-  </div>
 </div>
 {% endblock %}

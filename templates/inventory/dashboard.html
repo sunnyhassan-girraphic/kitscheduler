@@ -161,7 +161,8 @@
 
 <!-- Job Detail Dialog -->
 <dialog id="jobDetailDialog" style="background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 10px; padding: 0; width: 420px; max-width: 90vw;">
-  <div style="display:flex; align-items:center; gap:10px; padding:16px; border-bottom:1px solid var(--border);">
+  <button type="button" class="dialog-close-x" onclick="document.getElementById('jobDetailDialog').close()" aria-label="Close">&times;</button>
+  <div style="display:flex; align-items:center; gap:10px; padding:16px 44px 16px 16px; border-bottom:1px solid var(--border);">
     <div id="jdColorBar" style="width:6px; height:32px; border-radius:3px; flex-shrink:0;"></div>
     <div>
       <div id="jdTitle" style="font-weight:600; font-size:15px;"></div>
@@ -175,7 +176,6 @@
     <div id="jdNotesRow" style="display:none; gap:8px; padding:6px 0; font-size:13px;"><span style="color:var(--text-dim); min-width:80px;">Notes</span><span id="jdNotes"></span></div>
   </div>
   <div style="display:flex; gap:8px; padding:14px 16px; border-top:1px solid var(--border);">
-    <button class="btn" onclick="document.getElementById('jobDetailDialog').close()">Close</button>
     <span style="flex:1;"></span>
     <a class="btn" id="jdEditLink" href="#">Edit job</a>
     <button class="btn" id="jdCloneBtn" onclick="dashCloneJob()">Clone</button>

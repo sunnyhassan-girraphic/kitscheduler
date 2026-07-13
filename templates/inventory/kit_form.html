@@ -219,15 +219,16 @@
   </div>
 
   <dialog id="pdfMetaDialog" style="background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 10px; padding: 20px; width: 380px; max-width: 90vw;">
-    <h3 style="margin:0 0 4px; font-size:15px; font-weight:600;">Kit list PDF details</h3>
+    <button type="button" class="dialog-close-x" onclick="document.getElementById('pdfMetaDialog').close()" aria-label="Close">&times;</button>
+    <h3 style="margin:0 0 4px; font-size:15px; font-weight:600; padding-right:24px;">Kit list PDF details</h3>
     <p style="margin:0 0 14px; font-size:12px; color:var(--text-dim);">Fill in what you know now - anything left blank prints as a hand-fill line, same as leaving it blank on paper.</p>
     <div class="form-field">
       <label for="pdf-packed-by">Packed by</label>
-      <input type="text" id="pdf-packed-by" placeholder="e.g. Sunny Hassan">
+      <input type="text" id="pdf-packed-by">
     </div>
     <div class="form-field">
       <label for="pdf-event-date">Event date</label>
-      <input type="text" id="pdf-event-date" placeholder="e.g. 10/06/2026">
+      <input type="date" id="pdf-event-date">
     </div>
     <div class="form-field">
       <label for="pdf-gps-tag">GPS tag</label>
@@ -242,7 +243,6 @@
       <input type="text" id="pdf-cases">
     </div>
     <div class="form-actions" style="padding-top:6px;">
-      <button class="btn" type="button" onclick="document.getElementById('pdfMetaDialog').close()">Cancel</button>
       <button class="btn btn-primary" type="button" onclick="downloadKitPdf({{ kit.id }})">Download PDF</button>
     </div>
   </dialog>
@@ -252,9 +252,15 @@
 
 <script>
 function downloadKitPdf(kitId) {
+  const rawDate = document.getElementById("pdf-event-date").value.trim();
+  let eventDate = "";
+  if (rawDate) {
+    const [y, m, d] = rawDate.split("-");
+    eventDate = `${d}/${m}/${y}`;
+  }
   const params = new URLSearchParams({
     packed_by: document.getElementById("pdf-packed-by").value.trim(),
-    event_date: document.getElementById("pdf-event-date").value.trim(),
+    event_date: eventDate,
     gps_tag: document.getElementById("pdf-gps-tag").value.trim(),
     carnet: document.getElementById("pdf-carnet").value.trim(),
     cases: document.getElementById("pdf-cases").value.trim(),
