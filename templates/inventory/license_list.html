@@ -1,0 +1,76 @@
+{% extends "inventory/base.html" %}
+{% block title %}Licenses - Kit scheduler{% endblock %}
+{% block brand_sub %}{{ total }} license{{ total|pluralize }}{% endblock %}
+{% block header_actions %}
+  <a class="btn btn-primary" href="/admin/inventory/asset/add/">+ Add license</a>
+{% endblock %}
+{% block extra_style %}
+  table.lic-table { width:100%; border-collapse:collapse; }
+  table.lic-table th {
+    text-align:left; font-size:11px; font-weight:600; text-transform:uppercase;
+    letter-spacing:0.04em; color:var(--text-dim); padding:10px 16px;
+    border-bottom:1px solid var(--border); background:var(--surface);
+    position:sticky; top:0; z-index:1;
+  }
+  table.lic-table td { padding:10px 16px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:middle; }
+  table.lic-table tr:hover td { background:var(--surface); }
+  .func-tags { display:flex; flex-wrap:wrap; gap:4px; }
+  .func-tag { font-size:11px; padding:2px 7px; border-radius:999px; background:var(--surface-2); color:var(--text-dim); font-family:var(--mono); white-space:nowrap; }
+{% endblock %}
+{% block content %}
+<div class="filter-bar">
+  <form method="get" style="display:flex; align-items:center; gap:8px;">
+    <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+      <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %} onchange="this.form.submit()">
+      Show archived
+    </label>
+  </form>
+</div>
+{% if licenses %}
+<div style="overflow-x:auto;">
+<table class="lic-table">
+  <thead>
+    <tr>
+      <th>License ID</th>
+      <th>Type</th>
+      <th>Functionality</th>
+      <th>In kits</th>
+      <th>Status</th>
+      <th>Last updated</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for lic in licenses %}
+    <tr>
+      <td style="white-space:nowrap; font-family:var(--mono);">
+        <a href="/admin/inventory/asset/{{ lic.id }}/change/" style="color:var(--text); text-decoration:none;">{{ lic.asset_id }}</a>
+        {% if lic.archived %}<span class="badge badge-archived" style="margin-left:6px;">Archived</span>{% endif %}
+      </td>
+      <td style="color:var(--text-dim);">{{ lic.license_type|default:"-" }}</td>
+      <td>
+        {% if lic.func_tags %}
+          <div class="func-tags">{% for tag in lic.func_tags %}<span class="func-tag">{{ tag }}</span>{% endfor %}</div>
+        {% else %}
+          <span style="color:var(--text-faint);">-</span>
+        {% endif %}
+      </td>
+      <td style="color:var(--text-dim); font-size:12px;">
+        {% for kit in lic.kits.all %}{{ kit.name }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}
+      </td>
+      <td><span class="badge badge-{{ lic.status|lower }}">{{ lic.get_status_display }}</span></td>
+      <td style="color:var(--text-dim); font-size:12px; white-space:nowrap;">
+        {% if lic.last_updated_by or lic.last_updated_date %}
+          {% if lic.last_updated_by %}{{ lic.last_updated_by.name }}{% endif %}
+          {% if lic.last_updated_by and lic.last_updated_date %}<span style="color:var(--text-faint);"> on </span>{% endif %}
+          {% if lic.last_updated_date %}{{ lic.last_updated_date|date:"j M Y" }}{% endif %}
+        {% else %}-{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty">No licenses yet. <a href="/admin/inventory/asset/add/">Add a license</a> (set Asset type to License).</div>
+{% endif %}
+{% endblock %}

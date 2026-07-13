@@ -1,0 +1,72 @@
+{% extends "inventory/base.html" %}
+{% block title %}Kits - Kit scheduler{% endblock %}
+{% block brand_sub %}{{ total_kits }} kit{{ total_kits|pluralize }}{% endblock %}
+{% block header_actions %}
+  <a class="btn btn-primary" href="/kits/new/">+ New kit</a>
+{% endblock %}
+{% block extra_style %}
+  .kit-card {
+    border: 1px solid var(--border); border-radius: 8px;
+    margin: 12px 24px; overflow: hidden; background: var(--surface);
+  }
+  .kit-head {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    background: var(--surface-2); border-bottom: 1px solid var(--border);
+  }
+  .kit-head .name { font-weight: 600; font-size: 14px; }
+  .kit-head .name a { color: var(--text); text-decoration: none; }
+  .kit-head .name a:hover { color: var(--accent); }
+  .kit-head .meta { font-size: 12px; color: var(--text-dim); margin-left: auto; font-family: var(--mono); }
+  .member-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 16px; font-size: 13px; border-top: 1px solid var(--border);
+  }
+  .member-row .mname { color: var(--text); min-width: 130px; }
+  .member-row .mmodel { color: var(--text-dim); flex: 1; }
+  .member-row .mnested { font-size: 11px; color: var(--text-faint); font-family: var(--mono); }
+  .empty-members { padding: 10px 16px; color: var(--text-faint); font-size: 12px; font-style: italic; }
+{% endblock %}
+{% block content %}
+<div class="filter-bar">
+  <form method="get" style="display:flex; gap:8px; align-items:center;">
+    <input class="filter" type="text" name="q" value="{{ query }}" placeholder="Search kits&hellip;" style="width:220px;">
+    <button class="btn" type="submit">Search</button>
+    {% if query %}<a class="btn" href="/kits/">Clear</a>{% endif %}
+  </form>
+</div>
+{% if rows %}
+  {% for row in rows %}
+  <div class="kit-card">
+    <div class="kit-head">
+      <span class="name">{{ row.kit.name }}</span>
+      {% if row.current_booking %}
+        <span class="badge badge-in_use">Booked - {{ row.current_booking.job.name }}</span>
+      {% else %}
+        <span class="badge badge-available">Free today</span>
+      {% endif %}
+      <span class="meta">
+        {{ row.members|length }} member{{ row.members|length|pluralize }}{% if row.nested_count %} &middot; {{ row.nested_count }} nested{% endif %}
+      </span>
+      <a class="btn" href="/kits/{{ row.kit.id }}/edit/" style="font-size:12px; padding:4px 10px;">Edit</a>
+    </div>
+    {% for member in row.members %}
+      <div class="member-row">
+        <span class="mname">{{ member.asset_id }}</span>
+        <span class="mmodel">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
+        {% if member.asset_type == "ENGINE" %}
+          <span class="mnested">{{ member.nested_assets.count }} component{{ member.nested_assets.count|pluralize }}</span>
+        {% endif %}
+        <span class="badge badge-{{ member.status|lower }}">{{ member.get_status_display }}</span>
+      </div>
+    {% empty %}
+      <div class="empty-members">No members added yet.</div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+{% else %}
+<div class="empty">
+  No kits{% if query %} match your search. <a href="/kits/">Clear search</a> or{% endif %}.
+  <a href="/kits/new/">Create your first kit</a>.
+</div>
+{% endif %}
+{% endblock %}

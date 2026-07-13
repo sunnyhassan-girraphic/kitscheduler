@@ -1,0 +1,641 @@
+{% extends "inventory/base.html" %}
+{% block title %}Timeline - Kit scheduler{% endblock %}
+{% block brand_sub %}{{ total_kits }} kit{{ total_kits|pluralize }}, {{ total_staff }} staff{% endblock %}
+
+{% block header_actions %}
+  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ prev_anchor|date:'Y-m-d' }}">&larr;</a>
+  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Today</a>
+  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ next_anchor|date:'Y-m-d' }}">&rarr;</a>
+  <span class="range-label">
+    {% if range_mode == "month" %}{{ days.0|date:"F Y" }}{% else %}{{ days.0|date:"j M" }} &ndash; {{ days|last|date:"j M" }}{% endif %}
+  </span>
+  <a class="btn btn-primary" href="/admin/inventory/job/add/">+ New job</a>
+{% endblock %}
+
+{% block extra_style %}
+  /* CSS Grid timeline -- one column per day, flexible width so all days
+     always fit without scrolling regardless of range (week=14, month=30+) */
+  .cal-grid {
+    display: grid;
+    grid-template-columns: 160px repeat({{ days|length }}, minmax(0, 1fr));
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    width: 100%;
+  }
+  .grid-wrap { width: 100%; }
+
+  /* Header row */
+  .gh {
+    background: var(--surface-2);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-dim);
+    padding: 6px 2px;
+    line-height: 1.3;
+    font-family: var(--mono);
+  }
+  .gh.namecol-header {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--text-faint);
+    position: sticky;
+    left: 0;
+    background: var(--surface-2);
+    z-index: 3;
+  }
+  .gh.today { color: var(--accent); font-weight: 700; box-shadow: inset 0 3px 0 0 var(--accent); }
+  .gh.weekend { background: #1a1408; }
+
+  /* Name column */
+  .gname {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 0 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 38px;
+    position: sticky;
+    left: 0;
+    z-index: 2;
+  }
+  .item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .item-name:hover { color: var(--accent); }
+  .item-meta { font-size: 11px; color: var(--text-faint); font-family: var(--mono); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Day cells */
+  .gc {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    min-height: 38px;
+    position: relative;
+    cursor: crosshair;
+  }
+  .gc.weekend { background: #1a1408; }
+  .gc.preview { background: var(--accent-glow); }
+
+  /* Row cells wrapper: position:relative so .block-layer can overlay it absolutely */
+  .grow-cells {
+    grid-column: 2 / -1;
+    display: grid;
+    grid-template-columns: repeat({{ days|length }}, minmax(0, 1fr));
+    border-bottom: 1px solid var(--border);
+    position: relative;
+}
+
+  /* Block overlay */
+  .block-layer {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat({{ days|length }}, minmax(0, 1fr));
+    grid-auto-rows: 30px;
+    align-content: start;
+    gap: 4px 0;
+    padding: 4px 0 8px;
+    pointer-events: none;
+  }
+  .gblock {
+    position: relative;
+    z-index: 2;
+    border-radius: 4px;
+    border-left: 3px solid currentColor;
+    font-size: 11px;
+    font-family: var(--mono);
+    display: flex;
+    align-items: center;
+    padding: 0 7px;
+    margin: 0 1px;
+    height: 24px;
+    overflow: hidden;
+    white-space: nowrap;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .gblock.continues-before { border-radius: 0 4px 4px 0; margin-left: 0; }
+  .gblock.continues-after  { border-radius: 4px 0 0 4px; margin-right: 0; }
+
+  /* Job detail dialog */
+  dialog#jobDetailDialog {
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border-strong); border-radius: 10px;
+    padding: 0; width: 400px; max-width: 92vw;
+  }
+  dialog#jobDetailDialog::backdrop { background: rgba(0,0,0,0.6); }
+  .jd-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
+  .jd-color-bar { width: 4px; border-radius: 2px; min-height: 36px; flex-shrink: 0; }
+  .jd-title { font-size: 15px; font-weight: 600; line-height: 1.3; }
+  .jd-category { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .jd-body { padding: 14px 20px; }
+  .jd-row { display: flex; gap: 12px; margin-bottom: 10px; font-size: 13px; }
+  .jd-label { color: var(--text-dim); font-size: 11px; min-width: 60px; padding-top: 1px; }
+  .jd-value { color: var(--text); }
+  .jd-actions { display: flex; gap: 8px; padding: 10px 20px 16px; border-top: 1px solid var(--border); }
+  .jd-actions .spacer { flex: 1; }
+
+  /* Tab switcher in booking dialog */
+  .tab-bar { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  .tab-btn { padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--text-dim); border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+{% endblock %}
+
+{% block content %}
+
+<div class="stats-bar">
+  <div class="stat"><div class="num">{{ kits_fully_free }} <span style="font-size:13px; color:var(--text-faint); font-weight:400;">/ {{ total_kits }}</span></div><div class="label">kits free all week</div></div>
+  <div class="stat"><div class="num">{{ kits_partially_free }} <span style="font-size:13px; color:var(--text-faint); font-weight:400;">/ {{ total_kits }}</span></div><div class="label">kits free at least 1 day</div></div>
+  <div class="stat"><div class="num">{{ staff_fully_free }} <span style="font-size:13px; color:var(--text-faint); font-weight:400;">/ {{ total_staff }}</span></div><div class="label">staff free all week</div></div>
+  <div class="stat"><div class="num">{{ staff_partially_free }} <span style="font-size:13px; color:var(--text-faint); font-weight:400;">/ {{ total_staff }}</span></div><div class="label">staff free at least 1 day</div></div>
+</div>
+
+<div class="filter-bar">
+  <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em;">Range</span>
+  <a class="btn {% if range_mode == 'week' %}btn-active{% endif %}" href="?range=week&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Week</a>
+  <a class="btn {% if range_mode == 'month' %}btn-active{% endif %}" href="?range=month&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Month</a>
+  <span style="width:1px; height:16px; background:var(--border); margin:0 4px;"></span>
+  <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em;">Show</span>
+  <a class="btn {% if show_kits %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'0,1' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Kits</a>
+  <a class="btn {% if show_staff %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'0,1' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Staff</a>
+  <a class="btn {% if show_licenses %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'0,1' }}&start={{ anchor|date:'Y-m-d' }}">Licenses</a>
+  <span style="margin-left:auto; font-size:11px; color:var(--text-faint);">Drag across a row to pick a date range &middot; click a block to see details</span>
+</div>
+
+{% if show_kits %}
+<div class="section-label">Kits</div>
+{% if kit_rows %}
+<div class="grid-wrap">
+<div class="cal-grid resizable-grid" data-resize-key="timeline-kits">
+  <div class="gh namecol-header">Kit</div>
+  {% for d in days %}
+    <div class="gh {% if d == today %}today{% endif %} {% if d.weekday >= 5 %}weekend{% endif %}">
+      {% if range_mode == "month" %}{{ d|date:"j" }}{% else %}{{ d|date:"D" }}<br>{{ d|date:"j" }}{% endif %}
+    </div>
+  {% endfor %}
+
+  {% for row in kit_rows %}
+    <div class="gname">
+      <span class="item-name">{{ row.item.name }}</span>
+      <span class="item-meta">{{ row.item.assets.count }} member{{ row.item.assets.count|pluralize }}</span>
+    </div>
+    <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
+      {% for cell in row.cells %}
+        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %}"
+             data-kind="kit"
+             data-item-id="{{ row.item.id }}"
+             data-item-name="{{ row.item.name }}"
+             data-date="{{ cell.date|date:'Y-m-d' }}">
+        </div>
+      {% endfor %}
+      <div class="block-layer">
+        {% for span in row.spans %}
+          <div class="gblock {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
+               style="grid-column: {{ span.grid_col_start }} / {{ span.grid_col_end }};
+                      grid-row: {{ span.grid_row }};
+                      background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
+               data-job-id="{{ span.booking.job.id }}"
+               onclick="openJobDetail({{ span.booking.job.id }});">
+            {{ span.booking.job.name }}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+</div>
+{% else %}
+<div class="empty">No kits yet. <a href="/kits/new/">Create your first kit</a>.</div>
+{% endif %}
+{% endif %}{# end show_kits #}
+
+{% if show_staff %}
+<div class="section-label">Staff</div>
+{% if staff_rows %}
+<div class="grid-wrap">
+<div class="cal-grid resizable-grid" data-resize-key="timeline-staff">
+  <div class="gh namecol-header">Person</div>
+  {% for d in days %}
+    <div class="gh {% if d == today %}today{% endif %} {% if d.weekday >= 5 %}weekend{% endif %}">
+      {% if range_mode == "month" %}{{ d|date:"j" }}{% else %}{{ d|date:"D" }}<br>{{ d|date:"j" }}{% endif %}
+    </div>
+  {% endfor %}
+
+  {% for row in staff_rows %}
+    <div class="gname">
+      <span class="item-name">{{ row.item.name }}</span>
+    </div>
+    <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
+      {% for cell in row.cells %}
+        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %}"
+             data-kind="staff"
+             data-item-id="{{ row.item.id }}"
+             data-item-name="{{ row.item.name }}"
+             data-date="{{ cell.date|date:'Y-m-d' }}">
+        </div>
+      {% endfor %}
+      <div class="block-layer">
+        {% for span in row.spans %}
+          <div class="gblock {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
+               style="grid-column: {{ span.grid_col_start }} / {{ span.grid_col_end }};
+                      grid-row: {{ span.grid_row }};
+                      background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
+               data-job-id="{{ span.booking.job.id }}"
+               onclick="openJobDetail({{ span.booking.job.id }});">
+            {{ span.booking.job.name }}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+</div>
+{% else %}
+<div class="empty">No staff yet. <a href="/admin/inventory/staffmember/add/">Add your first team member</a>.</div>
+{% endif %}
+{% endif %}{# end show_staff #}
+
+{% if show_licenses %}
+<div class="section-label">Licenses</div>
+{% if license_rows %}
+<div class="grid-wrap">
+<div class="cal-grid resizable-grid" data-resize-key="timeline-licenses">
+  <div class="gh namecol-header">License</div>
+  {% for d in days %}
+    <div class="gh {% if d == today %}today{% endif %} {% if d.weekday >= 5 %}weekend{% endif %}">
+      {% if range_mode == "month" %}{{ d|date:"j" }}{% else %}{{ d|date:"D" }}<br>{{ d|date:"j" }}{% endif %}
+    </div>
+  {% endfor %}
+
+  {% for row in license_rows %}
+    <div class="gname">
+      <a class="item-name" href="/admin/inventory/asset/{{ row.item.id }}/change/">{{ row.item.asset_id }}</a>
+      {% if row.item.serial %}<div class="item-meta">{{ row.item.serial }}</div>{% endif %}
+    </div>
+    <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
+      {% for cell in row.cells %}
+        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %}"
+             data-kind="license"
+             data-item-id="{{ row.item.id }}"
+             data-item-name="{{ row.item.asset_id }}"
+             data-functionalities="{% for tag in row.item.func_tags %}{{ tag }}{% if not forloop.last %},{% endif %}{% endfor %}"
+             data-date="{{ cell.date|date:'Y-m-d' }}">
+        </div>
+      {% endfor %}
+      <div class="block-layer">
+        {% for span in row.spans %}
+          <div class="gblock {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
+               style="grid-column: {{ span.grid_col_start }} / {{ span.grid_col_end }};
+                      grid-row: {{ span.grid_row }};
+                      background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
+               data-job-id="{{ span.booking.job.id }}"
+               onclick="openJobDetail({{ span.booking.job.id }});">
+            <span style="font-weight:600;">{{ span.booking.job.name }}</span>
+            {% if span.booking.functionalities %}
+              <span style="opacity:0.85; margin-left:5px; font-size:10px;">{{ span.booking.functionalities }}</span>
+            {% endif %}
+            {% with kits=span.booking.asset.kits.all %}
+              {% if kits %}
+                <span style="opacity:0.75; margin-left:5px; font-size:10px;">&middot; {% for k in kits %}{{ k.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+              {% endif %}
+            {% endwith %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+</div>
+{% else %}
+<div class="empty">No licenses yet. <a href="/admin/inventory/asset/add/">Add a license</a> (set Asset type to License).</div>
+{% endif %}
+{% endif %}{# end show_licenses #}
+
+<!-- Job Detail Dialog -->
+<dialog id="jobDetailDialog">
+  <div class="jd-header">
+    <div class="jd-color-bar" id="jdColorBar"></div>
+    <div>
+      <div class="jd-title" id="jdTitle"></div>
+      <div class="jd-category" id="jdCategory"></div>
+    </div>
+  </div>
+  <div class="jd-body">
+    <div class="jd-row"><span class="jd-label">Dates</span><span class="jd-value" id="jdDates"></span></div>
+    <div class="jd-row" id="jdKitsRow" style="display:none;"><span class="jd-label">Kits</span><span class="jd-value" id="jdKits"></span></div>
+    <div class="jd-row" id="jdStaffRow" style="display:none;"><span class="jd-label">Staff</span><span class="jd-value" id="jdStaff"></span></div>
+    <div class="jd-row" id="jdNotesRow" style="display:none;"><span class="jd-label">Notes</span><span class="jd-value" id="jdNotes"></span></div>
+  </div>
+  <div class="jd-actions">
+    <button class="btn" onclick="document.getElementById('jobDetailDialog').close()">Close</button>
+    <span class="spacer"></span>
+    <a class="btn" id="jdEditLink" href="#">Edit job</a>
+    <button class="btn" id="jdCloneBtn" onclick="cloneJob()">Clone</button>
+    <button class="btn" id="jdDeleteBtn" style="color:var(--red);" onclick="deleteJob()">Delete</button>
+  </div>
+</dialog>
+
+<!-- Booking Dialog -->
+<dialog id="bookingDialog">
+  <h3 id="dialogTitle">New booking</h3>
+  <form id="bookingForm">
+    {% csrf_token %}
+    <input type="hidden" id="f_kind" name="kind">
+    <input type="hidden" id="f_item_id" name="item_id">
+
+    <div class="tab-bar">
+      <button type="button" class="tab-btn active" onclick="switchJobTab('existing')">Existing job</button>
+      <button type="button" class="tab-btn" onclick="switchJobTab('new')">New job</button>
+    </div>
+
+    <div class="tab-pane active" id="tab-existing">
+      <label for="f_job">Job</label>
+      <select id="f_job" name="job_id">
+        <option value="">Select a job...</option>
+        {% for job in jobs %}
+          <option value="{{ job.id }}">{{ job.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="tab-pane" id="tab-new">
+      <label for="f_new_name">Job name</label>
+      <input type="text" id="f_new_name" name="new_job_name">
+      <label for="f_new_cat">Category</label>
+      <select id="f_new_cat" name="new_job_category">
+        {% for value, label in job_categories %}
+          <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+      <label for="f_new_notes">Notes (optional)</label>
+      <input type="text" id="f_new_notes" name="new_job_notes">
+      <div class="color-override-row">
+        <input class="color-swatch-input" type="color" id="f_new_color" name="new_job_color" value="#EAB308" disabled>
+        <label class="color-override-label" for="f_new_color_override">
+          <input type="checkbox" id="f_new_color_override" name="color_override"
+                 onchange="document.getElementById('f_new_color').disabled = !this.checked">
+          Custom color
+        </label>
+      </div>
+    </div>
+
+    <label for="f_start">Start date</label>
+    <input type="date" id="f_start" name="start_date" required>
+    <label for="f_end">End date</label>
+    <input type="date" id="f_end" name="end_date" required>
+
+    <div id="f_functionalities_section" style="display:none;">
+      <label style="margin-top:10px; display:block; font-size:12px; color:var(--text-dim);">Functionalities being used</label>
+      <div id="f_functionalities_list" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;"></div>
+      <div class="dialog-hint">Tick the capabilities in use. The whole license is blocked regardless.</div>
+    </div>
+
+    <div class="dialog-error" id="dialogError"></div>
+    <div class="dialog-hint" id="dialogHint" style="display:none;">
+      Staff bookings aren't blocked on overlap - if this person is already booked on another job in this window, both will show as separate blocks.
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn" onclick="closeBookingDialog()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="submitBooking()">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const dialog = document.getElementById("bookingDialog");
+const jobDetailDialog = document.getElementById("jobDetailDialog");
+let activeKind = "kit";
+let activeJobId = null;
+let currentBookingId = null;
+
+const ENDPOINTS = {
+  kit:     { create: "/api/bookings/create/",         idField: "kit_id" },
+  staff:   { create: "/api/staff-bookings/create/",   idField: "staff_id" },
+  license: { create: "/api/license-bookings/create/", idField: "asset_id" },
+};
+
+function switchJobTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach((b, i) => {
+    b.classList.toggle("active", (i === 0) === (tab === "existing"));
+  });
+  document.getElementById("tab-existing").classList.toggle("active", tab === "existing");
+  document.getElementById("tab-new").classList.toggle("active", tab === "new");
+}
+
+function openDialogForRange(kind, itemId, itemName, startDate, endDate, functionalities) {
+  activeKind = kind;
+  document.getElementById("dialogTitle").textContent = `Book ${itemName}`;
+  document.getElementById("f_kind").value = kind;
+  document.getElementById("f_item_id").value = itemId;
+  document.getElementById("f_start").value = startDate;
+  document.getElementById("f_end").value = endDate;
+  document.getElementById("f_job").value = "";
+  document.getElementById("f_new_name").value = "";
+  document.getElementById("f_new_notes").value = "";
+  document.getElementById("f_new_color_override").checked = false;
+  document.getElementById("f_new_color").disabled = true;
+  document.getElementById("f_new_color").value = "#EAB308";
+  document.getElementById("dialogError").style.display = "none";
+  document.getElementById("dialogHint").style.display = kind === "staff" ? "block" : "none";
+
+  const funcSection = document.getElementById("f_functionalities_section");
+  const funcList = document.getElementById("f_functionalities_list");
+  funcList.innerHTML = "";
+  if (kind === "license" && functionalities && functionalities.length) {
+    functionalities.forEach(tag => {
+      if (!tag.trim()) return;
+      const label = document.createElement("label");
+      label.style.cssText = "display:inline-flex; align-items:center; gap:4px; font-size:11px; cursor:pointer; padding:3px 8px; border:1px solid var(--border-strong); border-radius:999px; background:var(--surface-2); white-space:nowrap; user-select:none;";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = tag.trim();
+      cb.style.cssText = "width:10px; height:10px; margin:0; accent-color:var(--accent); cursor:pointer; flex-shrink:0;";
+      cb.addEventListener("change", () => {
+        label.style.background = cb.checked ? "var(--accent-glow)" : "var(--surface-2)";
+        label.style.borderColor = cb.checked ? "var(--accent-deep)" : "var(--border-strong)";
+        label.style.color = cb.checked ? "var(--accent)" : "";
+      });
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(" " + tag.trim()));
+      funcList.appendChild(label);
+    });
+    funcSection.style.display = "block";
+  } else {
+    funcSection.style.display = "none";
+  }
+
+  switchJobTab("existing");
+  dialog.showModal();
+}
+
+function closeBookingDialog() {
+  dialog.close();
+}
+
+async function submitBooking() {
+  const kind = document.getElementById("f_kind").value;
+  const itemId = document.getElementById("f_item_id").value;
+  const startDate = document.getElementById("f_start").value;
+  const endDate = document.getElementById("f_end").value;
+  const jobId = document.getElementById("f_job").value;
+  const newJobName = document.getElementById("f_new_name").value.trim();
+  const newJobCategory = document.getElementById("f_new_cat").value;
+  const newJobNotes = document.getElementById("f_new_notes").value.trim();
+  const colorOverride = document.getElementById("f_new_color_override").checked;
+  const newJobColor = colorOverride ? document.getElementById("f_new_color").value : "";
+
+  const errorEl = document.getElementById("dialogError");
+  errorEl.style.display = "none";
+
+  const idField = ENDPOINTS[kind]?.idField ?? "kit_id";
+  const endpoint = ENDPOINTS[kind]?.create ?? "/api/bookings/create/";
+  const params = { [idField]: itemId, start_date: startDate, end_date: endDate };
+
+  if (kind === "license") {
+    const checked = Array.from(
+      document.querySelectorAll("#f_functionalities_list input[type='checkbox']:checked")
+    ).map(cb => cb.value);
+    if (checked.length) params.functionalities = checked.join(", ");
+  }
+
+  if (jobId) {
+    params.job_id = jobId;
+  } else {
+    if (!newJobName) { errorEl.textContent = "Enter a job name."; errorEl.style.display = "block"; return; }
+    params.new_job_name = newJobName;
+    params.new_job_category = newJobCategory;
+    if (newJobNotes) params.new_job_notes = newJobNotes;
+    if (newJobColor) params.new_job_color = newJobColor;
+  }
+
+  const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  const body = new URLSearchParams(params);
+
+  try {
+    const resp = await fetch(endpoint, {
+      method: "POST", headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { errorEl.textContent = data.error || "Something went wrong."; errorEl.style.display = "block"; return; }
+    dialog.close();
+    location.reload();
+  } catch (err) {
+    errorEl.textContent = "Network error. Please try again."; errorEl.style.display = "block";
+  }
+}
+
+async function openJobDetail(jobId) {
+  activeJobId = jobId;
+  try {
+    const resp = await fetch(`/api/jobs/${jobId}/`);
+    const job = await resp.json();
+    document.getElementById("jdTitle").textContent = job.name;
+    document.getElementById("jdCategory").textContent = job.category_display;
+    document.getElementById("jdColorBar").style.background = job.color;
+    const start = new Date(job.start_date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const end = new Date(job.end_date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    document.getElementById("jdDates").textContent = start === end ? start : `${start} - ${end}`;
+    if (job.kits.length) { document.getElementById("jdKits").textContent = job.kits.join(", "); document.getElementById("jdKitsRow").style.display = "flex"; }
+    else document.getElementById("jdKitsRow").style.display = "none";
+    if (job.staff.length) { document.getElementById("jdStaff").textContent = job.staff.join(", "); document.getElementById("jdStaffRow").style.display = "flex"; }
+    else document.getElementById("jdStaffRow").style.display = "none";
+    if (job.notes) { document.getElementById("jdNotes").textContent = job.notes; document.getElementById("jdNotesRow").style.display = "flex"; }
+    else document.getElementById("jdNotesRow").style.display = "none";
+    document.getElementById("jdEditLink").href = `/admin/inventory/job/${jobId}/change/`;
+    jobDetailDialog.showModal();
+  } catch(e) { console.error(e); }
+}
+
+async function deleteJob() {
+  if (!activeJobId || !confirm("Delete this job and all its bookings?")) return;
+  const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  await fetch(`/api/jobs/${activeJobId}/delete/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
+  jobDetailDialog.close();
+  location.reload();
+}
+
+async function cloneJob() {
+  if (!activeJobId) return;
+  const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  const resp = await fetch(`/api/jobs/${activeJobId}/clone/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
+  const data = await resp.json();
+  if (data.ok) { jobDetailDialog.close(); location.reload(); }
+}
+
+// Drag-to-book
+(function setupDrag() {
+  let dragState = null;
+
+  function clearPreview(rowEl) {
+    if (!rowEl) return;
+    rowEl.querySelectorAll(".gc.preview").forEach(c => c.classList.remove("preview"));
+  }
+
+  function applyPreview(rowEl, startIdx, endIdx) {
+    clearPreview(rowEl);
+    const cells = rowEl.querySelectorAll(".gc");
+    const lo = Math.min(startIdx, endIdx), hi = Math.max(startIdx, endIdx);
+    cells.forEach((c, i) => { if (i >= lo && i <= hi) c.classList.add("preview"); });
+  }
+
+  document.addEventListener("mousedown", (e) => {
+    const cell = e.target.closest(".gc");
+    if (!cell || e.button !== 0) return;
+    const rowEl = cell.closest(".grow-cells");
+    if (!rowEl) return;
+    const cells = Array.from(rowEl.querySelectorAll(".gc"));
+    const idx = cells.indexOf(cell);
+    dragState = {
+      kind: cell.dataset.kind, itemId: cell.dataset.itemId, itemName: cell.dataset.itemName,
+      functionalities: cell.dataset.functionalities || "",
+      startCell: cell, startIdx: idx, endIdx: idx, rowEl,
+    };
+    applyPreview(rowEl, idx, idx);
+    e.preventDefault();
+  });
+
+  document.addEventListener("mousemove", (e) => {
+    if (!dragState) return;
+    const cell = e.target.closest(".gc");
+    if (!cell) return;
+    const rowEl = cell.closest(".grow-cells");
+    if (rowEl !== dragState.rowEl) return;
+    const cells = Array.from(rowEl.querySelectorAll(".gc"));
+    const idx = cells.indexOf(cell);
+    if (idx !== dragState.endIdx) { dragState.endIdx = idx; applyPreview(rowEl, dragState.startIdx, idx); }
+  });
+
+  document.addEventListener("mouseup", (e) => {
+    if (!dragState) return;
+    const { kind, itemId, itemName, functionalities, startCell, startIdx, endIdx, rowEl } = dragState;
+    const cells = Array.from(rowEl.querySelectorAll(".gc"));
+    const endCell = cells[endIdx];
+    clearPreview(rowEl);
+    dragState = null;
+    if (e.target.closest(".gblock")) return;
+    const lo = startCell.dataset.date <= (endCell || startCell).dataset.date ? startCell.dataset.date : (endCell || startCell).dataset.date;
+    const hi = startCell.dataset.date <= (endCell || startCell).dataset.date ? (endCell || startCell).dataset.date : startCell.dataset.date;
+    const funcList = functionalities ? functionalities.split(",").map(s => s.trim()).filter(Boolean) : [];
+    openDialogForRange(kind, itemId, itemName, lo, hi, funcList);
+  });
+
+  document.addEventListener("mouseleave", () => {
+    if (dragState) clearPreview(dragState.rowEl);
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "inventory/base.html" %}
+{% block title %}Engines - Kit scheduler{% endblock %}
+{% block brand_sub %}{{ engines|length }} engine{{ engines|length|pluralize }}{% endblock %}
+{% block header_actions %}
+  <a class="btn btn-primary" href="/engines/new/">+ Add engine</a>
+{% endblock %}
+{% block extra_style %}
+  .engine-card { border: 1px solid var(--border); border-radius: 8px; margin: 12px 24px; overflow: hidden; background: var(--surface); }
+  .engine-head { display:flex; align-items:center; gap:10px; padding:12px 16px; background:var(--surface-2); border-bottom:1px solid var(--border); }
+  .engine-head .eid { font-family:var(--mono); font-weight:600; font-size:13px; }
+  .engine-head .emodel { font-size:12px; color:var(--text-dim); }
+  .engine-head .meta { margin-left:auto; font-size:12px; color:var(--text-dim); font-family:var(--mono); display:flex; gap:12px; align-items:center; }
+  .edit-btn { font-size:12px; padding:3px 10px; }
+  .comp-row { display:flex; align-items:center; gap:10px; padding:7px 16px; font-size:12px; border-top:1px solid var(--border); }
+  .comp-row .cid { font-family:var(--mono); min-width:130px; color:var(--text); }
+  .comp-row .ctype { color:var(--text-dim); flex:1; }
+  .comp-row .cserial { font-family:var(--mono); font-size:11px; color:var(--text-faint); }
+  .cmodel { font-size:12px; color:var(--text-dim); }
+  .no-comp { padding:8px 16px; color:var(--text-faint); font-size:12px; font-style:italic; }
+{% endblock %}
+{% block content %}
+<div class="filter-bar">
+  <form method="get" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    {% if engine_models %}
+    <select class="filter" name="make_model" onchange="this.form.submit()">
+      <option value="">All types</option>
+      {% for m in engine_models %}
+        <option value="{{ m }}" {% if selected_make_model == m %}selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+    <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+      <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %} onchange="this.form.submit()"> Show archived
+    </label>
+  </form>
+</div>
+{% for engine in engines %}
+<div class="engine-card">
+  <div class="engine-head">
+    <span class="eid">{{ engine.asset_id }}</span>
+    {% if engine.make_model %}<span class="emodel">{{ engine.make_model }}</span>{% endif %}
+    <span class="badge badge-{{ engine.status|lower }}">{{ engine.get_status_display }}</span>
+    {% if engine.archived %}<span class="badge badge-archived">Archived</span>{% endif %}
+    <span class="meta">
+      {% if engine.serial %}<span>S/N {{ engine.serial }}</span>{% endif %}
+      <span>{{ engine.nested_assets.count }} component{{ engine.nested_assets.count|pluralize }}</span>
+      {% with k=engine.kits.all %}
+        {% if k %}<span>in {% for kit in k %}{{ kit.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+      {% endwith %}
+      {% if engine.last_updated_by or engine.last_updated_date %}
+        <span>Last updated{% if engine.last_updated_by %} by {{ engine.last_updated_by.name }}{% endif %}{% if engine.last_updated_date %} on {{ engine.last_updated_date|date:"j M Y" }}{% endif %}</span>
+      {% endif %}
+      <a class="btn edit-btn" href="/engines/{{ engine.id }}/edit/">Edit</a>
+    </span>
+  </div>
+  {% for comp in engine.nested_assets.all %}
+    <div class="comp-row">
+      <span class="cid">{{ comp.asset_id }}</span>
+      <span class="ctype">{{ comp.get_asset_type_display }}</span>
+      {% if comp.make_model %}<span class="cmodel">{{ comp.make_model }}</span>{% endif %}
+      {% if comp.serial %}<span class="cserial">{{ comp.serial }}</span>{% endif %}
+      <span class="badge badge-{{ comp.status|lower }}">{{ comp.get_status_display }}</span>
+    </div>
+  {% empty %}
+    <div class="no-comp">No components configured for this engine yet.</div>
+  {% endfor %}
+</div>
+{% empty %}
+<div class="empty">No engines yet. <a href="/engines/new/">Add your first engine</a>.</div>
+{% endfor %}
+{% endblock %}

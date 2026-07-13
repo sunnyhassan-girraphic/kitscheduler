@@ -1,0 +1,38 @@
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("", views.dashboard_view, name="dashboard"),
+    path("timeline/", views.timeline_view, name="timeline"),
+    path("calendar/", views.calendar_view, name="calendar"),
+    path("assets/", views.asset_list_view, name="asset_list"),
+    path("engines/", views.engine_list_view, name="engine_list"),
+    path("engines/new/", views.engine_create_view, name="engine_create"),
+    path("engines/<int:engine_id>/edit/", views.engine_edit_view, name="engine_edit"),
+    path("engines/<int:engine_id>/delete/", views.engine_delete_view, name="engine_delete"),
+    path("kits/", views.kit_list_view, name="kit_list"),
+    path("kits/new/", views.kit_create_view, name="kit_create"),
+    path("kits/<int:kit_id>/edit/", views.kit_edit_view, name="kit_edit"),
+    path("kits/<int:kit_id>/delete/", views.kit_delete_view, name="kit_delete"),
+    path("licenses/", views.license_list_view, name="license_list"),
+    path("settings/", views.settings_view, name="settings"),
+    path("settings/export/", views.export_csv_view, name="export_csv"),
+    path("api/kits/<int:kit_id>/", views.kit_detail_api, name="kit_detail_api"),
+    path("api/jobs/<int:job_id>/", views.job_detail_api, name="job_detail_api"),
+    path("api/jobs/<int:job_id>/delete/", views.delete_job, name="delete_job"),
+    path("api/jobs/<int:job_id>/clone/", views.clone_job, name="clone_job"),
+    path("api/bookings/create/", views.create_booking, name="create_booking"),
+    path("api/bookings/<int:booking_id>/delete/", views.delete_booking, name="delete_booking"),
+    path("api/staff-bookings/create/", views.create_staff_booking, name="create_staff_booking"),
+    path(
+        "api/staff-bookings/<int:booking_id>/delete/",
+        views.delete_staff_booking,
+        name="delete_staff_booking",
+    ),
+    path("api/license-bookings/create/", views.create_license_booking, name="create_license_booking"),
+    path(
+        "api/license-bookings/<int:booking_id>/delete/",
+        views.delete_license_booking,
+        name="delete_license_booking",
+    ),
+]

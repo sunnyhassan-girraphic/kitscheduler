@@ -1,0 +1,85 @@
+{% extends "inventory/base.html" %}
+{% load inventory_extras %}
+{% block title %}Inventory - Kit scheduler{% endblock %}
+{% block brand_sub %}{{ total_active }} asset{{ total_active|pluralize }} tracked{% endblock %}
+{% block header_actions %}
+  <a class="btn btn-primary" href="/admin/inventory/asset/add/">+ Add asset</a>
+{% endblock %}
+{% block extra_style %}
+  .filter-bar form { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+{% endblock %}
+{% block content %}
+<div class="filter-bar">
+  <form method="get">
+    <input class="filter" type="text" name="q" value="{{ query }}" placeholder="Search ID, model, serial..." style="width:200px;">
+    <select class="filter" name="type">
+      <option value="">All types</option>
+      {% for value, label in asset_types %}
+        <option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>{{ label }} ({{ type_counts|get_item:value|default:0 }})</option>
+      {% endfor %}
+    </select>
+    <select class="filter" name="status">
+      <option value="">All statuses</option>
+      {% for value, label in statuses %}
+        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
+      <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %}> Show archived
+    </label>
+    <button class="btn" type="submit">Filter</button>
+    {% if query or selected_type or selected_status or show_archived %}
+      <a class="btn" href="/assets/">Clear</a>
+    {% endif %}
+  </form>
+</div>
+<div style="overflow-x:auto;">
+<table class="list">
+  <thead>
+    <tr>
+      <th>Asset ID</th>
+      <th>Type</th>
+      <th>Make / Model</th>
+      <th>Serial</th>
+      <th>Qty</th>
+      <th>Status</th>
+      <th>In kits</th>
+      <th>Last updated</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for asset in assets %}
+    <tr class="{% if asset.is_nested %}nested{% endif %}">
+      <td style="white-space:nowrap;">
+        <a href="/admin/inventory/asset/{{ asset.id }}/change/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
+        {% if asset.is_nested %}<span style="color:var(--text-faint);"> (in {{ asset.parent_engine.asset_id }})</span>{% endif %}
+        {% if asset.archived %}<span class="badge badge-archived" style="margin-left:6px;">Archived</span>{% endif %}
+      </td>
+      <td><span class="badge badge-type">{{ asset.get_asset_type_display }}</span></td>
+      <td style="color:var(--text-dim);">
+        {{ asset.make_model|default:"-" }}
+        {% if asset.asset_type == "LICENSE" and asset.license_functionality %}
+          <div style="font-size:11px; color:var(--text-faint);">{{ asset.license_functionality }}</div>
+        {% endif %}
+      </td>
+      <td style="color:var(--text-dim); font-family:monospace; font-size:12px;">{{ asset.serial|default:"-" }}</td>
+      <td>{{ asset.qty }}</td>
+      <td><span class="badge badge-{{ asset.status|lower }}">{{ asset.get_status_display }}</span></td>
+      <td style="color:var(--text-dim); font-size:12px;">
+        {% for kit in asset.kits.all %}{{ kit.name }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}
+      </td>
+      <td style="color:var(--text-dim); font-size:12px; white-space:nowrap;">
+        {% if asset.last_updated_by or asset.last_updated_date %}
+          {% if asset.last_updated_by %}{{ asset.last_updated_by.name }}{% endif %}
+          {% if asset.last_updated_by and asset.last_updated_date %}<span style="color:var(--text-faint);"> on </span>{% endif %}
+          {% if asset.last_updated_date %}{{ asset.last_updated_date|date:"j M Y" }}{% endif %}
+        {% else %}-{% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="8"><div class="empty">No assets match. <a href="/assets/">Clear filters</a> or <a href="/admin/inventory/asset/add/">add your first asset</a>.</div></td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

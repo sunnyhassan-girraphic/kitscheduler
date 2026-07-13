@@ -1,0 +1,674 @@
+{% extends "inventory/base.html" %}
+
+{% block title %}Calendar - Kit scheduler{% endblock %}
+{% block brand_sub %}{{ total_kits }} kit{{ total_kits|pluralize }}, {{ total_staff }} staff{% endblock %}
+
+{% block header_actions %}
+  <a class="btn" href="?range={{ range_mode }}&start={{ prev_anchor|date:'Y-m-d' }}" title="Back one week">&larr;</a>
+  <a class="btn" href="?range={{ range_mode }}">Today</a>
+  <a class="btn" href="?range={{ range_mode }}&start={{ next_anchor|date:'Y-m-d' }}" title="Forward one week">&rarr;</a>
+  <span class="range-label">
+    {% if range_mode == "month" %}{{ days.0|date:"F Y" }}{% else %}{{ days.0|date:"j M" }} &ndash; {{ days|last|date:"j M" }}{% endif %}
+  </span>
+  <a class="btn btn-primary" href="/admin/inventory/job/add/">+ New job</a>
+{% endblock %}
+
+{% block extra_style %}
+  /* One real CSS Grid per section (Kits / Staff): a name column plus one
+     column per visible day, a header row, then one row per item. Each
+     item's row height is intrinsic -- driven entirely by how many
+     overlapping bookings it actually has -- so there's never a second
+     "overlay" row, never a visible seam, and never wasted empty space
+     under a row with nothing booked. This replaced an earlier
+     two-<tr>-per-item table design that kept producing exactly those
+     problems. */
+  .cal-grid {
+    display: grid;
+    grid-template-columns: 160px repeat({{ days|length }}, minmax(0, 1fr));
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    width: 100%;
+  }
+  .grid-wrap { width: 100%; }
+
+  .gh, .gname {
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .gh {
+    background: var(--surface);
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 12px;
+    padding: 8px 4px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .gh.namecol-header {
+    text-align: left;
+    padding: 10px 12px;
+    position: sticky;
+    left: 0;
+    z-index: 3;
+  }
+  .gh.weekend { background: #1a1408; }
+  .gh.today { box-shadow: inset 0 4px 0 0 var(--accent); color: var(--accent); font-weight: 700; padding-top: 12px; }
+
+  .gname {
+    background: var(--surface);
+    padding: 10px 12px;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Each item's row of day cells is itself a nested grid, so the
+     booking-block layer can be placed by real grid-column/grid-row
+     instead of pixel/percentage math, and the row's height grows to fit
+     however many lanes are in use automatically. */
+  /* .grow-cells is the real row container: a grid of day cells, sized
+     entirely by ITS OWN content (the tallest .gc, which is min-height
+     38px, OR the block-layer below if more lanes are needed). It does
+     NOT declare a fixed/fractional row height -- that was the actual
+     bug: an earlier version set grid-template-rows: 1fr, which made the
+     .gc cells and the overlaid .block-layer compute their effective
+     heights independently and drift apart (the symptom: blocks floating
+     in a visibly different box than the cell grid/hover highlight).
+     position: relative here makes this the anchor for .block-layer,
+     which is now position:absolute and fills this exact box via inset:0
+     -- a guaranteed pixel-for-pixel match, not two grids coordinating
+     through shared row lines. */
+  .grow-cells {
+    grid-column: 2 / -1;
+    display: grid;
+    grid-template-columns: repeat({{ days|length }}, minmax(0, 1fr));
+    position: relative;
+  }
+  .gc {
+    position: relative;
+    min-height: 38px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .gc:hover { background: #1e1e1e; }
+  .gc.drag-preview { background: var(--accent-glow); box-shadow: inset 0 0 0 1px var(--accent); }
+  .gc.weekend { background: #1a1408; }
+  /* Deliberately no .gc.today border: today is marked once, on the
+     header cell only (.gh.today below), not repeated down every row --
+     see the redesign earlier in this project, which replaced a heavy
+     border-on-every-cell treatment with this single header bar. */
+
+  /* The booking-block layer: absolutely positioned to fill .grow-cells'
+     exact box (inset: 0), so it can NEVER be a different height than the
+     row it's drawn over -- there is only one box, not two coordinating
+     ones. Its own content (one or more lanes of .gblock) still pushes
+     .grow-cells taller via min-height below, so a row with 2 overlapping
+     bookings is still genuinely, automatically taller. */
+  .block-layer {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat({{ days|length }}, minmax(0, 1fr));
+    grid-auto-rows: 30px;
+    align-content: start;
+    gap: 2px 0;
+    padding: 3px 0;
+    pointer-events: none; /* clicks fall through to the .gc cells
+                              underneath, except on .gblock itself */
+  }
+  .gblock {
+    position: relative;
+    z-index: 2;
+    border-radius: 4px;
+    border-left: 2px solid currentColor;
+    font-size: 11px;
+    font-family: var(--mono);
+    display: flex;
+    align-items: center;
+    padding: 0 7px;
+    margin: 0 1px;
+    overflow: hidden;
+    white-space: nowrap;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .gblock:hover { filter: brightness(1.3); }
+  .gblock.continues-before { border-left-style: dotted; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+  .gblock.continues-after { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .gblock.staff { border-left-style: dashed; }
+  .gblock.staff.continues-before { border-left-style: dotted; }
+
+  .item-name { color: var(--text); text-decoration: none; font-weight: 500; }
+  .item-name:hover { color: var(--accent); }
+  .item-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; font-family: var(--mono); }
+
+  /* Richer job detail popup */
+  dialog#jobDetailDialog {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 0;
+    width: 480px;
+    max-width: 92vw;
+  }
+  dialog#jobDetailDialog::backdrop { background: rgba(0,0,0,0.6); }
+  .jd-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .jd-color-dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .jd-title { font-size: 17px; font-weight: 600; line-height: 1.3; }
+  .jd-close { margin-left: auto; background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 18px; line-height: 1; padding: 4px; }
+  .jd-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .jd-row { display: flex; gap: 10px; }
+  .jd-field { flex: 1; }
+  .jd-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
+  .jd-value { font-size: 13px; }
+  .jd-notes { font-size: 13px; color: var(--text-dim); line-height: 1.6; white-space: pre-wrap; }
+  .jd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .jd-chip { font-size: 11px; padding: 4px 9px; border-radius: 999px; background: var(--surface-2); color: var(--text-dim); font-family: var(--mono); }
+  .jd-footer { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-top: 1px solid var(--border); }
+{% endblock %}
+
+{% block content %}
+
+<div class="stats-bar">
+  <div class="stat">
+    <div class="num">{{ kits_fully_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_kits }}</span></div>
+    <div class="label">kits free all week</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ kits_partially_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_kits }}</span></div>
+    <div class="label">kits free at least 1 day</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ staff_fully_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_staff }}</span></div>
+    <div class="label">staff free all week</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ staff_partially_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_staff }}</span></div>
+    <div class="label">staff free at least 1 day</div>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em;">Range</span>
+  <a class="btn {% if range_mode == 'week' %}btn-active{% endif %}" href="?range=week">Week</a>
+  <a class="btn {% if range_mode == 'month' %}btn-active{% endif %}" href="?range=month">Month</a>
+  <span style="margin-left:auto; font-size:11px; color:var(--text-faint);">Drag across a row to pick a date range &middot; click a block to see details</span>
+</div>
+
+<div class="section-label">Kits</div>
+{% if kit_rows %}
+<div class="grid-wrap">
+<div class="cal-grid resizable-grid" data-resize-key="calendar-kits">
+  <div class="gh namecol-header">Kit</div>
+  {% for d in days %}
+    <div class="gh {% if d == today %}today{% endif %} {% if d.weekday >= 5 %}weekend{% endif %}">
+      {% if range_mode == "month" %}{{ d|date:"j" }}{% else %}{{ d|date:"D" }}<br>{{ d|date:"j" }}{% endif %}
+    </div>
+  {% endfor %}
+
+  {% for row in kit_rows %}
+    <div class="gname">
+      <a class="item-name" href="/admin/inventory/kit/{{ row.item.id }}/change/">{{ row.item.name }}</a>
+      <div class="item-meta">{{ row.item.assets.count }} member{{ row.item.assets.count|pluralize }}</div>
+    </div>
+    <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
+      {% for cell in row.cells %}
+        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %}"
+             data-kind="kit"
+             data-item-id="{{ row.item.id }}"
+             data-item-name="{{ row.item.name }}"
+             data-date="{{ cell.date|date:'Y-m-d' }}">
+        </div>
+      {% endfor %}
+      <div class="block-layer">
+        {% for span in row.spans %}
+          <div class="gblock kit {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
+               style="grid-column: {{ span.grid_col_start }} / {{ span.grid_col_end }};
+                      grid-row: {{ span.grid_row }};
+                      background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
+               data-job-id="{{ span.booking.job.id }}"
+               onclick="openJobDetail({{ span.booking.job.id }});">
+            {{ span.booking.job.name }}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+</div>
+{% else %}
+<div class="empty">
+  No kits yet. <a href="/admin/inventory/kit/add/">Create your first kit</a> in the admin,
+  then come back here to book it against a job.
+</div>
+{% endif %}
+
+<div class="section-label">Staff</div>
+{% if staff_rows %}
+<div class="grid-wrap">
+<div class="cal-grid resizable-grid" data-resize-key="calendar-staff">
+  <div class="gh namecol-header">Person</div>
+  {% for d in days %}
+    <div class="gh {% if d == today %}today{% endif %} {% if d.weekday >= 5 %}weekend{% endif %}">
+      {% if range_mode == "month" %}{{ d|date:"j" }}{% else %}{{ d|date:"D" }}<br>{{ d|date:"j" }}{% endif %}
+    </div>
+  {% endfor %}
+
+  {% for row in staff_rows %}
+    <div class="gname">
+      <a class="item-name" href="/admin/inventory/staffmember/{{ row.item.id }}/change/">{{ row.item.name }}</a>
+    </div>
+    <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
+      {% for cell in row.cells %}
+        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %}"
+             data-kind="staff"
+             data-item-id="{{ row.item.id }}"
+             data-item-name="{{ row.item.name }}"
+             data-date="{{ cell.date|date:'Y-m-d' }}">
+        </div>
+      {% endfor %}
+      <div class="block-layer">
+        {% for span in row.spans %}
+          <div class="gblock staff {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
+               style="grid-column: {{ span.grid_col_start }} / {{ span.grid_col_end }};
+                      grid-row: {{ span.grid_row }};
+                      background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
+               data-job-id="{{ span.booking.job.id }}"
+               onclick="openJobDetail({{ span.booking.job.id }});">
+            {{ span.booking.job.name }}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+</div>
+{% else %}
+<div class="empty">
+  No staff yet. <a href="/admin/inventory/staffmember/add/">Add your first team member</a> in the admin,
+  then come back here to block out their schedule.
+</div>
+{% endif %}
+
+<dialog id="bookingDialog">
+  <h3 id="dialogTitle">Book</h3>
+  <form id="bookingForm" method="dialog">
+    <input type="hidden" id="f_kind" name="kind">
+    <input type="hidden" id="f_item_id" name="item_id">
+
+    <div style="display:flex; gap:4px; margin-top:10px;">
+      <button type="button" class="btn" id="tabExisting" onclick="switchJobTab('existing')">Existing job</button>
+      <button type="button" class="btn" id="tabNew" onclick="switchJobTab('new')">New job</button>
+    </div>
+
+    <div id="existingJobFields">
+      <label for="f_job">Job</label>
+      <select id="f_job" name="job_id">
+        <option value="">Select a job&hellip;</option>
+        {% for job in jobs %}
+          <option value="{{ job.id }}">{{ job.name }} ({{ job.start_date|date:"j M" }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div id="newJobFields" style="display:none;">
+      <label for="f_new_name">Job name</label>
+      <input type="text" id="f_new_name" name="new_job_name">
+      <label for="f_new_category">Category</label>
+      <select id="f_new_category" name="new_job_category">
+        {% for value, label in job_categories %}
+          <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+      <div class="color-override-row">
+        <input type="color" id="f_new_color" name="new_job_color" value="#EAB308" disabled class="color-swatch-input">
+        <label for="f_new_color_override" class="color-override-label">
+          <input type="checkbox" id="f_new_color_override" onchange="document.getElementById('f_new_color').disabled = !this.checked;">
+          Override this job's color
+        </label>
+      </div>
+      <div class="dialog-hint">Leave unticked to use the category's default color.</div>
+      <label for="f_new_notes">Notes (optional)</label>
+      <textarea id="f_new_notes" name="new_job_notes" rows="2" style="width:100%; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--text); border-radius:6px; padding:7px 8px; font-size:13px; font-family:inherit; resize:vertical;"></textarea>
+    </div>
+
+    <label for="f_start">Start date</label>
+    <input type="date" id="f_start" name="start_date" required>
+    <label for="f_end">End date</label>
+    <input type="date" id="f_end" name="end_date" required>
+    <div class="dialog-error" id="dialogError"></div>
+    <div class="dialog-hint" id="dialogHint" style="display:none;">
+      Staff bookings aren't blocked on overlap - if this person is already booked
+      on another job in this window, both will show as separate blocks stacked in the cell.
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="btn" onclick="closeBookingDialog()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="submitBooking()">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="jobDetailDialog">
+  <div class="jd-head">
+    <div class="jd-color-dot" id="jdColorDot"></div>
+    <div class="jd-title" id="jdTitle">&nbsp;</div>
+    <button type="button" class="jd-close" onclick="closeJobDetail()" aria-label="Close">&times;</button>
+  </div>
+  <div class="jd-body">
+    <div class="jd-row">
+      <div class="jd-field">
+        <div class="jd-label">Start date</div>
+        <div class="jd-value" id="jdStart">-</div>
+      </div>
+      <div class="jd-field">
+        <div class="jd-label">End date</div>
+        <div class="jd-value" id="jdEnd">-</div>
+      </div>
+      <div class="jd-field">
+        <div class="jd-label">Category</div>
+        <div class="jd-value" id="jdCategory">-</div>
+      </div>
+    </div>
+    <div>
+      <div class="jd-label">Notes</div>
+      <div class="jd-notes" id="jdNotes">No notes added.</div>
+    </div>
+    <div>
+      <div class="jd-label">Kits booked</div>
+      <div class="jd-chips" id="jdKits"></div>
+    </div>
+    <div>
+      <div class="jd-label">Staff booked</div>
+      <div class="jd-chips" id="jdStaff"></div>
+    </div>
+  </div>
+  <div class="jd-footer">
+    <button type="button" class="btn" id="jdDeleteBtn" style="color:var(--red);" onclick="deleteJob()">Delete job</button>
+    <div style="display:flex; gap:8px;">
+      <button type="button" class="btn" id="jdCloneBtn" onclick="cloneJob()" title="Create a copy of this job, with the same kits/staff already attached, so you can adjust the dates">Clone &rarr; new job</button>
+      <a class="btn" id="jdEditLink" href="#">Edit in admin</a>
+      <button type="button" class="btn btn-primary" onclick="closeJobDetail()">Close</button>
+    </div>
+  </div>
+</dialog>
+
+{% endblock %}
+
+{% block extra_body %}
+<script>
+const CSRF_TOKEN = "{{ csrf_token }}";
+const dialog = document.getElementById("bookingDialog");
+const jobDetailDialog = document.getElementById("jobDetailDialog");
+let activeKind = null;
+
+const ENDPOINTS = {
+  kit: { create: "/api/bookings/create/" },
+  staff: { create: "/api/staff-bookings/create/" },
+};
+
+let activeJobTab = "existing";
+
+function switchJobTab(tab) {
+  activeJobTab = tab;
+  document.getElementById("existingJobFields").style.display = tab === "existing" ? "block" : "none";
+  document.getElementById("newJobFields").style.display = tab === "new" ? "block" : "none";
+  document.getElementById("tabExisting").classList.toggle("btn-active", tab === "existing");
+  document.getElementById("tabNew").classList.toggle("btn-active", tab === "new");
+  document.getElementById("dialogError").style.display = "none";
+}
+
+function openDialogForRange(kind, itemId, itemName, startDate, endDate) {
+  activeKind = kind;
+
+  document.getElementById("dialogTitle").textContent = `Book ${itemName}`;
+  document.getElementById("f_kind").value = kind;
+  document.getElementById("f_item_id").value = itemId;
+  document.getElementById("f_start").value = startDate;
+  document.getElementById("f_end").value = endDate;
+  document.getElementById("f_job").value = "";
+  document.getElementById("f_new_name").value = "";
+  document.getElementById("f_new_notes").value = "";
+  document.getElementById("f_new_color_override").checked = false;
+  document.getElementById("f_new_color").disabled = true;
+  document.getElementById("f_new_color").value = "#EAB308";
+  document.getElementById("dialogError").style.display = "none";
+  document.getElementById("dialogHint").style.display = kind === "staff" ? "block" : "none";
+  switchJobTab("existing");
+
+  dialog.showModal();
+}
+
+function closeBookingDialog() {
+  dialog.close();
+}
+
+async function submitBooking() {
+  const kind = document.getElementById("f_kind").value;
+  const itemId = document.getElementById("f_item_id").value;
+  const startDate = document.getElementById("f_start").value;
+  const endDate = document.getElementById("f_end").value;
+  const errorBox = document.getElementById("dialogError");
+
+  if (startDate > endDate) {
+    errorBox.textContent = "End date cannot be before start date.";
+    errorBox.style.display = "block";
+    return;
+  }
+
+  const idField = kind === "staff" ? "staff_id" : "kit_id";
+  const params = { [idField]: itemId, start_date: startDate, end_date: endDate };
+
+  if (activeJobTab === "existing") {
+    const jobId = document.getElementById("f_job").value;
+    if (!jobId) {
+      errorBox.textContent = "Pick a job, or switch to \u201cNew job\u201d to create one.";
+      errorBox.style.display = "block";
+      return;
+    }
+    params.job_id = jobId;
+  } else {
+    const newName = document.getElementById("f_new_name").value.trim();
+    if (!newName) {
+      errorBox.textContent = "Give the new job a name.";
+      errorBox.style.display = "block";
+      return;
+    }
+    params.new_job_name = newName;
+    params.new_job_category = document.getElementById("f_new_category").value;
+    params.new_job_notes = document.getElementById("f_new_notes").value;
+    // Same rule as the admin's color picker: the color input ALWAYS holds
+    // a value (browsers can't leave <input type="color"> empty), so it's
+    // only trustworthy -- and only sent at all -- when the override
+    // checkbox says the person actually meant to set one. Otherwise the
+    // job is created with no custom_color and falls through to its
+    // category's color, same as not touching the field at all.
+    if (document.getElementById("f_new_color_override").checked) {
+      params.new_job_color = document.getElementById("f_new_color").value;
+    }
+  }
+
+  const body = new URLSearchParams(params);
+  const resp = await fetch(ENDPOINTS[kind].create, {
+    method: "POST",
+    headers: { "X-CSRFToken": CSRF_TOKEN, "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const data = await resp.json();
+  if (!resp.ok) {
+    errorBox.textContent = data.error || "Something went wrong.";
+    errorBox.style.display = "block";
+    return;
+  }
+  window.location.reload();
+}
+
+function formatDateLong(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+}
+
+let activeJobDetailId = null;
+let activeJobDetailName = "";
+
+async function openJobDetail(jobId) {
+  const resp = await fetch(`/api/jobs/${jobId}/`);
+  if (!resp.ok) return;
+  const job = await resp.json();
+
+  activeJobDetailId = job.id;
+  activeJobDetailName = job.name;
+
+  document.getElementById("jdColorDot").style.background = job.color;
+  document.getElementById("jdTitle").textContent = job.name;
+  document.getElementById("jdStart").textContent = formatDateLong(job.start_date);
+  document.getElementById("jdEnd").textContent = formatDateLong(job.end_date);
+  document.getElementById("jdCategory").textContent = job.category_display;
+  document.getElementById("jdNotes").textContent = job.notes && job.notes.trim() ? job.notes : "No notes added.";
+  document.getElementById("jdEditLink").href = `/admin/inventory/job/${job.id}/change/`;
+
+  const kitsEl = document.getElementById("jdKits");
+  kitsEl.innerHTML = job.kits.length
+    ? job.kits.map((k) => `<span class="jd-chip">${k}</span>`).join("")
+    : '<span class="jd-chip" style="opacity:0.5;">None</span>';
+
+  const staffEl = document.getElementById("jdStaff");
+  const allStaff = job.staff.concat(job.assets.map((a) => `${a} (asset)`));
+  staffEl.innerHTML = allStaff.length
+    ? allStaff.map((s) => `<span class="jd-chip">${s}</span>`).join("")
+    : '<span class="jd-chip" style="opacity:0.5;">None</span>';
+
+  jobDetailDialog.showModal();
+}
+
+function closeJobDetail() {
+  jobDetailDialog.close();
+}
+
+async function deleteJob() {
+  if (!activeJobDetailId) return;
+  const confirmed = confirm(
+    `Delete "${activeJobDetailName}"? This removes the job and every kit/staff booking on it. This can't be undone.`
+  );
+  if (!confirmed) return;
+
+  const resp = await fetch(`/api/jobs/${activeJobDetailId}/delete/`, {
+    method: "POST",
+    headers: { "X-CSRFToken": CSRF_TOKEN },
+  });
+  if (resp.ok) {
+    window.location.reload();
+  } else {
+    alert("Couldn't delete this job. Try again, or remove it from the admin instead.");
+  }
+}
+
+async function cloneJob() {
+  if (!activeJobDetailId) return;
+  const resp = await fetch(`/api/jobs/${activeJobDetailId}/clone/`, {
+    method: "POST",
+    headers: { "X-CSRFToken": CSRF_TOKEN },
+  });
+  const data = await resp.json();
+  if (resp.ok && data.job_id) {
+    window.location.href = `/admin/inventory/job/${data.job_id}/change/`;
+  } else {
+    alert("Couldn't clone this job. Try again, or duplicate it from the admin instead.");
+  }
+}
+
+// --- Drag-to-select across a single row ---
+// Mousedown on a cell with no blocks yet starts a drag; dragging across
+// cells in the SAME row previews a date range; mouseup opens the booking
+// dialog pre-filled with that range. A plain click on an empty cell still
+// opens the dialog for a single day. Clicking an existing block is handled
+// by the block's own onclick (with stopPropagation), so it never reaches
+// this drag logic at all.
+(function setupDragSelect() {
+  let dragState = null;
+
+  function cellsInRow(rowEl) {
+    return Array.from(rowEl.querySelectorAll(".gc"));
+  }
+
+  function clearPreview(rowEl) {
+    if (!rowEl) return;
+    cellsInRow(rowEl).forEach((c) => c.classList.remove("drag-preview"));
+  }
+
+  function previewRange(rowEl, fromCell, toCell) {
+    const cells = cellsInRow(rowEl);
+    const fromIdx = cells.indexOf(fromCell);
+    const toIdx = cells.indexOf(toCell);
+    const lo = Math.min(fromIdx, toIdx);
+    const hi = Math.max(fromIdx, toIdx);
+    cells.forEach((c, i) => {
+      c.classList.toggle("drag-preview", i >= lo && i <= hi);
+    });
+  }
+
+  document.querySelectorAll(".gc").forEach((cell) => {
+    cell.addEventListener("mousedown", (e) => {
+      const rowEl = cell.closest(".grow-cells");
+      dragState = {
+        kind: cell.dataset.kind,
+        itemId: cell.dataset.itemId,
+        itemName: cell.dataset.itemName,
+        rowEl,
+        startCell: cell,
+        moved: false,
+      };
+      previewRange(rowEl, cell, cell);
+    });
+
+    cell.addEventListener("mouseenter", () => {
+      if (!dragState) return;
+      if (cell.closest(".grow-cells") !== dragState.rowEl) return;
+      dragState.moved = dragState.moved || cell !== dragState.startCell;
+      previewRange(dragState.rowEl, dragState.startCell, cell);
+      dragState.endCell = cell;
+    });
+  });
+
+  document.addEventListener("mouseup", (e) => {
+    if (!dragState) return;
+    const { kind, itemId, itemName, rowEl, startCell, endCell, moved } = dragState;
+    clearPreview(rowEl);
+    dragState = null;
+
+    // If the mouseup happened directly on a booking block, that block's
+    // own onclick handler already handled it -- don't also open the
+    // new-booking dialog underneath it.
+    if (e.target.closest(".gblock")) return;
+
+    const finalEndCell = endCell || startCell;
+    const startDate = startCell.dataset.date;
+    const endDate = finalEndCell.dataset.date;
+    const lo = startDate <= endDate ? startDate : endDate;
+    const hi = startDate <= endDate ? endDate : startDate;
+    openDialogForRange(kind, itemId, itemName, lo, hi);
+  });
+
+  document.addEventListener("mouseleave", () => {
+    if (dragState) clearPreview(dragState.rowEl);
+  });
+})();
+</script>
+{% endblock %}

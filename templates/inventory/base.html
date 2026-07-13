@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Kit scheduler{% endblock %}</title>
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --surface-2: #1c1c1c;
+    --border: #2a2a2a;
+    --border-strong: #3a3a3a;
+    --text: #ededea;
+    --text-dim: #9a978c;
+    --text-faint: #65625a;
+    --accent: rgb(234, 179, 8);
+    --accent-deep: #a87c06;
+    --accent-glow: rgba(234, 179, 8, 0.1);
+    --accent-on: #1a1400;
+    --green: #3fb950;
+    --green-dim: rgba(63, 185, 80, 0.12);
+    --blue: #58a6ff;
+    --blue-dim: rgba(88, 166, 255, 0.12);
+    --red: #f85149;
+    --red-dim: rgba(248, 81, 73, 0.12);
+    --mono: "SF Mono", "JetBrains Mono", Consolas, monospace;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-size: 14px; zoom: 1.2; }
+  a { color: inherit; }
+  header.top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #121212 0%, #0d0d0d 100%);
+    flex-wrap: wrap; gap: 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; }
+  .brand-mark {
+    width: 26px; height: 26px; border-radius: 6px;
+    background: var(--accent-glow); border: 1px solid var(--accent-deep);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent); font-family: var(--mono); font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .brand .sub { font-weight: 400; font-size: 12px; color: var(--text-dim); margin-left: 6px; font-family: var(--mono); }
+  nav.primary {
+    display: flex; align-items: center; gap: 2px;
+    padding: 0 24px; border-bottom: 1px solid var(--border); overflow-x: auto;
+  }
+  nav.primary a {
+    padding: 11px 14px; font-size: 13px; text-decoration: none;
+    color: var(--text-dim); border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  nav.primary a:hover { color: var(--text); }
+  nav.primary a.active { color: var(--accent); border-bottom-color: var(--accent); }
+  nav.primary .nav-spacer { flex: 1; }
+  nav.primary .cog-link {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; margin: 6px 0; border-radius: 6px;
+    color: var(--text-dim); border-bottom: none; padding: 0;
+  }
+  nav.primary .cog-link:hover { color: var(--accent); background: var(--surface-2); }
+  nav.primary .cog-link.active { color: var(--accent); background: var(--accent-glow); }
+  nav.primary .cog-link svg { width: 17px; height: 17px; }
+  .nav { display: flex; align-items: center; gap: 8px; }
+  .btn {
+    background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 6px; padding: 7px 14px; font-size: 13px;
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { border-color: var(--accent-deep); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-on); font-weight: 600; }
+  .btn-primary:hover { opacity: 0.9; border-color: var(--accent); }
+  .btn-active { background: var(--accent-glow); border-color: var(--accent-deep); color: var(--accent); }
+  .range-label { color: var(--text-dim); font-size: 13px; min-width: 150px; font-family: var(--mono); }
+  select.filter, input.filter {
+    background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 6px; padding: 7px 10px; font-size: 13px;
+  }
+  select.filter:focus, input.filter:focus { outline: none; border-color: var(--accent); }
+  .stats-bar {
+    display: flex; gap: 24px; padding: 14px 24px;
+    border-bottom: 1px solid var(--border); background: var(--surface); flex-wrap: wrap;
+  }
+  .stat .num { font-size: 22px; font-weight: 700; font-family: var(--mono); }
+  .stat .label { font-size: 12px; color: var(--text-dim); }
+  .filter-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .section-label {
+    padding: 10px 24px 6px; font-size: 11px; font-weight: 700;
+    color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  table.list { width: 100%; border-collapse: collapse; }
+  table.list th {
+    text-align: left; font-size: 11px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.03em; padding: 8px 12px;
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg);
+  }
+  table.list td {
+    padding: 9px 12px; border-bottom: 1px solid var(--border);
+    font-size: 13px; vertical-align: middle;
+  }
+  table.list tr.nested td { color: var(--text-dim); }
+  table.list tr:hover td { background: #161616; }
+  .badge {
+    font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 600;
+    font-family: var(--mono); letter-spacing: 0.02em;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .badge-available { background: var(--green-dim); color: var(--green); }
+  .badge-in_use { background: var(--blue-dim); color: var(--blue); }
+  .badge-needs_repair { background: var(--red-dim); color: var(--red); }
+  .badge-maintenance { background: var(--accent-glow); color: var(--accent); }
+  .badge-missing { background: var(--red-dim); color: var(--red); }
+  .badge-archived { background: var(--surface-2); color: var(--text-faint); }
+  .badge-type { background: var(--surface-2); color: var(--text-dim); }
+  .empty { padding: 48px 24px; text-align: center; color: var(--text-dim); }
+  .empty a { color: var(--accent); }
+  .grid-wrap { width: 100%; }
+  dialog#bookingDialog {
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border-strong); border-radius: 10px;
+    padding: 20px; width: 360px; max-width: 90vw;
+  }
+  dialog#bookingDialog::backdrop { background: rgba(0,0,0,0.6); }
+  dialog#bookingDialog h3 { margin: 0 0 14px; font-size: 15px; font-weight: 600; }
+  dialog#bookingDialog label { display: block; font-size: 12px; color: var(--text-dim); margin: 10px 0 4px; }
+  dialog#bookingDialog select, dialog#bookingDialog input {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 6px; padding: 7px 8px; font-size: 13px;
+  }
+  dialog#bookingDialog select:focus, dialog#bookingDialog input:focus { outline: none; border-color: var(--accent); }
+  .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .dialog-error { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
+  .dialog-hint { color: var(--text-faint); font-size: 11px; margin-top: 10px; line-height: 1.5; }
+  .color-override-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .color-override-row .color-swatch-input {
+    width: 36px !important; height: 36px; padding: 2px;
+    border: 1px solid var(--border-strong); border-radius: 6px;
+    background: var(--surface-2); cursor: pointer; flex-shrink: 0;
+  }
+  .color-override-row .color-swatch-input:disabled { opacity: 0.4; cursor: not-allowed; }
+  .color-override-row .color-override-label {
+    display: flex !important; align-items: center; gap: 8px; margin: 0 !important;
+    font-size: 13px; color: var(--text); cursor: pointer;
+  }
+  .color-override-label input[type="checkbox"] { margin: 0; width: auto; }
+  td.weekend, th.weekend { background: #1a1408; }
+  th.today { color: var(--accent); font-weight: 700; box-shadow: inset 0 4px 0 0 var(--accent); padding-top: 12px; }
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+  .col-resize-handle {
+    position: absolute; top: 0; right: -3px; width: 6px; height: 100%;
+    cursor: col-resize; z-index: 4;
+  }
+  .col-resize-handle:hover, .col-resize-handle:active { background: var(--accent); opacity: 0.5; }
+  {% block extra_style %}{% endblock %}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="brand-mark">KS</div>
+    Kit scheduler
+    <span class="sub">{% block brand_sub %}{% endblock %}</span>
+  </div>
+  <div class="nav">{% block header_actions %}{% endblock %}</div>
+</header>
+<nav class="primary">
+  <a href="/" class="{% if active_nav == 'dashboard' %}active{% endif %}">Dashboard</a>
+  <a href="/timeline/" class="{% if active_nav == 'timeline' %}active{% endif %}">Timeline</a>
+  <a href="/assets/" class="{% if active_nav == 'assets' %}active{% endif %}">Inventory</a>
+  <a href="/engines/" class="{% if active_nav == 'engines' %}active{% endif %}">Engines</a>
+  <a href="/kits/" class="{% if active_nav == 'kits' %}active{% endif %}">Kits</a>
+  <a href="/licenses/" class="{% if active_nav == 'licenses' %}active{% endif %}">Licenses</a>
+  <span class="nav-spacer"></span>
+  <a href="/settings/" class="cog-link {% if active_nav == 'settings' %}active{% endif %}" title="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </a>
+</nav>
+<main>{% block content %}{% endblock %}</main>
+
+<script>
+(function setupResizableColumns() {
+  function applyWidth(grid, width) {
+    const w = Math.max(80, Math.min(400, width));
+    const currentCols = getComputedStyle(grid).gridTemplateColumns.split(" ");
+    currentCols[0] = w + "px";
+    grid.style.gridTemplateColumns = currentCols.join(" ");
+    return w;
+  }
+
+  document.querySelectorAll(".resizable-grid").forEach((grid) => {
+    const key = grid.dataset.resizeKey;
+    if (!key) return;
+    const storageKey = `kitscheduler-colwidth-${key}`;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) applyWidth(grid, parseInt(saved, 10));
+
+    const headerCell = grid.querySelector(".namecol-header");
+    if (!headerCell) return;
+
+    const handle = document.createElement("div");
+    handle.className = "col-resize-handle";
+    headerCell.style.position = "sticky";
+    headerCell.appendChild(handle);
+
+    let dragging = false, startX = 0, startWidth = 0;
+
+    function effectiveZoom(el) {
+      let z = 1, node = el;
+      while (node && node !== document.body.parentElement) {
+        const nodeZoom = parseFloat(getComputedStyle(node).zoom);
+        if (!isNaN(nodeZoom)) z *= nodeZoom;
+        node = node.parentElement;
+      }
+      return z || 1;
+    }
+
+    handle.addEventListener("mousedown", (e) => {
+      dragging = true;
+      startX = e.clientX;
+      startWidth = headerCell.getBoundingClientRect().width / effectiveZoom(headerCell);
+      document.body.style.cursor = "col-resize";
+      e.preventDefault(); e.stopPropagation();
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (!dragging) return;
+      const zoom = effectiveZoom(headerCell);
+      applyWidth(grid, startWidth + (e.clientX - startX) / zoom);
+    });
+
+    document.addEventListener("mouseup", () => {
+      if (!dragging) return;
+      dragging = false;
+      document.body.style.cursor = "";
+      const finalWidth = headerCell.getBoundingClientRect().width / effectiveZoom(headerCell);
+      localStorage.setItem(storageKey, Math.round(finalWidth));
+    });
+  });
+})();
+</script>
+</body>
+</html>
