@@ -1,0 +1,123 @@
+{% extends "inventory/base.html" %}
+{% block title %}Ticket #{{ ticket.id }} - Kit scheduler{% endblock %}
+{% block brand_sub %}Ticket #{{ ticket.id }}{% endblock %}
+{% block header_actions %}
+  <a class="btn" href="/tickets/">Back to tickets</a>
+{% endblock %}
+
+{% block extra_style %}
+  .form-page { max-width: 720px; margin: 0 auto; padding: 24px; }
+  .form-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 16px; overflow: hidden;
+  }
+  .form-section-head {
+    padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border);
+    font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim);
+  }
+  .form-section-body { padding: 16px; }
+  .detail-row { display: flex; gap: 8px; padding: 6px 0; font-size: 13px; }
+  .detail-row .k { color: var(--text-dim); min-width: 100px; }
+  .detail-row .v { color: var(--text); }
+  .description-block {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; margin-top: 8px;
+  }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .form-field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
+  .form-field select, .form-field textarea {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px;
+    font-family: inherit; box-sizing: border-box;
+  }
+  .form-field select:focus, .form-field textarea:focus { outline: none; border-color: var(--accent); }
+  .form-field textarea { resize: vertical; min-height: 70px; }
+  .form-actions { display: flex; justify-content: flex-end; padding-top: 8px; }
+
+  .history-item { display: flex; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--border); font-size: 13px; }
+  .history-item:first-child { border-top: none; }
+  .history-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 5px;
+  }
+  .history-body { flex: 1; }
+  .history-meta { color: var(--text-faint); font-size: 11px; margin-top: 2px; }
+  .history-change { color: var(--text); }
+  .history-change .field { color: var(--accent); font-family: var(--mono); font-size: 12px; }
+  .history-comment { color: var(--text-dim); margin-top: 2px; white-space: pre-wrap; }
+{% endblock %}
+
+{% block content %}
+<div class="form-page">
+
+  <div class="form-section">
+    <div class="form-section-head">Ticket details</div>
+    <div class="form-section-body">
+      <div class="detail-row"><span class="k">Asset</span><span class="v">{% if ticket.asset %}{{ ticket.asset.asset_id }}{% if ticket.asset.make_model %} - {{ ticket.asset.make_model }}{% endif %}{% else %}Not specified{% endif %}</span></div>
+      <div class="detail-row"><span class="k">Reported by</span><span class="v">{{ ticket.reporter_name }}{% if ticket.reporter_contact %} ({{ ticket.reporter_contact }}){% endif %}</span></div>
+      <div class="detail-row"><span class="k">Reported</span><span class="v">{{ ticket.created_at|date:"j M Y, g:ia" }}</span></div>
+      <div class="detail-row"><span class="k">Description</span></div>
+      <div class="description-block">{{ ticket.description }}</div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-head">Manage ticket</div>
+    <div class="form-section-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="form-row">
+          <div class="form-field">
+            <label for="f-status">Status</label>
+            <select id="f-status" name="status">
+              {% for value, label in statuses %}
+                <option value="{{ value }}" {% if ticket.status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="f-priority">Priority</label>
+            <select id="f-priority" name="priority">
+              {% for value, label in priorities %}
+                <option value="{{ value }}" {% if ticket.priority == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-field" style="margin-bottom:14px;">
+          <label for="f-comment">Add a comment <span style="color:var(--text-faint); font-weight:400;">(optional, logged to history)</span></label>
+          <textarea id="f-comment" name="comment" placeholder="Notes on what was done, parts ordered, etc..."></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Save changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-head">History</div>
+    {% for entry in history %}
+    <div class="history-item">
+      <div class="history-dot"></div>
+      <div class="history-body">
+        {% if entry.field_changed == "created" %}
+          <div class="history-change">Ticket created</div>
+        {% elif entry.field_changed == "comment" %}
+          <div class="history-change">Comment added</div>
+          <div class="history-comment">{{ entry.note }}</div>
+        {% else %}
+          <div class="history-change"><span class="field">{{ entry.field_changed }}</span> changed from <strong>{{ entry.old_value }}</strong> to <strong>{{ entry.new_value }}</strong></div>
+        {% endif %}
+        <div class="history-meta">
+          {% if entry.changed_by %}{{ entry.changed_by.get_username }}{% else %}Public submission{% endif %}
+          &middot; {{ entry.created_at|date:"j M Y, g:ia" }}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="form-section-body" style="color:var(--text-faint); font-size:13px;">No history yet.</div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}

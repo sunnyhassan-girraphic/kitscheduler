@@ -1,0 +1,58 @@
+{% extends "inventory/base.html" %}
+{% block title %}Tickets - Kit scheduler{% endblock %}
+{% block brand_sub %}{{ tickets|length }} ticket{{ tickets|length|pluralize }}{% if open_count %} &middot; {{ open_count }} open{% endif %}{% endblock %}
+{% block header_actions %}
+  <a class="btn" href="/report-issue/" target="_blank">View public form</a>
+{% endblock %}
+{% block extra_style %}
+  .ticket-row { text-decoration: none; color: inherit; display: block; }
+  .ticket-row:hover td { background: #161616; }
+  .ticket-desc { color: var(--text-dim); font-size: 12px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ticket-id { font-family: var(--mono); color: var(--text-faint); }
+{% endblock %}
+{% block content %}
+<div class="filter-bar">
+  <form method="get" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex:1;">
+    <select class="filter" name="status" onchange="this.form.submit()">
+      <option value="">All statuses</option>
+      {% for value, label in statuses %}
+        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <input class="filter" type="text" name="q" value="{{ search_query }}" placeholder="Search asset, reporter, description..." style="flex:1; min-width:200px;">
+    <button class="btn" type="submit">Search</button>
+    {% if selected_status or search_query %}<a class="btn" href="/tickets/">Clear</a>{% endif %}
+  </form>
+</div>
+
+{% if tickets %}
+<table class="list">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Asset</th>
+      <th>Reporter</th>
+      <th>Description</th>
+      <th>Priority</th>
+      <th>Status</th>
+      <th>Reported</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ticket in tickets %}
+    <tr onclick="window.location='/tickets/{{ ticket.id }}/'" style="cursor:pointer;">
+      <td class="ticket-id">#{{ ticket.id }}</td>
+      <td>{% if ticket.asset %}{{ ticket.asset.asset_id }}{% else %}<span style="color:var(--text-faint);">-</span>{% endif %}</td>
+      <td>{{ ticket.reporter_name }}</td>
+      <td class="ticket-desc">{{ ticket.description }}</td>
+      <td><span class="badge badge-{{ ticket.priority|lower }}">{{ ticket.get_priority_display }}</span></td>
+      <td><span class="badge badge-{{ ticket.status|lower }}">{{ ticket.get_status_display }}</span></td>
+      <td style="color:var(--text-dim); font-size:12px;">{{ ticket.created_at|date:"j M Y, g:ia" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">No tickets found.</div>
+{% endif %}
+{% endblock %}

@@ -117,6 +117,14 @@
   .badge-missing { background: var(--red-dim); color: var(--red); }
   .badge-archived { background: var(--surface-2); color: var(--text-faint); }
   .badge-type { background: var(--surface-2); color: var(--text-dim); }
+  .badge-open { background: var(--red-dim); color: var(--red); }
+  .badge-in_progress { background: var(--accent-glow); color: var(--accent); }
+  .badge-resolved { background: var(--green-dim); color: var(--green); }
+  .badge-closed { background: var(--surface-2); color: var(--text-faint); }
+  .badge-low { background: var(--surface-2); color: var(--text-dim); }
+  .badge-medium { background: var(--blue-dim); color: var(--blue); }
+  .badge-high { background: var(--accent-glow); color: var(--accent); }
+  .badge-urgent { background: var(--red-dim); color: var(--red); }
   .empty { padding: 48px 24px; text-align: center; color: var(--text-dim); }
   .empty a { color: var(--accent); }
   .grid-wrap { width: 100%; }
@@ -176,6 +184,7 @@
   <a href="/engines/" class="{% if active_nav == 'engines' %}active{% endif %}">Engines</a>
   <a href="/kits/" class="{% if active_nav == 'kits' %}active{% endif %}">Kits</a>
   <a href="/licenses/" class="{% if active_nav == 'licenses' %}active{% endif %}">Licenses</a>
+  <a href="/tickets/" class="{% if active_nav == 'tickets' %}active{% endif %}">Tickets</a>
   <span class="nav-spacer"></span>
   <a href="/settings/" class="cog-link {% if active_nav == 'settings' %}active{% endif %}" title="Settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
