@@ -48,12 +48,24 @@ detail_style = ParagraphStyle("DetailCell", fontName="Helvetica", fontSize=9, le
 qty_style = ParagraphStyle("QtyCell", fontName="Helvetica", fontSize=9, leading=11, alignment=1)
 
 
-def _checkbox_flowable():
-    """A small empty square drawn as a 1x1 table, since Helvetica's base
-    WinAnsi encoding has no checkbox/checkmark glyph to rely on."""
-    box = Table([[""]], colWidths=[10], rowHeights=[10])
+def _checkbox_flowable(checked=False):
+    """A small square drawn as a 1x1 table, since Helvetica's base WinAnsi
+    encoding has no checkbox/checkmark glyph to rely on. When checked, a
+    bold X is drawn inside using the same table-cell text (Helvetica-Bold
+    has a plain 'X' glyph, unlike checkmark/box unicode chars)."""
+    content = Paragraph("<b>X</b>", ParagraphStyle(
+        "CheckX", fontName="Helvetica-Bold", fontSize=8, leading=9,
+        alignment=1, textColor=colors.black,
+    )) if checked else ""
+    box = Table([[content]], colWidths=[10], rowHeights=[10])
     box.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1, BORDER_BLACK),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
     ]))
     return box
 
@@ -113,11 +125,14 @@ def _meta_grid(meta=None):
     return tbl
 
 
-def _item_rows(kit):
-    """Direct kit members plus, for Engines, their nested components as sub-rows."""
+def get_kit_checklist_rows(kit):
+    """Direct kit members plus, for Engines, their nested components as
+    sub-rows. Each row includes the real Asset id so the edit-before-export
+    UI (and the override lookup below) can key off something stable."""
     rows = []
     for asset in kit.assets.all().order_by("asset_type", "asset_id"):
         rows.append({
+            "id": asset.id,
             "item": asset.asset_id,
             "details": asset.make_model,
             "qty": asset.qty,
@@ -126,6 +141,7 @@ def _item_rows(kit):
         if asset.asset_type == "ENGINE":
             for comp in asset.nested_assets.all().order_by("asset_id"):
                 rows.append({
+                    "id": comp.id,
                     "item": comp.asset_id,
                     "details": comp.make_model,
                     "qty": comp.qty,
@@ -134,7 +150,10 @@ def _item_rows(kit):
     return rows
 
 
-def _items_table(kit):
+def _items_table(kit, item_overrides=None):
+    """`item_overrides` maps asset id (int or str) -> {"case": str, "checked": bool}."""
+    item_overrides = item_overrides or {}
+
     header = [
         Paragraph("ITEM", header_cell_style),
         Paragraph("DETAILS", header_cell_style),
@@ -143,15 +162,18 @@ def _items_table(kit):
         Paragraph("CHECK", header_cell_style),
     ]
     data = [header]
-    rows = _item_rows(kit)
+    rows = get_kit_checklist_rows(kit)
     for row in rows:
+        override = item_overrides.get(row["id"]) or item_overrides.get(str(row["id"])) or {}
         item_para = Paragraph(
             ("- " if row["nested"] else "") + row["item"],
             nested_item_style if row["nested"] else item_style,
         )
         details_para = Paragraph(row["details"] or "", detail_style)
         qty_para = Paragraph(str(row["qty"]), qty_style)
-        data.append([item_para, details_para, qty_para, "", _checkbox_flowable()])
+        case_para = Paragraph(override.get("case", "") or "", detail_style)
+        checkbox = _checkbox_flowable(checked=bool(override.get("checked")))
+        data.append([item_para, details_para, qty_para, case_para, checkbox])
 
     col_widths = [
         CONTENT_WIDTH * 0.28, CONTENT_WIDTH * 0.36,
@@ -172,10 +194,11 @@ def _items_table(kit):
     return tbl, len(rows)
 
 
-def build_kit_checklist_pdf(kit, meta=None):
+def build_kit_checklist_pdf(kit, meta=None, item_overrides=None):
     """Returns PDF bytes for a single kit's printable checklist.
     `meta` may include packed_by, event_date, gps_tag, carnet, cases -
-    any left out (or blank) render as blank hand-fill space, as before."""
+    any left out (or blank) render as blank hand-fill space, as before.
+    `item_overrides` maps asset id -> {"case": str, "checked": bool}."""
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
@@ -183,7 +206,7 @@ def build_kit_checklist_pdf(kit, meta=None):
         title=f"{kit.name} - Kit Checklist",
     )
 
-    items_table, item_count = _items_table(kit)
+    items_table, item_count = _items_table(kit, item_overrides)
 
     story = [
         _title_band(kit.name),

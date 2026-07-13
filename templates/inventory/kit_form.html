@@ -124,6 +124,21 @@
   .picker-search-wrap { position: relative; }
   .picker-filter-row { display: flex; gap: 8px; align-items: center; }
   .picker-filter-row select { min-width: 140px; }
+  .pdf-meta-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .pdf-items-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
+  .pdf-items-table th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--text-faint); padding: 6px 6px; border-bottom: 1px solid var(--border-strong);
+  }
+  .pdf-items-table td { padding: 5px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .pdf-items-table td.nested { color: var(--text-dim); padding-left: 16px; }
+  .pdf-items-table td .dim { color: var(--text-faint); }
+  .pdf-items-table .pdf-case-input {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 4px; padding: 4px 6px; font-size: 12px; box-sizing: border-box;
+  }
+  .pdf-items-table .pdf-case-input:focus { outline: none; border-color: var(--accent); }
+  .pdf-items-table .pdf-checked-input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
   .picker-search-wrap input {
     width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
     color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px;
@@ -232,7 +247,7 @@
     </form>
   </div>
 
-  <dialog id="pdfMetaDialog" style="background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 10px; padding: 20px; width: 380px; max-width: 90vw;">
+  <dialog id="pdfMetaDialog" style="background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 10px; padding: 20px; width: 560px; max-width: 92vw; max-height: 85vh; overflow-y: auto;">
     <button type="button" class="dialog-close-x" onclick="document.getElementById('pdfMetaDialog').close()" aria-label="Close">&times;</button>
     <h3 style="margin:0 0 4px; font-size:15px; font-weight:600; padding-right:24px;">Kit list PDF details</h3>
     <p style="margin:0 0 14px; font-size:12px; color:var(--text-dim);">Fill in what you know now - anything left blank prints as a hand-fill line, same as leaving it blank on paper.</p>
@@ -252,18 +267,41 @@
         <input type="date" id="pdf-event-date-native" class="date-native-hidden" tabindex="-1" aria-hidden="true">
       </div>
     </div>
-    <div class="form-field">
-      <label for="pdf-gps-tag">GPS tag</label>
-      <input type="text" id="pdf-gps-tag">
+    <div class="pdf-meta-row">
+      <div class="form-field">
+        <label for="pdf-gps-tag">GPS tag</label>
+        <input type="text" id="pdf-gps-tag">
+      </div>
+      <div class="form-field">
+        <label for="pdf-carnet">Carnet</label>
+        <input type="text" id="pdf-carnet">
+      </div>
+      <div class="form-field">
+        <label for="pdf-cases">No. of cases</label>
+        <input type="text" id="pdf-cases">
+      </div>
     </div>
+
+    {% if pdf_items %}
     <div class="form-field">
-      <label for="pdf-carnet">Carnet</label>
-      <input type="text" id="pdf-carnet">
+      <label style="margin-bottom:8px;">Items <span style="color:var(--text-faint); font-weight:400;">(set a case number and tick off as packed - both are optional, blank prints as a hand-fill line)</span></label>
+      <table class="pdf-items-table">
+        <thead>
+          <tr><th>Item</th><th>Case No.</th><th>Checked</th></tr>
+        </thead>
+        <tbody>
+          {% for row in pdf_items %}
+          <tr>
+            <td class="{% if row.nested %}nested{% endif %}">{% if row.nested %}&mdash; {% endif %}{{ row.item }}{% if row.details %} <span class="dim">{{ row.details }}</span>{% endif %}</td>
+            <td><input type="text" class="pdf-case-input" data-asset-id="{{ row.id }}" placeholder="-"></td>
+            <td style="text-align:center;"><input type="checkbox" class="pdf-checked-input" data-asset-id="{{ row.id }}"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-    <div class="form-field">
-      <label for="pdf-cases">No. of cases</label>
-      <input type="text" id="pdf-cases">
-    </div>
+    {% endif %}
+
     <div class="form-actions" style="padding-top:6px;">
       <button class="btn btn-primary" type="button" onclick="downloadKitPdf({{ kit.id }})">Download PDF</button>
     </div>
@@ -299,6 +337,13 @@ function downloadKitPdf(kitId) {
     gps_tag: document.getElementById("pdf-gps-tag").value.trim(),
     carnet: document.getElementById("pdf-carnet").value.trim(),
     cases: document.getElementById("pdf-cases").value.trim(),
+  });
+  document.querySelectorAll(".pdf-case-input").forEach(input => {
+    const val = input.value.trim();
+    if (val) params.set(`case_${input.dataset.assetId}`, val);
+  });
+  document.querySelectorAll(".pdf-checked-input").forEach(input => {
+    if (input.checked) params.set(`checked_${input.dataset.assetId}`, "1");
   });
   window.location.href = `/kits/${kitId}/pdf/?${params.toString()}`;
   document.getElementById("pdfMetaDialog").close();

@@ -26,6 +26,7 @@ urlpatterns = [
     path("api/jobs/<int:job_id>/", views.job_detail_api, name="job_detail_api"),
     path("api/jobs/<int:job_id>/delete/", views.delete_job, name="delete_job"),
     path("api/jobs/<int:job_id>/clone/", views.clone_job, name="clone_job"),
+    path("api/jobs/create/", views.job_create_view, name="job_create"),
     path("api/bookings/create/", views.create_booking, name="create_booking"),
     path("api/bookings/<int:booking_id>/delete/", views.delete_booking, name="delete_booking"),
     path("api/staff-bookings/create/", views.create_staff_booking, name="create_staff_booking"),

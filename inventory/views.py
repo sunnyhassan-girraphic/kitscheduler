@@ -16,7 +16,7 @@ from .models import (
     Asset, AssetBooking, CategoryColor, Job, Kit, KitBooking,
     StaffBooking, StaffMember, Ticket, TicketHistory,
 )
-from .pdf_utils import build_kit_checklist_pdf
+from .pdf_utils import build_kit_checklist_pdf, get_kit_checklist_rows
 
 VIEW_DAYS = 14
 STEP_DAYS = 7
@@ -213,6 +213,7 @@ def dashboard_view(request):
         "open_ticket_count": open_ticket_count,
         "urgent_ticket_count": urgent_ticket_count,
         "upcoming_jobs": upcoming_jobs,
+        "job_categories": Job.Category.choices,
         "attention_assets": attention_assets,
         "attention_count": attention_count,
         "active_nav": "dashboard",
@@ -538,6 +539,7 @@ def kit_edit_view(request, kit_id):
         "name": kit.name,
         "notes": kit.notes,
         "active_nav": "kits",
+        "pdf_items": get_kit_checklist_rows(kit),
     })
 
 
@@ -559,7 +561,16 @@ def kit_pdf_view(request, kit_id):
         "carnet": request.GET.get("carnet", ""),
         "cases": request.GET.get("cases", ""),
     }
-    pdf_bytes = build_kit_checklist_pdf(kit, meta)
+
+    item_overrides = {}
+    for row in get_kit_checklist_rows(kit):
+        asset_id = row["id"]
+        case_val = request.GET.get(f"case_{asset_id}", "").strip()
+        checked_val = request.GET.get(f"checked_{asset_id}", "") == "1"
+        if case_val or checked_val:
+            item_overrides[asset_id] = {"case": case_val, "checked": checked_val}
+
+    pdf_bytes = build_kit_checklist_pdf(kit, meta, item_overrides)
     filename = f"{kit.name} - Kit Checklist.pdf".replace("/", "-")
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -948,6 +959,41 @@ def clone_job(request, job_id):
             start_date=sb.start_date, end_date=sb.end_date, notes=sb.notes,
         )
     return JsonResponse({"ok": True, "job_id": new_job.id})
+
+
+@login_required
+@require_POST
+def job_create_view(request):
+    name = request.POST.get("name", "").strip()
+    category = request.POST.get("category", "").strip()
+    notes = request.POST.get("notes", "").strip()
+    custom_color = request.POST.get("custom_color", "").strip()
+    start_date = request.POST.get("start_date")
+    end_date = request.POST.get("end_date")
+
+    if not name:
+        return JsonResponse({"error": "Job name is required."}, status=400)
+    if not start_date or not end_date:
+        return JsonResponse({"error": "Start and end dates are required."}, status=400)
+    if custom_color and not re.fullmatch(r"#[0-9A-Fa-f]{6}", custom_color):
+        custom_color = ""
+
+    try:
+        start = datetime.date.fromisoformat(start_date)
+        end = datetime.date.fromisoformat(end_date)
+    except ValueError:
+        return JsonResponse({"error": "Invalid date format."}, status=400)
+
+    if start > end:
+        return JsonResponse({"error": "End date cannot be before start date."}, status=400)
+
+    category = category if category in Job.Category.values else Job.Category.TX
+
+    job = Job.objects.create(
+        name=name, category=category, notes=notes,
+        custom_color=custom_color, start_date=start, end_date=end,
+    )
+    return JsonResponse({"ok": True, "job_id": job.id})
 
 
 @login_required

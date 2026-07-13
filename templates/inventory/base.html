@@ -55,15 +55,26 @@
   nav.primary a:hover { color: var(--text); }
   nav.primary a.active { color: var(--accent); border-bottom-color: var(--accent); }
   nav.primary .nav-spacer { flex: 1; }
-  nav.primary .cog-link {
+  .cog-link {
     display: flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; margin: 6px 0; border-radius: 6px;
-    color: var(--text-dim); border-bottom: none; padding: 0;
+    width: 32px; height: 32px; border-radius: 6px;
+    color: var(--text-dim); border-bottom: none; padding: 0; text-decoration: none;
   }
-  nav.primary .cog-link:hover { color: var(--accent); background: var(--surface-2); }
-  nav.primary .cog-link.active { color: var(--accent); background: var(--accent-glow); }
-  nav.primary .cog-link svg { width: 17px; height: 17px; }
+  .cog-link:hover { color: var(--accent); background: var(--surface-2); }
+  .cog-link.active { color: var(--accent); background: var(--accent-glow); }
+  .cog-link svg { width: 18px; height: 18px; }
   .nav { display: flex; align-items: center; gap: 8px; }
+  nav.primary .nav { margin: 6px 0 6px 12px; }
+  nav.primary .nav a,
+  nav.primary .nav button {
+    padding: 7px 14px; border-bottom: none; color: var(--text); font-size: 13px;
+  }
+  nav.primary .nav a:hover,
+  nav.primary .nav button:hover { color: var(--text); }
+  nav.primary .nav a.btn-primary,
+  nav.primary .nav button.btn-primary { color: var(--accent-on); }
+  nav.primary .nav a.btn-primary:hover,
+  nav.primary .nav button.btn-primary:hover { color: var(--accent-on); }
   .btn {
     background: var(--surface-2); border: 1px solid var(--border-strong);
     color: var(--text); border-radius: 6px; padding: 7px 14px; font-size: 13px;
@@ -72,7 +83,7 @@
   .btn:hover { border-color: var(--accent-deep); }
   .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-on); font-weight: 600; }
   .btn-primary:hover { opacity: 0.9; border-color: var(--accent); }
-  .btn-active { background: var(--accent-glow); border-color: var(--accent-deep); color: var(--accent); }
+  .btn-active { background: var(--accent-glow); border-color: var(--accent-deep); color: var(--accent); font-weight: 600; }
   .range-label { color: var(--text-dim); font-size: 13px; min-width: 150px; font-family: var(--mono); }
   select.filter, input.filter {
     background: var(--surface-2); border: 1px solid var(--border-strong);
@@ -128,7 +139,7 @@
   .empty { padding: 48px 24px; text-align: center; color: var(--text-dim); }
   .empty a { color: var(--accent); }
   .grid-wrap { width: 100%; }
-  dialog#bookingDialog {
+  dialog.dialog-panel {
     background: var(--surface); color: var(--text);
     border: 1px solid var(--border-strong); border-radius: 10px;
     padding: 20px; width: 360px; max-width: 90vw;
@@ -148,13 +159,13 @@
     z-index: 5;
   }
   .dialog-close-x:hover { background: var(--surface-2); color: var(--text); }
-  dialog#bookingDialog h3 { margin: 0 0 14px; font-size: 15px; font-weight: 600; }
-  dialog#bookingDialog label { display: block; font-size: 12px; color: var(--text-dim); margin: 10px 0 4px; }
-  dialog#bookingDialog select, dialog#bookingDialog input {
+  dialog.dialog-panel h3 { margin: 0 0 14px; font-size: 15px; font-weight: 600; }
+  dialog.dialog-panel label { display: block; font-size: 12px; color: var(--text-dim); margin: 10px 0 4px; }
+  dialog.dialog-panel select, dialog.dialog-panel input {
     width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
     color: var(--text); border-radius: 6px; padding: 7px 8px; font-size: 13px;
   }
-  dialog#bookingDialog select:focus, dialog#bookingDialog input:focus { outline: none; border-color: var(--accent); }
+  dialog.dialog-panel select:focus, dialog.dialog-panel input:focus { outline: none; border-color: var(--accent); }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   .dialog-error { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
   .dialog-hint { color: var(--text-faint); font-size: 11px; margin-top: 10px; line-height: 1.5; }
@@ -189,7 +200,11 @@
     Kit scheduler
     <span class="sub">{% block brand_sub %}{% endblock %}</span>
   </div>
-  <div class="nav">{% block header_actions %}{% endblock %}</div>
+  <a href="/settings/" class="cog-link {% if active_nav == 'settings' %}active{% endif %}" title="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </a>
 </header>
 <nav class="primary">
   <a href="/" class="{% if active_nav == 'dashboard' %}active{% endif %}">Dashboard</a>
@@ -200,11 +215,7 @@
   <a href="/licenses/" class="{% if active_nav == 'licenses' %}active{% endif %}">Licenses</a>
   <a href="/tickets/" class="{% if active_nav == 'tickets' %}active{% endif %}">Tickets</a>
   <span class="nav-spacer"></span>
-  <a href="/settings/" class="cog-link {% if active_nav == 'settings' %}active{% endif %}" title="Settings">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-    </svg>
-  </a>
+  <div class="nav">{% block header_actions %}{% endblock %}</div>
 </nav>
 <main>{% block content %}{% endblock %}</main>
 

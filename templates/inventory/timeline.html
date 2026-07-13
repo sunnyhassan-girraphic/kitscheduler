@@ -3,13 +3,7 @@
 {% block brand_sub %}{{ total_kits }} kit{{ total_kits|pluralize }}, {{ total_staff }} staff{% endblock %}
 
 {% block header_actions %}
-  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ prev_anchor|date:'Y-m-d' }}">&larr;</a>
-  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Today</a>
-  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ next_anchor|date:'Y-m-d' }}">&rarr;</a>
-  <span class="range-label">
-    {% if range_mode == "month" %}{{ days.0|date:"F Y" }}{% else %}{{ days.0|date:"j M" }} &ndash; {{ days|last|date:"j M" }}{% endif %}
-  </span>
-  <a class="btn btn-primary" href="/admin/inventory/job/add/">+ New job</a>
+  <button type="button" class="btn btn-primary" onclick="document.getElementById('newJobDialog').showModal()">+ New job</button>
 {% endblock %}
 
 {% block extra_style %}
@@ -165,15 +159,24 @@
 </div>
 
 <div class="filter-bar">
-  <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em;">Range</span>
-  <a class="btn {% if range_mode == 'week' %}btn-active{% endif %}" href="?range=week&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Week</a>
-  <a class="btn {% if range_mode == 'month' %}btn-active{% endif %}" href="?range=month&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Month</a>
-  <span style="width:1px; height:16px; background:var(--border); margin:0 4px;"></span>
-  <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em;">Show</span>
-  <a class="btn {% if show_kits %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'0,1' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Kits</a>
-  <a class="btn {% if show_staff %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'0,1' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Staff</a>
-  <a class="btn {% if show_licenses %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'0,1' }}&start={{ anchor|date:'Y-m-d' }}">Licenses</a>
-  <span style="margin-left:auto; font-size:11px; color:var(--text-faint);">Drag across a row to pick a date range &middot; click a block to see details</span>
+  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ prev_anchor|date:'Y-m-d' }}">&larr;</a>
+  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Today</a>
+  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ next_anchor|date:'Y-m-d' }}">&rarr;</a>
+  <span class="range-label">
+    {% if range_mode == "month" %}{{ days.0|date:"F Y" }}{% else %}{{ days.0|date:"j M" }} &ndash; {{ days|last|date:"j M" }}{% endif %}
+  </span>
+  <span style="font-size:11px; color:var(--text-faint); margin-left:16px;">Drag across a row to pick a date range &middot; click a block to see details</span>
+
+  <span style="margin-left:auto; display:flex; align-items:center; gap:8px; flex-shrink:0;">
+    <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em;">Range</span>
+    <a class="btn {% if range_mode == 'week' %}btn-active{% endif %}" href="?range=week&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Week</a>
+    <a class="btn {% if range_mode == 'month' %}btn-active{% endif %}" href="?range=month&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Month</a>
+    <span style="width:1px; height:16px; background:var(--border); margin:0 4px;"></span>
+    <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em;">Show</span>
+    <a class="btn {% if show_kits %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'0,1' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Kits</a>
+    <a class="btn {% if show_staff %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'0,1' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Staff</a>
+    <a class="btn {% if show_licenses %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'0,1' }}&start={{ anchor|date:'Y-m-d' }}">Licenses</a>
+  </span>
 </div>
 
 {% if show_kits %}
@@ -351,7 +354,7 @@
 </dialog>
 
 <!-- Booking Dialog -->
-<dialog id="bookingDialog">
+<dialog id="bookingDialog" class="dialog-panel">
   <button type="button" class="dialog-close-x" onclick="closeBookingDialog()" aria-label="Close">&times;</button>
   <h3 id="dialogTitle">New booking</h3>
   <form id="bookingForm">
@@ -411,6 +414,46 @@
     </div>
     <div class="dialog-actions">
       <button type="button" class="btn btn-primary" onclick="submitBooking()">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- New Job Dialog (standalone - no kit/staff/license attached yet) -->
+<dialog id="newJobDialog" class="dialog-panel">
+  <button type="button" class="dialog-close-x" onclick="document.getElementById('newJobDialog').close()" aria-label="Close">&times;</button>
+  <h3>New job</h3>
+  <form id="newJobForm">
+    {% csrf_token %}
+    <label for="nj_name">Job name</label>
+    <input type="text" id="nj_name" autofocus>
+
+    <label for="nj_category">Category</label>
+    <select id="nj_category">
+      {% for value, label in job_categories %}
+        <option value="{{ value }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="nj_start">Start date</label>
+    <input type="date" id="nj_start">
+    <label for="nj_end">End date</label>
+    <input type="date" id="nj_end">
+
+    <label for="nj_notes">Notes (optional)</label>
+    <input type="text" id="nj_notes">
+
+    <div class="color-override-row">
+      <input class="color-swatch-input" type="color" id="nj_color" value="#EAB308" disabled>
+      <label class="color-override-label" for="nj_color_override">
+        <input type="checkbox" id="nj_color_override" onchange="document.getElementById('nj_color').disabled = !this.checked">
+        Custom color
+      </label>
+    </div>
+
+    <div class="dialog-hint">This creates the job on its own. Book kits, staff, or licenses onto it afterwards by dragging across their row on the timeline.</div>
+    <div class="dialog-error" id="newJobError"></div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-primary" onclick="submitNewJob()">Create job</button>
     </div>
   </form>
 </dialog>
@@ -535,6 +578,40 @@ async function submitBooking() {
     const data = await resp.json();
     if (!resp.ok) { errorEl.textContent = data.error || "Something went wrong."; errorEl.style.display = "block"; return; }
     dialog.close();
+    location.reload();
+  } catch (err) {
+    errorEl.textContent = "Network error. Please try again."; errorEl.style.display = "block";
+  }
+}
+
+async function submitNewJob() {
+  const name = document.getElementById("nj_name").value.trim();
+  const category = document.getElementById("nj_category").value;
+  const startDate = document.getElementById("nj_start").value;
+  const endDate = document.getElementById("nj_end").value;
+  const notes = document.getElementById("nj_notes").value.trim();
+  const colorOverride = document.getElementById("nj_color_override").checked;
+  const color = colorOverride ? document.getElementById("nj_color").value : "";
+
+  const errorEl = document.getElementById("newJobError");
+  errorEl.style.display = "none";
+
+  if (!name) { errorEl.textContent = "Enter a job name."; errorEl.style.display = "block"; return; }
+  if (!startDate || !endDate) { errorEl.textContent = "Pick a start and end date."; errorEl.style.display = "block"; return; }
+
+  const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  const params = { name, category, start_date: startDate, end_date: endDate };
+  if (notes) params.notes = notes;
+  if (color) params.custom_color = color;
+
+  try {
+    const resp = await fetch("/api/jobs/create/", {
+      method: "POST", headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(params).toString(),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { errorEl.textContent = data.error || "Something went wrong."; errorEl.style.display = "block"; return; }
+    document.getElementById("newJobDialog").close();
     location.reload();
   } catch (err) {
     errorEl.textContent = "Network error. Please try again."; errorEl.style.display = "block";

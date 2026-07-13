@@ -2,7 +2,7 @@
 {% block title %}Dashboard - Kit scheduler{% endblock %}
 {% block brand_sub %}{{ today|date:"l, j F" }}{% endblock %}
 {% block header_actions %}
-  <a class="btn btn-primary" href="/admin/inventory/job/add/">+ New job</a>
+  <button type="button" class="btn btn-primary" onclick="document.getElementById('newJobDialog').showModal()">+ New job</button>
 {% endblock %}
 {% block extra_style %}
   .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 20px 24px; }
@@ -128,7 +128,7 @@
             </span>
           </a>
         {% empty %}
-          <div class="dash-empty">Nothing scheduled yet. <a href="/admin/inventory/job/add/" style="color:var(--accent);">Add a job</a>.</div>
+          <div class="dash-empty">Nothing scheduled yet. <a href="#" onclick="document.getElementById('newJobDialog').showModal(); return false;" style="color:var(--accent);">Add a job</a>.</div>
         {% endfor %}
       </div>
     </div>
@@ -182,6 +182,82 @@
     <button class="btn" id="jdDeleteBtn" style="color:var(--red);" onclick="dashDeleteJob()">Delete job</button>
   </div>
 </dialog>
+
+<!-- New Job Dialog -->
+<dialog id="newJobDialog" class="dialog-panel">
+  <button type="button" class="dialog-close-x" onclick="document.getElementById('newJobDialog').close()" aria-label="Close">&times;</button>
+  <h3>New job</h3>
+  <form id="newJobForm">
+    {% csrf_token %}
+    <label for="nj_name">Job name</label>
+    <input type="text" id="nj_name" autofocus>
+
+    <label for="nj_category">Category</label>
+    <select id="nj_category">
+      {% for value, label in job_categories %}
+        <option value="{{ value }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="nj_start">Start date</label>
+    <input type="date" id="nj_start">
+    <label for="nj_end">End date</label>
+    <input type="date" id="nj_end">
+
+    <label for="nj_notes">Notes (optional)</label>
+    <input type="text" id="nj_notes">
+
+    <div class="color-override-row">
+      <input class="color-swatch-input" type="color" id="nj_color" value="#EAB308" disabled>
+      <label class="color-override-label" for="nj_color_override">
+        <input type="checkbox" id="nj_color_override" onchange="document.getElementById('nj_color').disabled = !this.checked">
+        Custom color
+      </label>
+    </div>
+
+    <div class="dialog-hint">This creates the job on its own. Book kits, staff, or licenses onto it from the Timeline afterwards.</div>
+    <div class="dialog-error" id="newJobError"></div>
+    <div class="dialog-actions">
+      <button type="button" class="btn btn-primary" onclick="submitNewJob()">Create job</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+async function submitNewJob() {
+  const name = document.getElementById("nj_name").value.trim();
+  const category = document.getElementById("nj_category").value;
+  const startDate = document.getElementById("nj_start").value;
+  const endDate = document.getElementById("nj_end").value;
+  const notes = document.getElementById("nj_notes").value.trim();
+  const colorOverride = document.getElementById("nj_color_override").checked;
+  const color = colorOverride ? document.getElementById("nj_color").value : "";
+
+  const errorEl = document.getElementById("newJobError");
+  errorEl.style.display = "none";
+
+  if (!name) { errorEl.textContent = "Enter a job name."; errorEl.style.display = "block"; return; }
+  if (!startDate || !endDate) { errorEl.textContent = "Pick a start and end date."; errorEl.style.display = "block"; return; }
+
+  const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  const params = { name, category, start_date: startDate, end_date: endDate };
+  if (notes) params.notes = notes;
+  if (color) params.custom_color = color;
+
+  try {
+    const resp = await fetch("/api/jobs/create/", {
+      method: "POST", headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(params).toString(),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { errorEl.textContent = data.error || "Something went wrong."; errorEl.style.display = "block"; return; }
+    document.getElementById("newJobDialog").close();
+    location.reload();
+  } catch (err) {
+    errorEl.textContent = "Network error. Please try again."; errorEl.style.display = "block";
+  }
+}
+</script>
 
 <script>
 const dashJobDialog = document.getElementById("jobDetailDialog");
