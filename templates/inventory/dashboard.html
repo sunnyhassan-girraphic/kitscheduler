@@ -56,6 +56,26 @@
           <div class="label">staff free 1+ day</div>
         </div>
       </div>
+      <div class="avail-pair">
+        <div class="avail-stat">
+          <div class="num">{{ licenses_fully_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_licenses }}</span></div>
+          <div class="label">licenses free all week</div>
+        </div>
+        <div class="avail-stat">
+          <div class="num">{{ licenses_partially_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_licenses }}</span></div>
+          <div class="label">licenses free 1+ day</div>
+        </div>
+      </div>
+      <div class="avail-pair" style="border-left:1px solid var(--border); margin-left:4px; padding-left:20px;">
+        <a class="avail-stat" href="/timeline/" style="text-decoration:none; color:inherit;">
+          <div class="num">{{ jobs_this_week }}</div>
+          <div class="label">jobs this week</div>
+        </a>
+        <a class="avail-stat" href="/tickets/?status=OPEN" style="text-decoration:none; color:inherit;">
+          <div class="num" style="{% if urgent_ticket_count %}color:var(--red);{% endif %}">{{ open_ticket_count }}{% if urgent_ticket_count %}<span style="font-size:13px; color:var(--red); font-weight:400;"> ({{ urgent_ticket_count }} urgent)</span>{% endif %}</div>
+          <div class="label">open tickets</div>
+        </a>
+      </div>
     </div>
   </div>
 
@@ -99,7 +119,7 @@
       </div>
       <div class="dash-card-body">
         {% for job in upcoming_jobs %}
-          <a class="dash-row" style="text-decoration:none; color:inherit;" href="/admin/inventory/job/{{ job.id }}/change/">
+          <a class="dash-row" style="text-decoration:none; color:inherit; cursor:pointer;" onclick="openDashJobDetail({{ job.id }}); return false;" href="/admin/inventory/job/{{ job.id }}/change/">
             <span class="primary-text">{{ job.name }}</span>
             <span class="badge badge-type">{{ job.get_category_display }}</span>
             <span class="secondary-text">
@@ -120,7 +140,7 @@
       </div>
       <div class="dash-card-body">
         {% for asset in attention_assets %}
-          <a class="dash-row" style="text-decoration:none; color:inherit;" href="/admin/inventory/asset/{{ asset.id }}/change/">
+          <a class="dash-row" style="text-decoration:none; color:inherit;" href="/assets/?q={{ asset.asset_id|urlencode }}">
             <span class="attention-dot"></span>
             <span class="primary-text">{{ asset.asset_id }}</span>
             <span class="secondary-text">{{ asset.make_model|default:"" }}</span>
@@ -138,4 +158,71 @@
     </div>
   </div>
 </div>
+
+<!-- Job Detail Dialog -->
+<dialog id="jobDetailDialog" style="background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 10px; padding: 0; width: 420px; max-width: 90vw;">
+  <div style="display:flex; align-items:center; gap:10px; padding:16px; border-bottom:1px solid var(--border);">
+    <div id="jdColorBar" style="width:6px; height:32px; border-radius:3px; flex-shrink:0;"></div>
+    <div>
+      <div id="jdTitle" style="font-weight:600; font-size:15px;"></div>
+      <div id="jdCategory" style="font-size:12px; color:var(--text-dim);"></div>
+    </div>
+  </div>
+  <div style="padding:16px;">
+    <div style="display:flex; gap:8px; padding:6px 0; font-size:13px;"><span style="color:var(--text-dim); min-width:80px;">Dates</span><span id="jdDates"></span></div>
+    <div id="jdKitsRow" style="display:none; gap:8px; padding:6px 0; font-size:13px;"><span style="color:var(--text-dim); min-width:80px;">Kits</span><span id="jdKits"></span></div>
+    <div id="jdStaffRow" style="display:none; gap:8px; padding:6px 0; font-size:13px;"><span style="color:var(--text-dim); min-width:80px;">Staff</span><span id="jdStaff"></span></div>
+    <div id="jdNotesRow" style="display:none; gap:8px; padding:6px 0; font-size:13px;"><span style="color:var(--text-dim); min-width:80px;">Notes</span><span id="jdNotes"></span></div>
+  </div>
+  <div style="display:flex; gap:8px; padding:14px 16px; border-top:1px solid var(--border);">
+    <button class="btn" onclick="document.getElementById('jobDetailDialog').close()">Close</button>
+    <span style="flex:1;"></span>
+    <a class="btn" id="jdEditLink" href="#">Edit job</a>
+    <button class="btn" id="jdCloneBtn" onclick="dashCloneJob()">Clone</button>
+    <button class="btn" id="jdDeleteBtn" style="color:var(--red);" onclick="dashDeleteJob()">Delete job</button>
+  </div>
+</dialog>
+
+<script>
+const dashJobDialog = document.getElementById("jobDetailDialog");
+let dashActiveJobId = null;
+
+async function openDashJobDetail(jobId) {
+  dashActiveJobId = jobId;
+  try {
+    const resp = await fetch(`/api/jobs/${jobId}/`);
+    const job = await resp.json();
+    document.getElementById("jdTitle").textContent = job.name;
+    document.getElementById("jdCategory").textContent = job.category_display;
+    document.getElementById("jdColorBar").style.background = job.color;
+    const start = new Date(job.start_date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const end = new Date(job.end_date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    document.getElementById("jdDates").textContent = start === end ? start : `${start} - ${end}`;
+    if (job.kits.length) { document.getElementById("jdKits").textContent = job.kits.join(", "); document.getElementById("jdKitsRow").style.display = "flex"; }
+    else document.getElementById("jdKitsRow").style.display = "none";
+    if (job.staff.length) { document.getElementById("jdStaff").textContent = job.staff.join(", "); document.getElementById("jdStaffRow").style.display = "flex"; }
+    else document.getElementById("jdStaffRow").style.display = "none";
+    if (job.notes) { document.getElementById("jdNotes").textContent = job.notes; document.getElementById("jdNotesRow").style.display = "flex"; }
+    else document.getElementById("jdNotesRow").style.display = "none";
+    document.getElementById("jdEditLink").href = `/admin/inventory/job/${jobId}/change/`;
+    dashJobDialog.showModal();
+  } catch (e) { console.error(e); }
+}
+
+async function dashDeleteJob() {
+  if (!dashActiveJobId || !confirm("Delete this ENTIRE job and all its bookings? This cannot be undone.")) return;
+  const csrf = document.querySelector("[name=csrfmiddlewaretoken]")?.value || "{{ csrf_token }}";
+  await fetch(`/api/jobs/${dashActiveJobId}/delete/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
+  dashJobDialog.close();
+  location.reload();
+}
+
+async function dashCloneJob() {
+  if (!dashActiveJobId) return;
+  const csrf = document.querySelector("[name=csrfmiddlewaretoken]")?.value || "{{ csrf_token }}";
+  const resp = await fetch(`/api/jobs/${dashActiveJobId}/clone/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
+  const data = await resp.json();
+  if (data.ok) { dashJobDialog.close(); location.reload(); }
+}
+</script>
 {% endblock %}

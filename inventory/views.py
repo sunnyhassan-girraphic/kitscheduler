@@ -166,6 +166,22 @@ def dashboard_view(request):
     kits_fully_free, kits_partially_free = _week_availability(kits, bookings_by_kit, week_days)
     staff_fully_free, staff_partially_free = _week_availability(staff, bookings_by_staff, week_days)
 
+    licenses = list(Asset.objects.filter(asset_type=Asset.AssetType.LICENSE, archived=False))
+    license_bookings_week = list(AssetBooking.objects.filter(
+        asset__asset_type=Asset.AssetType.LICENSE,
+        start_date__lte=week_days[-1], end_date__gte=week_days[0],
+    ))
+    bookings_by_license = {}
+    for b in license_bookings_week:
+        bookings_by_license.setdefault(b.asset_id, []).append(b)
+    licenses_fully_free, licenses_partially_free = _week_availability(licenses, bookings_by_license, week_days)
+
+    jobs_this_week = Job.objects.filter(start_date__lte=week_days[-1], end_date__gte=week_days[0]).count()
+
+    open_tickets = Ticket.objects.filter(status__in=[Ticket.Status.OPEN, Ticket.Status.IN_PROGRESS])
+    open_ticket_count = open_tickets.count()
+    urgent_ticket_count = open_tickets.filter(priority__in=[Ticket.Priority.HIGH, Ticket.Priority.URGENT]).count()
+
     upcoming_jobs = list(Job.objects.filter(start_date__gte=today).order_by("start_date")[:8])
 
     attention_assets = list(
@@ -190,6 +206,12 @@ def dashboard_view(request):
         "kits_partially_free": kits_partially_free,
         "staff_fully_free": staff_fully_free,
         "staff_partially_free": staff_partially_free,
+        "total_licenses": len(licenses),
+        "licenses_fully_free": licenses_fully_free,
+        "licenses_partially_free": licenses_partially_free,
+        "jobs_this_week": jobs_this_week,
+        "open_ticket_count": open_ticket_count,
+        "urgent_ticket_count": urgent_ticket_count,
         "upcoming_jobs": upcoming_jobs,
         "attention_assets": attention_assets,
         "attention_count": attention_count,
@@ -391,13 +413,39 @@ def kit_list_view(request):
     return render(request, "inventory/kit_list.html", context)
 
 
-def _kit_picker_assets():
-    """Assets eligible to be direct kit members, with nested-component info for engines."""
-    assets = Asset.objects.filter(
+def _kit_eligible_assets_qs(current_kit=None):
+    """Assets eligible to be direct kit members: not archived, not COMPONENT
+    type, and not already claimed by a DIFFERENT kit (directly, or nested
+    inside an Engine that's a member of a different kit) - an asset can only
+    live in one kit at a time. Assets already in the current kit are always
+    included so they remain visible/removable even in edge cases."""
+    other_kit_asset_ids = set(
+        Kit.objects.exclude(pk=current_kit.pk if current_kit else None)
+        .values_list("assets__id", flat=True)
+    )
+    other_kit_asset_ids.discard(None)
+    other_kit_engine_ids = set(
+        Asset.objects.filter(
+            id__in=other_kit_asset_ids, asset_type=Asset.AssetType.ENGINE
+        ).values_list("id", flat=True)
+    )
+    current_kit_asset_ids = set(current_kit.assets.values_list("id", flat=True)) if current_kit else set()
+
+    return Asset.objects.filter(
         archived=False
     ).exclude(
         asset_type=Asset.AssetType.COMPONENT
-    ).order_by("asset_type", "asset_id").prefetch_related("nested_assets")
+    ).filter(
+        Q(id__in=current_kit_asset_ids)
+        | (~Q(id__in=other_kit_asset_ids) & ~Q(parent_engine_id__in=other_kit_engine_ids))
+    )
+
+
+def _kit_picker_assets(current_kit=None):
+    """Assets eligible to be direct kit members, with nested-component info for engines."""
+    assets = _kit_eligible_assets_qs(current_kit).order_by(
+        "asset_type", "asset_id"
+    ).prefetch_related("nested_assets")
 
     data = []
     for a in assets:
@@ -439,9 +487,7 @@ def kit_create_view(request):
 
         kit = Kit.objects.create(name=name, notes=notes)
         if selected_ids:
-            valid_assets = Asset.objects.filter(
-                id__in=selected_ids, archived=False
-            ).exclude(asset_type=Asset.AssetType.COMPONENT)
+            valid_assets = _kit_eligible_assets_qs(kit).filter(id__in=selected_ids)
             kit.assets.set(valid_assets)
 
         return redirect("/kits/")
@@ -454,7 +500,7 @@ def kit_create_view(request):
 @login_required
 def kit_edit_view(request, kit_id):
     kit = get_object_or_404(Kit, pk=kit_id)
-    assets, assets_json = _kit_picker_assets()
+    assets, assets_json = _kit_picker_assets(current_kit=kit)
 
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
@@ -479,9 +525,7 @@ def kit_edit_view(request, kit_id):
         kit.notes = notes
         kit.save()
 
-        valid_assets = Asset.objects.filter(
-            id__in=selected_ids, archived=False
-        ).exclude(asset_type=Asset.AssetType.COMPONENT)
+        valid_assets = _kit_eligible_assets_qs(kit).filter(id__in=selected_ids)
         kit.assets.set(valid_assets)
 
         return redirect("/kits/")
@@ -508,7 +552,14 @@ def kit_delete_view(request, kit_id):
 @login_required
 def kit_pdf_view(request, kit_id):
     kit = get_object_or_404(Kit, pk=kit_id)
-    pdf_bytes = build_kit_checklist_pdf(kit)
+    meta = {
+        "packed_by": request.GET.get("packed_by", ""),
+        "event_date": request.GET.get("event_date", ""),
+        "gps_tag": request.GET.get("gps_tag", ""),
+        "carnet": request.GET.get("carnet", ""),
+        "cases": request.GET.get("cases", ""),
+    }
+    pdf_bytes = build_kit_checklist_pdf(kit, meta)
     filename = f"{kit.name} - Kit Checklist.pdf".replace("/", "-")
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -1194,7 +1245,7 @@ def ticket_detail_view(request, ticket_id):
         "ticket": ticket,
         "statuses": Ticket.Status.choices,
         "priorities": Ticket.Priority.choices,
-        "history": ticket.history.select_related("changed_by").all(),
+        "history": ticket.history.select_related("changed_by").order_by("-created_at"),
         "active_nav": "tickets",
     })
 

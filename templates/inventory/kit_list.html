@@ -24,6 +24,13 @@
   .member-row .mname { color: var(--text); min-width: 130px; }
   .member-row .mmodel { color: var(--text-dim); flex: 1; }
   .member-row .mnested { font-size: 11px; color: var(--text-faint); font-family: var(--mono); }
+  .nested-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 16px 6px 40px; font-size: 12px; border-top: 1px solid var(--border);
+    color: var(--text-dim); background: var(--bg);
+  }
+  .nested-row .nname { font-family: var(--mono); min-width: 120px; color: var(--text-dim); }
+  .nested-row .nmodel { flex: 1; }
   .empty-members { padding: 10px 16px; color: var(--text-faint); font-size: 12px; font-style: italic; }
 {% endblock %}
 {% block content %}
@@ -58,6 +65,15 @@
         {% endif %}
         <span class="badge badge-{{ member.status|lower }}">{{ member.get_status_display }}</span>
       </div>
+      {% if member.asset_type == "ENGINE" %}
+        {% for comp in member.nested_assets.all %}
+          <div class="nested-row">
+            <span class="nname">{{ comp.asset_id }}</span>
+            <span class="nmodel">{{ comp.get_asset_type_display }}{% if comp.make_model %} &middot; {{ comp.make_model }}{% endif %}</span>
+            <span class="badge badge-{{ comp.status|lower }}">{{ comp.get_status_display }}</span>
+          </div>
+        {% endfor %}
+      {% endif %}
     {% empty %}
       <div class="empty-members">No members added yet.</div>
     {% endfor %}

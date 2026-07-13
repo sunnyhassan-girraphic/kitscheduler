@@ -73,16 +73,24 @@ def _title_band(kit_name):
     return tbl
 
 
-def _meta_field(label):
-    return Paragraph(f"<b>{label}</b>", label_style), Spacer(1, 14)
+def _meta_grid(meta=None):
+    meta = meta or {}
 
+    def field(label, key, extra_space=14):
+        value = meta.get(key, "").strip()
+        cell = [Paragraph(f"<b>{label}</b>", label_style)]
+        if value:
+            cell.append(Paragraph(value, value_style))
+            cell.append(Spacer(1, max(extra_space - 12, 2)))
+        else:
+            cell.append(Spacer(1, extra_space))
+        return cell
 
-def _meta_grid():
-    packed_by_cell = [Paragraph("<b>PACKED BY</b>", label_style), Spacer(1, 30)]
-    event_date_cell = [Paragraph("<b>EVENT DATE</b>", label_style), Spacer(1, 14)]
-    gps_tag_cell = [Paragraph("<b>GPS TAG</b>", label_style), Spacer(1, 14)]
-    carnet_cell = [Paragraph("<b>CARNET</b>", label_style), Spacer(1, 14)]
-    cases_cell = [Paragraph("<b>No. of CASES</b>", label_style), Spacer(1, 14)]
+    packed_by_cell = field("PACKED BY", "packed_by", extra_space=30)
+    event_date_cell = field("EVENT DATE", "event_date")
+    gps_tag_cell = field("GPS TAG", "gps_tag")
+    carnet_cell = field("CARNET", "carnet")
+    cases_cell = field("No. of CASES", "cases")
     blank_cell = ""
 
     col1 = CONTENT_WIDTH * 0.34
@@ -164,8 +172,10 @@ def _items_table(kit):
     return tbl, len(rows)
 
 
-def build_kit_checklist_pdf(kit):
-    """Returns PDF bytes for a single kit's printable checklist."""
+def build_kit_checklist_pdf(kit, meta=None):
+    """Returns PDF bytes for a single kit's printable checklist.
+    `meta` may include packed_by, event_date, gps_tag, carnet, cases -
+    any left out (or blank) render as blank hand-fill space, as before."""
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
@@ -178,7 +188,7 @@ def build_kit_checklist_pdf(kit):
     story = [
         _title_band(kit.name),
         Spacer(1, 6),
-        _meta_grid(),
+        _meta_grid(meta),
         Spacer(1, 10),
         items_table,
     ]

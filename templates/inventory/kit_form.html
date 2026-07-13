@@ -4,7 +4,7 @@
 
 {% block header_actions %}
   {% if kit %}
-  <a class="btn" href="/kits/{{ kit.id }}/pdf/">Download kit list PDF</a>
+  <button class="btn" type="button" onclick="document.getElementById('pdfMetaDialog').showModal()">Download kit list PDF</button>
   {% endif %}
   <a class="btn" href="/kits/">Cancel</a>
 {% endblock %}
@@ -108,6 +108,8 @@
   }
   .picker-nested-row .nmodel { color: var(--text-faint); font-family: inherit; }
   .picker-search-wrap { position: relative; }
+  .picker-filter-row { display: flex; gap: 8px; align-items: center; }
+  .picker-filter-row select { min-width: 140px; }
   .picker-search-wrap input {
     width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
     color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px;
@@ -185,11 +187,16 @@
         <div class="picker-selected" id="picker-selected"></div>
         <div class="picker-empty" id="picker-empty" style="display:none;">No assets added yet. Search below to add some.</div>
 
-        <div class="picker-search-wrap">
-          <input type="text" id="asset-search" placeholder="Search by ID or model to add an asset..." autocomplete="off">
+        <div class="picker-filter-row">
+          <div class="picker-search-wrap" style="flex:1;">
+            <input type="text" id="asset-search" placeholder="Search by ID or model to add an asset..." autocomplete="off">
+          </div>
+          <select id="asset-type-filter" class="filter">
+            <option value="">All types</option>
+          </select>
         </div>
         <div class="picker-results" id="picker-results"></div>
-        <div class="picker-hint">Individually-tracked components aren't listed here directly - add the Engine they're nested in instead.</div>
+        <div class="picker-hint">Individually-tracked components aren't listed here directly - add the Engine they're nested in instead. Assets already assigned to another kit won't appear here until removed from it.</div>
       </div>
     </div>
 
@@ -210,9 +217,52 @@
       <button class="btn" type="submit" style="color:var(--red);">Delete kit</button>
     </form>
   </div>
+
+  <dialog id="pdfMetaDialog" style="background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 10px; padding: 20px; width: 380px; max-width: 90vw;">
+    <h3 style="margin:0 0 4px; font-size:15px; font-weight:600;">Kit list PDF details</h3>
+    <p style="margin:0 0 14px; font-size:12px; color:var(--text-dim);">Fill in what you know now - anything left blank prints as a hand-fill line, same as leaving it blank on paper.</p>
+    <div class="form-field">
+      <label for="pdf-packed-by">Packed by</label>
+      <input type="text" id="pdf-packed-by" placeholder="e.g. Sunny Hassan">
+    </div>
+    <div class="form-field">
+      <label for="pdf-event-date">Event date</label>
+      <input type="text" id="pdf-event-date" placeholder="e.g. 10/06/2026">
+    </div>
+    <div class="form-field">
+      <label for="pdf-gps-tag">GPS tag</label>
+      <input type="text" id="pdf-gps-tag">
+    </div>
+    <div class="form-field">
+      <label for="pdf-carnet">Carnet</label>
+      <input type="text" id="pdf-carnet">
+    </div>
+    <div class="form-field">
+      <label for="pdf-cases">No. of cases</label>
+      <input type="text" id="pdf-cases">
+    </div>
+    <div class="form-actions" style="padding-top:6px;">
+      <button class="btn" type="button" onclick="document.getElementById('pdfMetaDialog').close()">Cancel</button>
+      <button class="btn btn-primary" type="button" onclick="downloadKitPdf({{ kit.id }})">Download PDF</button>
+    </div>
+  </dialog>
   {% endif %}
 
 </div>
+
+<script>
+function downloadKitPdf(kitId) {
+  const params = new URLSearchParams({
+    packed_by: document.getElementById("pdf-packed-by").value.trim(),
+    event_date: document.getElementById("pdf-event-date").value.trim(),
+    gps_tag: document.getElementById("pdf-gps-tag").value.trim(),
+    carnet: document.getElementById("pdf-carnet").value.trim(),
+    cases: document.getElementById("pdf-cases").value.trim(),
+  });
+  window.location.href = `/kits/${kitId}/pdf/?${params.toString()}`;
+  document.getElementById("pdfMetaDialog").close();
+}
+</script>
 
 {{ assets_json|json_script:"assets-data" }}
 <script>
@@ -225,10 +275,19 @@
   const emptyMsg = document.getElementById("picker-empty");
   const resultsContainer = document.getElementById("picker-results");
   const searchInput = document.getElementById("asset-search");
+  const typeFilter = document.getElementById("asset-type-filter");
   const countEl = document.getElementById("selected-count");
   const pluralEl = document.getElementById("selected-plural");
 
   let selected = new Set([{{ selected_ids|join:"," }}]);
+
+  // Populate the type filter from whatever types actually exist in the pool
+  Array.from(new Set(ALL.map(a => a.type))).sort().forEach(t => {
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = t;
+    typeFilter.appendChild(opt);
+  });
 
   function statusBadge(a) {
     return `<span class="astatus"><span class="badge badge-${a.status}">${a.statusDisplay}</span></span>`;
@@ -267,12 +326,14 @@
 
   function renderResults() {
     const q = searchInput.value.toLowerCase().trim();
+    const typeVal = typeFilter.value;
     resultsContainer.innerHTML = "";
-    if (!q) return;
+    if (!q && !typeVal) return;
     const matches = ALL.filter(a =>
       !selected.has(a.id) &&
-      (a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q))
-    ).slice(0, 8);
+      (typeVal === "" || a.type === typeVal) &&
+      (q === "" || a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q))
+    );
     if (!matches.length) {
       resultsContainer.innerHTML = `<div class="picker-hint" style="margin-top:8px;">No matching assets found.</div>`;
       return;
@@ -309,6 +370,7 @@
   });
 
   searchInput.addEventListener("input", renderResults);
+  typeFilter.addEventListener("change", renderResults);
 
   renderSelected();
 })();
