@@ -68,6 +68,10 @@ class Asset(models.Model):
         related_name="updated_assets",
     )
     last_updated_date = models.DateField(null=True, blank=True)
+    last_updated_notes = models.CharField(
+        max_length=300, blank=True,
+        help_text="Short note on what changed, e.g. 'Replaced fan, retested OK'.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

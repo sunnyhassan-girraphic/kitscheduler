@@ -13,6 +13,7 @@ from .models import (
 
 class ComponentPickerField(forms.ModelMultipleChoiceField):
     def __init__(self, *args, **kwargs):
+        kwargs.setdefault("queryset", Asset.objects.none())
         kwargs.setdefault("required", False)
         kwargs.setdefault("label", "Components")
         kwargs.setdefault(
@@ -60,7 +61,7 @@ class AssetAdmin(admin.ModelAdmin):
         ),
         (
             "Last updated",
-            {"fields": ("last_updated_by", "last_updated_date")},
+            {"fields": ("last_updated_by", "last_updated_date", "last_updated_notes")},
         ),
     )
 
@@ -77,7 +78,7 @@ class AssetAdmin(admin.ModelAdmin):
         real_fields = [
             "asset_id", "asset_type", "status", "archived", "make_model", "serial",
             "qty", "notes", "license_type", "license_functionality", "parent_engine",
-            "last_updated_by", "last_updated_date",
+            "last_updated_by", "last_updated_date", "last_updated_notes",
         ]
         base_form = modelform_factory(
             Asset, form=forms.ModelForm, fields=real_fields,

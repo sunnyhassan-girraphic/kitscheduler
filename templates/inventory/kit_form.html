@@ -3,6 +3,9 @@
 {% block brand_sub %}{% if kit %}Editing kit{% else %}New kit{% endif %}{% endblock %}
 
 {% block header_actions %}
+  {% if kit %}
+  <a class="btn" href="/kits/{{ kit.id }}/pdf/">Download kit list PDF</a>
+  {% endif %}
   <a class="btn" href="/kits/">Cancel</a>
 {% endblock %}
 
@@ -12,6 +15,12 @@
     margin: 0 auto;
     padding: 24px;
   }
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--text-dim); text-decoration: none; font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .back-link:hover { color: var(--accent); }
   .form-section {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -63,53 +72,50 @@
     margin-bottom: 16px;
   }
 
-  /* Asset picker */
-  .asset-search-wrap {
-    margin-bottom: 12px;
+  /* Asset picker: selected list (with nested components for engines) + search-to-add */
+  .picker-selected { margin-bottom: 14px; }
+  .picker-empty {
+    padding: 14px 10px; font-size: 12px; color: var(--text-faint);
+    font-style: italic; text-align: center; border: 1px dashed var(--border-strong);
+    border-radius: 6px;
   }
-  .asset-search-wrap input {
-    width: 100%;
+  .picker-item { margin-bottom: 6px; }
+  .picker-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border);
     background: var(--surface-2);
-    border: 1px solid var(--border-strong);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 8px 10px;
-    font-size: 13px;
-    font-family: inherit;
-    box-sizing: border-box;
   }
-  .asset-search-wrap input:focus { outline: none; border-color: var(--accent); }
-
-  .asset-type-group { margin-bottom: 12px; }
-  .asset-type-label {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 4px 0;
-    margin-bottom: 4px;
+  .picker-row .aid { font-family: var(--mono); font-size: 12px; color: var(--text); min-width: 110px; }
+  .picker-row .amodel { font-size: 12px; color: var(--text-dim); flex: 1; }
+  .picker-row .atype { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
+  .picker-row .astatus .badge { font-size: 10px; padding: 2px 6px; }
+  .picker-remove-btn {
+    background: none; border: none; color: var(--text-faint); cursor: pointer;
+    font-size: 16px; line-height: 1; padding: 2px 4px; flex-shrink: 0;
   }
-  .asset-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 7px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    border: 1px solid transparent;
+  .picker-remove-btn:hover { color: var(--red); }
+  .picker-add-btn {
+    background: var(--accent-glow); border: 1px solid var(--accent-deep); color: var(--accent);
+    cursor: pointer; font-size: 12px; padding: 3px 10px; border-radius: 5px; flex-shrink: 0;
   }
-  .asset-row:hover { background: var(--surface-2); }
-  .asset-row.selected {
-    background: var(--accent-glow);
-    border-color: var(--accent-deep);
+  .picker-add-btn:hover { opacity: 0.85; }
+  .picker-nested {
+    margin: 4px 0 0 24px; padding-left: 10px; border-left: 2px solid var(--border-strong);
   }
-  .asset-row input[type="checkbox"] { margin: 0; accent-color: var(--accent); flex-shrink: 0; }
-  .asset-row .aid { font-family: var(--mono); font-size: 12px; color: var(--text); min-width: 120px; }
-  .asset-row .amodel { font-size: 12px; color: var(--text-dim); flex: 1; }
-  .asset-row .anested { font-size: 11px; color: var(--text-faint); font-family: var(--mono); }
-  .asset-row .astatus .badge { font-size: 10px; padding: 2px 6px; }
-  .no-results { padding: 12px 0; font-size: 12px; color: var(--text-faint); font-style: italic; }
+  .picker-nested-row {
+    font-size: 11px; color: var(--text-faint); font-family: var(--mono);
+    padding: 2px 0;
+  }
+  .picker-nested-row .nmodel { color: var(--text-faint); font-family: inherit; }
+  .picker-search-wrap { position: relative; }
+  .picker-search-wrap input {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px;
+    font-family: inherit; box-sizing: border-box;
+  }
+  .picker-search-wrap input:focus { outline: none; border-color: var(--accent); }
+  .picker-results { margin-top: 8px; max-height: 260px; overflow-y: auto; }
+  .picker-hint { font-size: 11px; color: var(--text-faint); margin-top: 6px; }
 
   .selected-count {
     font-size: 12px;
@@ -142,11 +148,13 @@
 {% block content %}
 <div class="form-page">
 
+  <a class="back-link" href="/kits/">&larr; All kits</a>
+
   {% if error %}
   <div class="error-msg">{{ error }}</div>
   {% endif %}
 
-  <form method="post">
+  <form method="post" id="kit-form">
     {% csrf_token %}
 
     <div class="form-section">
@@ -167,36 +175,21 @@
       <div class="form-section-head">Assets in this kit</div>
       <div class="form-section-body">
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
-          Add Engines and standalone gear. Components inside an Engine travel with it automatically.
+          Search below to add Engines and standalone gear. Components inside an Engine travel
+          with it automatically and show up underneath it here.
         </p>
         <div class="selected-count">
-          <span id="selected-count">{{ selected_ids|length }}</span> asset{{ selected_ids|length|pluralize }} selected
-        </div>
-        <div class="asset-search-wrap">
-          <input type="text" id="asset-search" placeholder="Search assets by ID or model..." autocomplete="off">
+          <span id="selected-count">0</span> asset<span id="selected-plural">s</span> selected
         </div>
 
-        {% regroup assets by get_asset_type_display as asset_groups %}
-        {% for group in asset_groups %}
-        <div class="asset-type-group" data-type-group="{{ group.grouper }}">
-          <div class="asset-type-label">{{ group.grouper }}</div>
-          {% for asset in group.list %}
-          <label class="asset-row {% if asset.id in selected_ids %}selected{% endif %}"
-                 data-search="{{ asset.asset_id|lower }} {{ asset.make_model|lower }}">
-            <input type="checkbox" name="assets" value="{{ asset.id }}"
-                   {% if asset.id in selected_ids %}checked{% endif %}
-                   onchange="updateSelected(this)">
-            <span class="aid">{{ asset.asset_id }}</span>
-            <span class="amodel">{% if asset.make_model %}{{ asset.make_model }}{% endif %}</span>
-            {% if asset.asset_type == "ENGINE" %}
-              <span class="anested">{{ asset.nested_assets.count }} comp.</span>
-            {% endif %}
-            <span class="astatus"><span class="badge badge-{{ asset.status|lower }}">{{ asset.get_status_display }}</span></span>
-          </label>
-          {% endfor %}
+        <div class="picker-selected" id="picker-selected"></div>
+        <div class="picker-empty" id="picker-empty" style="display:none;">No assets added yet. Search below to add some.</div>
+
+        <div class="picker-search-wrap">
+          <input type="text" id="asset-search" placeholder="Search by ID or model to add an asset..." autocomplete="off">
         </div>
-        {% endfor %}
-        <div class="no-results" id="no-results" style="display:none;">No assets match your search.</div>
+        <div class="picker-results" id="picker-results"></div>
+        <div class="picker-hint">Individually-tracked components aren't listed here directly - add the Engine they're nested in instead.</div>
       </div>
     </div>
 
@@ -221,36 +214,103 @@
 
 </div>
 
+{{ assets_json|json_script:"assets-data" }}
 <script>
-// Live search filter
-const searchInput = document.getElementById("asset-search");
-const noResults = document.getElementById("no-results");
+(function() {
+  const ALL = JSON.parse(document.getElementById("assets-data").textContent);
+  const byId = {};
+  ALL.forEach(a => byId[a.id] = a);
 
-searchInput.addEventListener("input", () => {
-  const q = searchInput.value.toLowerCase().trim();
-  let anyVisible = false;
-  document.querySelectorAll(".asset-row").forEach(row => {
-    const match = !q || row.dataset.search.includes(q);
-    row.style.display = match ? "" : "none";
-    if (match) anyVisible = true;
-  });
-  // Hide group headers if all their rows are hidden
-  document.querySelectorAll(".asset-type-group").forEach(group => {
-    const visible = Array.from(group.querySelectorAll(".asset-row")).some(r => r.style.display !== "none");
-    group.style.display = visible ? "" : "none";
-  });
-  noResults.style.display = anyVisible ? "none" : "block";
-});
-
-// Selected count
-function updateSelected(checkbox) {
-  const label = checkbox.closest(".asset-row");
-  label.classList.toggle("selected", checkbox.checked);
-  const count = document.querySelectorAll(".asset-row input:checked").length;
-  document.getElementById("selected-count").textContent = count;
-  // update the pluralisation text
+  const selectedContainer = document.getElementById("picker-selected");
+  const emptyMsg = document.getElementById("picker-empty");
+  const resultsContainer = document.getElementById("picker-results");
+  const searchInput = document.getElementById("asset-search");
   const countEl = document.getElementById("selected-count");
-  countEl.parentElement.innerHTML = `<span id="selected-count">${count}</span> asset${count !== 1 ? "s" : ""} selected`;
-}
+  const pluralEl = document.getElementById("selected-plural");
+
+  let selected = new Set([{{ selected_ids|join:"," }}]);
+
+  function statusBadge(a) {
+    return `<span class="astatus"><span class="badge badge-${a.status}">${a.statusDisplay}</span></span>`;
+  }
+
+  function nestedHtml(a) {
+    if (!a.nested || !a.nested.length) return "";
+    const rows = a.nested.map(n => `<div class="picker-nested-row">${n.assetId}${n.makeModel ? ` <span class="nmodel">- ${n.makeModel}</span>` : ""}</div>`).join("");
+    return `<div class="picker-nested">${rows}</div>`;
+  }
+
+  function renderSelected() {
+    selectedContainer.innerHTML = "";
+    const ids = Array.from(selected).filter(id => byId[id]);
+    ids.forEach(id => {
+      const a = byId[id];
+      const item = document.createElement("div");
+      item.className = "picker-item";
+      item.innerHTML = `
+        <div class="picker-row">
+          <span class="aid">${a.assetId}</span>
+          <span class="amodel">${a.makeModel || ""}</span>
+          <span class="atype">${a.type}</span>
+          ${statusBadge(a)}
+          <button type="button" class="picker-remove-btn" title="Remove" data-id="${id}">&times;</button>
+          <input type="hidden" name="assets" value="${id}">
+        </div>
+        ${nestedHtml(a)}
+      `;
+      selectedContainer.appendChild(item);
+    });
+    emptyMsg.style.display = ids.length ? "none" : "block";
+    countEl.textContent = ids.length;
+    pluralEl.textContent = ids.length === 1 ? "" : "s";
+  }
+
+  function renderResults() {
+    const q = searchInput.value.toLowerCase().trim();
+    resultsContainer.innerHTML = "";
+    if (!q) return;
+    const matches = ALL.filter(a =>
+      !selected.has(a.id) &&
+      (a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q))
+    ).slice(0, 8);
+    if (!matches.length) {
+      resultsContainer.innerHTML = `<div class="picker-hint" style="margin-top:8px;">No matching assets found.</div>`;
+      return;
+    }
+    matches.forEach(a => {
+      const row = document.createElement("div");
+      row.className = "picker-row";
+      row.style.marginBottom = "6px";
+      row.innerHTML = `
+        <span class="aid">${a.assetId}</span>
+        <span class="amodel">${a.makeModel || ""}</span>
+        <span class="atype">${a.type}</span>
+        ${statusBadge(a)}
+        <button type="button" class="picker-add-btn" data-id="${a.id}">Add</button>
+      `;
+      resultsContainer.appendChild(row);
+    });
+  }
+
+  selectedContainer.addEventListener("click", (e) => {
+    const btn = e.target.closest(".picker-remove-btn");
+    if (!btn) return;
+    selected.delete(parseInt(btn.dataset.id, 10));
+    renderSelected();
+    renderResults();
+  });
+
+  resultsContainer.addEventListener("click", (e) => {
+    const btn = e.target.closest(".picker-add-btn");
+    if (!btn) return;
+    selected.add(parseInt(btn.dataset.id, 10));
+    renderSelected();
+    renderResults();
+  });
+
+  searchInput.addEventListener("input", renderResults);
+
+  renderSelected();
+})();
 </script>
 {% endblock %}

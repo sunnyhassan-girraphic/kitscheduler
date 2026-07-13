@@ -16,6 +16,7 @@ from .models import (
     Asset, AssetBooking, CategoryColor, Job, Kit, KitBooking,
     StaffBooking, StaffMember, Ticket, TicketHistory,
 )
+from .pdf_utils import build_kit_checklist_pdf
 
 VIEW_DAYS = 14
 STEP_DAYS = 7
@@ -390,13 +391,33 @@ def kit_list_view(request):
     return render(request, "inventory/kit_list.html", context)
 
 
-@login_required
-def kit_create_view(request):
+def _kit_picker_assets():
+    """Assets eligible to be direct kit members, with nested-component info for engines."""
     assets = Asset.objects.filter(
         archived=False
     ).exclude(
         asset_type=Asset.AssetType.COMPONENT
-    ).order_by("asset_type", "asset_id")
+    ).order_by("asset_type", "asset_id").prefetch_related("nested_assets")
+
+    data = []
+    for a in assets:
+        nested = []
+        if a.asset_type == Asset.AssetType.ENGINE:
+            nested = [
+                {"assetId": n.asset_id, "makeModel": n.make_model}
+                for n in a.nested_assets.all()
+            ]
+        data.append({
+            "id": a.id, "assetId": a.asset_id, "makeModel": a.make_model,
+            "type": a.get_asset_type_display(), "status": a.status.lower(),
+            "statusDisplay": a.get_status_display(), "nested": nested,
+        })
+    return list(assets), data
+
+
+@login_required
+def kit_create_view(request):
+    assets, assets_json = _kit_picker_assets()
 
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
@@ -406,13 +427,13 @@ def kit_create_view(request):
 
         if not name:
             return render(request, "inventory/kit_form.html", {
-                "assets": assets, "error": "Kit name is required.",
+                "assets": assets, "assets_json": assets_json, "error": "Kit name is required.",
                 "selected_ids": selected_ids, "notes": notes, "active_nav": "kits",
             })
 
         if Kit.objects.filter(name=name).exists():
             return render(request, "inventory/kit_form.html", {
-                "assets": assets, "error": f'A kit named "{name}" already exists.',
+                "assets": assets, "assets_json": assets_json, "error": f'A kit named "{name}" already exists.',
                 "selected_ids": selected_ids, "name": name, "notes": notes, "active_nav": "kits",
             })
 
@@ -426,18 +447,14 @@ def kit_create_view(request):
         return redirect("/kits/")
 
     return render(request, "inventory/kit_form.html", {
-        "assets": assets, "selected_ids": [], "active_nav": "kits",
+        "assets": assets, "assets_json": assets_json, "selected_ids": [], "active_nav": "kits",
     })
 
 
 @login_required
 def kit_edit_view(request, kit_id):
     kit = get_object_or_404(Kit, pk=kit_id)
-    assets = Asset.objects.filter(
-        archived=False
-    ).exclude(
-        asset_type=Asset.AssetType.COMPONENT
-    ).order_by("asset_type", "asset_id")
+    assets, assets_json = _kit_picker_assets()
 
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
@@ -447,13 +464,13 @@ def kit_edit_view(request, kit_id):
 
         if not name:
             return render(request, "inventory/kit_form.html", {
-                "kit": kit, "assets": assets, "error": "Kit name is required.",
+                "kit": kit, "assets": assets, "assets_json": assets_json, "error": "Kit name is required.",
                 "selected_ids": selected_ids, "notes": notes, "active_nav": "kits",
             })
 
         if Kit.objects.filter(name=name).exclude(pk=kit_id).exists():
             return render(request, "inventory/kit_form.html", {
-                "kit": kit, "assets": assets,
+                "kit": kit, "assets": assets, "assets_json": assets_json,
                 "error": f'A kit named "{name}" already exists.',
                 "selected_ids": selected_ids, "name": name, "notes": notes, "active_nav": "kits",
             })
@@ -472,6 +489,7 @@ def kit_edit_view(request, kit_id):
     return render(request, "inventory/kit_form.html", {
         "kit": kit,
         "assets": assets,
+        "assets_json": assets_json,
         "selected_ids": list(kit.assets.values_list("id", flat=True)),
         "name": kit.name,
         "notes": kit.notes,
@@ -487,6 +505,16 @@ def kit_delete_view(request, kit_id):
     return redirect("/kits/")
 
 
+@login_required
+def kit_pdf_view(request, kit_id):
+    kit = get_object_or_404(Kit, pk=kit_id)
+    pdf_bytes = build_kit_checklist_pdf(kit)
+    filename = f"{kit.name} - Kit Checklist.pdf".replace("/", "-")
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
 def _engine_form_context(engine=None):
     """Shared context builder for the engine create/edit form."""
     components_qs = Asset.objects.filter(
@@ -497,8 +525,22 @@ def _engine_form_context(engine=None):
         Q(parent_engine__isnull=True) | Q(parent_engine=engine)
     ).order_by("asset_type", "asset_id")
 
+    components = list(components_qs)
+    components_json = [
+        {
+            "id": a.id,
+            "assetId": a.asset_id,
+            "makeModel": a.make_model,
+            "type": a.get_asset_type_display(),
+            "status": a.status.lower(),
+            "statusDisplay": a.get_status_display(),
+        }
+        for a in components
+    ]
+
     return {
-        "components": list(components_qs),
+        "components": components,
+        "components_json": components_json,
         "staff_members": list(StaffMember.objects.filter(active=True).order_by("name")),
         "statuses": Asset.Status.choices,
         "active_nav": "engines",
@@ -532,6 +574,7 @@ def engine_create_view(request):
         notes = request.POST.get("notes", "").strip()
         last_updated_by_id = request.POST.get("last_updated_by", "").strip()
         last_updated_date = request.POST.get("last_updated_date", "").strip()
+        last_updated_notes = request.POST.get("last_updated_notes", "").strip()
         component_ids = request.POST.getlist("components")
         selected_ids = [int(i) for i in component_ids if i.isdigit()]
 
@@ -539,7 +582,7 @@ def engine_create_view(request):
         form_ctx.update({
             "asset_id": asset_id, "make_model": make_model, "serial": serial,
             "qty": qty, "status": status, "archived": archived, "notes": notes,
-            "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date,
+            "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date, "last_updated_notes": last_updated_notes,
             "selected_ids": selected_ids,
         })
 
@@ -574,7 +617,7 @@ def engine_create_view(request):
             asset_id=asset_id, asset_type=Asset.AssetType.ENGINE,
             make_model=make_model, serial=serial, qty=qty_val, status=status,
             archived=archived, notes=notes,
-            last_updated_by=last_updated_by, last_updated_date=parsed_date,
+            last_updated_by=last_updated_by, last_updated_date=parsed_date, last_updated_notes=last_updated_notes,
         )
         _apply_component_selection(engine, selected_ids)
 
@@ -602,6 +645,7 @@ def engine_edit_view(request, engine_id):
         notes = request.POST.get("notes", "").strip()
         last_updated_by_id = request.POST.get("last_updated_by", "").strip()
         last_updated_date = request.POST.get("last_updated_date", "").strip()
+        last_updated_notes = request.POST.get("last_updated_notes", "").strip()
         component_ids = request.POST.getlist("components")
         selected_ids = [int(i) for i in component_ids if i.isdigit()]
 
@@ -610,7 +654,7 @@ def engine_edit_view(request, engine_id):
             "engine": engine,
             "asset_id": asset_id, "make_model": make_model, "serial": serial,
             "qty": qty, "status": status, "archived": archived, "notes": notes,
-            "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date,
+            "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date, "last_updated_notes": last_updated_notes,
             "selected_ids": selected_ids,
         })
 
@@ -652,6 +696,7 @@ def engine_edit_view(request, engine_id):
         engine.notes = notes
         engine.last_updated_by = last_updated_by
         engine.last_updated_date = parsed_date
+        engine.last_updated_notes = last_updated_notes
         engine.save()
 
         _apply_component_selection(engine, selected_ids)
@@ -669,7 +714,7 @@ def engine_edit_view(request, engine_id):
         "archived": engine.archived,
         "notes": engine.notes,
         "last_updated_by_id": str(engine.last_updated_by_id) if engine.last_updated_by_id else "",
-        "last_updated_date": engine.last_updated_date.isoformat() if engine.last_updated_date else "",
+        "last_updated_date": engine.last_updated_date.isoformat() if engine.last_updated_date else "", "last_updated_notes": engine.last_updated_notes,
         "selected_ids": list(engine.nested_assets.values_list("id", flat=True)),
     })
     return render(request, "inventory/engine_form.html", form_ctx)
@@ -1023,6 +1068,17 @@ def delete_license_booking(request, booking_id):
 # Ticketing (fault reports)
 # ---------------------------------------------------------------------------
 
+def _public_asset_picker_json():
+    assets = Asset.objects.filter(archived=False).order_by("asset_type", "asset_id")
+    return [
+        {
+            "id": a.id, "assetId": a.asset_id, "makeModel": a.make_model,
+            "type": a.get_asset_type_display(),
+        }
+        for a in assets
+    ]
+
+
 def ticket_report_view(request):
     """Public fault-report form. No login required - anyone with the link can submit."""
     if request.method == "POST":
@@ -1036,7 +1092,7 @@ def ticket_report_view(request):
             "reporter_contact": reporter_contact,
             "description": description,
             "selected_asset_id": asset_id,
-            "assets": Asset.objects.filter(archived=False).order_by("asset_type", "asset_id"),
+            "assets_json": _public_asset_picker_json(),
         }
 
         if not reporter_name:
@@ -1066,7 +1122,7 @@ def ticket_report_view(request):
         return render(request, "inventory/ticket_report.html", {"submitted": True, "ticket": ticket})
 
     ctx = {
-        "assets": Asset.objects.filter(archived=False).order_by("asset_type", "asset_id"),
+        "assets_json": _public_asset_picker_json(),
     }
     return render(request, "inventory/ticket_report.html", ctx)
 
@@ -1141,3 +1197,11 @@ def ticket_detail_view(request, ticket_id):
         "history": ticket.history.select_related("changed_by").all(),
         "active_nav": "tickets",
     })
+
+
+@staff_member_required
+@require_POST
+def ticket_delete_view(request, ticket_id):
+    ticket = get_object_or_404(Ticket, pk=ticket_id)
+    ticket.delete()
+    return redirect("/tickets/")

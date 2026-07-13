@@ -26,7 +26,7 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font-size: 14px; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; }
   .page {
     max-width: 560px;
     margin: 0 auto;
@@ -47,34 +47,32 @@
     border-radius: 8px;
     padding: 18px 16px;
   }
-  .form-field { margin-bottom: 16px; }
+  .form-field { margin-bottom: 18px; }
   .form-field:last-child { margin-bottom: 0; }
   .form-field label {
     display: block;
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text-dim);
-    margin-bottom: 5px;
+    margin-bottom: 6px;
   }
   .form-field input[type="text"],
-  .form-field select,
   .form-field textarea {
     width: 100%;
     background: var(--surface-2);
     border: 1px solid var(--border-strong);
     color: var(--text);
     border-radius: 6px;
-    padding: 9px 10px;
-    font-size: 13px;
+    padding: 11px 12px;
+    font-size: 15px;
     font-family: inherit;
     box-sizing: border-box;
   }
   .form-field input:focus,
-  .form-field select:focus,
   .form-field textarea:focus { outline: none; border-color: var(--accent); }
   .form-field textarea { resize: vertical; min-height: 100px; }
   .btn-primary {
     background: var(--accent); border: 1px solid var(--accent); color: var(--accent-on);
-    border-radius: 6px; padding: 10px 18px; font-size: 13px; font-weight: 600;
+    border-radius: 6px; padding: 12px 18px; font-size: 15px; font-weight: 600;
     cursor: pointer; width: 100%;
   }
   .btn-primary:hover { opacity: 0.9; }
@@ -103,6 +101,61 @@
   .confirm-box h2 { margin: 0 0 8px; font-size: 17px; }
   .confirm-box p { color: var(--text-dim); font-size: 13px; margin: 0; }
   .confirm-box .ref { font-family: var(--mono); color: var(--accent); }
+
+  /* Asset picker: search + tappable cards, easy for non-technical users */
+  .asset-picker-search input {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 11px 12px;
+    font-size: 15px;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .asset-picker-search input:focus { outline: none; border-color: var(--accent); }
+  .asset-picker-results {
+    margin-top: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .asset-card {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .asset-card:active { background: var(--accent-glow); }
+  .asset-card .aid { font-family: var(--mono); font-weight: 700; font-size: 14px; }
+  .asset-card .amodel { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+  .asset-card .atype {
+    display: inline-block; margin-top: 6px; font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--text-faint); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;
+  }
+  .no-matches { font-size: 13px; color: var(--text-faint); font-style: italic; padding: 10px 2px; }
+  .asset-selected-box {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--accent-glow); border: 1px solid var(--accent-deep);
+    border-radius: 8px; padding: 12px 14px;
+  }
+  .asset-selected-box .aid { font-family: var(--mono); font-weight: 700; font-size: 14px; color: var(--accent); }
+  .asset-selected-box .amodel { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+  .change-btn {
+    background: none; border: 1px solid var(--border-strong); color: var(--text-dim);
+    border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; flex-shrink: 0;
+  }
+  .not-listed-btn {
+    background: none; border: none; color: var(--text-faint); font-size: 12px;
+    text-decoration: underline; cursor: pointer; padding: 8px 2px 0; display: inline-block;
+  }
 </style>
 </head>
 <body>
@@ -123,10 +176,10 @@
     <div class="error-msg">{{ error }}</div>
     {% endif %}
 
-    <form method="post" class="form-section">
+    <form method="post" class="form-section" id="report-form">
       {% csrf_token %}
       <div class="form-field">
-        <label for="f-name">Your name <span style="color:var(--red);">*</span></label>
+        <label for="f-name">Your name</label>
         <input type="text" id="f-name" name="reporter_name" value="{{ reporter_name|default:'' }}" autofocus>
       </div>
       <div class="form-field">
@@ -134,28 +187,109 @@
         <input type="text" id="f-contact" name="reporter_contact" value="{{ reporter_contact|default:'' }}">
       </div>
       <div class="form-field">
-        <label for="f-asset">Which item? <span style="color:var(--text-faint); font-weight:400;">(optional if not listed)</span></label>
-        <select id="f-asset" name="asset">
-          <option value="">-- Select if listed --</option>
-          {% regroup assets by get_asset_type_display as asset_groups %}
-          {% for group in asset_groups %}
-          <optgroup label="{{ group.grouper }}">
-            {% for asset in group.list %}
-            <option value="{{ asset.id }}" {% if selected_asset_id == asset.id|stringformat:"s" %}selected{% endif %}>
-              {{ asset.asset_id }}{% if asset.make_model %} - {{ asset.make_model }}{% endif %}
-            </option>
-            {% endfor %}
-          </optgroup>
-          {% endfor %}
-        </select>
+        <label>Which item? <span style="color:var(--text-faint); font-weight:400;">(optional if you're not sure)</span></label>
+
+        <div id="asset-selected-view" style="display:none;">
+          <div class="asset-selected-box">
+            <div>
+              <div class="aid" id="selected-aid"></div>
+              <div class="amodel" id="selected-amodel"></div>
+            </div>
+            <button type="button" class="change-btn" id="change-asset-btn">Change</button>
+          </div>
+        </div>
+
+        <div id="asset-search-view">
+          <div class="asset-picker-search">
+            <input type="text" id="asset-search" placeholder="Type the equipment name or ID..." autocomplete="off">
+          </div>
+          <div class="asset-picker-results" id="asset-results"></div>
+        </div>
+
+        <input type="hidden" name="asset" id="f-asset" value="{{ selected_asset_id|default:'' }}">
       </div>
       <div class="form-field">
-        <label for="f-description">What's wrong? <span style="color:var(--red);">*</span></label>
+        <label for="f-description">What's wrong?</label>
         <textarea id="f-description" name="description" placeholder="Describe the fault or issue...">{{ description|default:'' }}</textarea>
       </div>
       <button class="btn-primary" type="submit">Submit report</button>
     </form>
   {% endif %}
 </div>
+
+{% if not submitted %}
+{{ assets_json|json_script:"assets-data" }}
+<script>
+(function() {
+  const ALL = JSON.parse(document.getElementById("assets-data").textContent);
+  const byId = {};
+  ALL.forEach(a => byId[a.id] = a);
+
+  const searchInput = document.getElementById("asset-search");
+  const resultsEl = document.getElementById("asset-results");
+  const hiddenInput = document.getElementById("f-asset");
+  const selectedView = document.getElementById("asset-selected-view");
+  const searchView = document.getElementById("asset-search-view");
+  const changeBtn = document.getElementById("change-asset-btn");
+
+  function showSelected(a) {
+    document.getElementById("selected-aid").textContent = a.assetId;
+    document.getElementById("selected-amodel").textContent = a.makeModel ? `${a.makeModel} (${a.type})` : a.type;
+    selectedView.style.display = "block";
+    searchView.style.display = "none";
+    hiddenInput.value = a.id;
+  }
+
+  function renderResults() {
+    const q = searchInput.value.toLowerCase().trim();
+    resultsEl.innerHTML = "";
+    if (!q) return;
+    const matches = ALL.filter(a =>
+      a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q)
+    ).slice(0, 10);
+    if (!matches.length) {
+      resultsEl.innerHTML = `<div class="no-matches">No matching equipment found. You can still submit without picking one.</div>`;
+      return;
+    }
+    matches.forEach(a => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "asset-card";
+      card.dataset.id = a.id;
+      card.innerHTML = `
+        <div class="aid">${a.assetId}</div>
+        ${a.makeModel ? `<div class="amodel">${a.makeModel}</div>` : ""}
+        <div class="atype">${a.type}</div>
+      `;
+      resultsEl.appendChild(card);
+    });
+  }
+
+  resultsEl.addEventListener("click", (e) => {
+    const card = e.target.closest(".asset-card");
+    if (!card) return;
+    const a = byId[parseInt(card.dataset.id, 10)];
+    if (a) showSelected(a);
+  });
+
+  changeBtn.addEventListener("click", () => {
+    hiddenInput.value = "";
+    selectedView.style.display = "none";
+    searchView.style.display = "block";
+    searchInput.value = "";
+    resultsEl.innerHTML = "";
+    searchInput.focus();
+  });
+
+  searchInput.addEventListener("input", renderResults);
+
+  // Pre-select if the form re-rendered with a previously chosen asset (e.g. validation error)
+  const preselected = hiddenInput.value;
+  if (preselected && byId[parseInt(preselected, 10)]) {
+    showSelected(byId[parseInt(preselected, 10)]);
+  }
+})();
+</script>
+{% endif %}
 </body>
 </html>

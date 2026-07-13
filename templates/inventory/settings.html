@@ -2,6 +2,9 @@
 {% load inventory_extras %}
 {% block title %}Settings - Kit scheduler{% endblock %}
 {% block brand_sub %}Settings{% endblock %}
+{% block header_actions %}
+  <a class="btn" href="/admin/" target="_blank">Open Admin</a>
+{% endblock %}
 {% block extra_style %}
   .settings-section { max-width: 640px; margin: 24px auto; padding: 0 24px; }
   .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }

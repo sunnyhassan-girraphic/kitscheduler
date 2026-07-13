@@ -209,7 +209,7 @@
                       grid-row: {{ span.grid_row }};
                       background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
                data-job-id="{{ span.booking.job.id }}"
-               onclick="openJobDetail({{ span.booking.job.id }});">
+               onclick="openJobDetail({{ span.booking.job.id }}, 'kit', {{ span.booking.id }});">
             {{ span.booking.job.name }}
           </div>
         {% endfor %}
@@ -255,7 +255,7 @@
                       grid-row: {{ span.grid_row }};
                       background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
                data-job-id="{{ span.booking.job.id }}"
-               onclick="openJobDetail({{ span.booking.job.id }});">
+               onclick="openJobDetail({{ span.booking.job.id }}, 'staff', {{ span.booking.id }});">
             {{ span.booking.job.name }}
           </div>
         {% endfor %}
@@ -303,7 +303,7 @@
                       grid-row: {{ span.grid_row }};
                       background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
                data-job-id="{{ span.booking.job.id }}"
-               onclick="openJobDetail({{ span.booking.job.id }});">
+               onclick="openJobDetail({{ span.booking.job.id }}, 'license', {{ span.booking.id }});">
             <span style="font-weight:600;">{{ span.booking.job.name }}</span>
             {% if span.booking.functionalities %}
               <span style="opacity:0.85; margin-left:5px; font-size:10px;">{{ span.booking.functionalities }}</span>
@@ -345,7 +345,8 @@
     <span class="spacer"></span>
     <a class="btn" id="jdEditLink" href="#">Edit job</a>
     <button class="btn" id="jdCloneBtn" onclick="cloneJob()">Clone</button>
-    <button class="btn" id="jdDeleteBtn" style="color:var(--red);" onclick="deleteJob()">Delete</button>
+    <button class="btn" id="jdUnassignBtn" style="color:var(--accent);" onclick="unassignBooking()">Unassign</button>
+    <button class="btn" id="jdDeleteBtn" style="color:var(--red);" onclick="deleteJob()">Delete job</button>
   </div>
 </dialog>
 
@@ -420,11 +421,13 @@ const jobDetailDialog = document.getElementById("jobDetailDialog");
 let activeKind = "kit";
 let activeJobId = null;
 let currentBookingId = null;
+let activeBookingKind = null;
+let activeBookingId = null;
 
 const ENDPOINTS = {
-  kit:     { create: "/api/bookings/create/",         idField: "kit_id" },
-  staff:   { create: "/api/staff-bookings/create/",   idField: "staff_id" },
-  license: { create: "/api/license-bookings/create/", idField: "asset_id" },
+  kit:     { create: "/api/bookings/create/",         idField: "kit_id",    deleteBase: "/api/bookings/" },
+  staff:   { create: "/api/staff-bookings/create/",   idField: "staff_id",  deleteBase: "/api/staff-bookings/" },
+  license: { create: "/api/license-bookings/create/", idField: "asset_id",  deleteBase: "/api/license-bookings/" },
 };
 
 function switchJobTab(tab) {
@@ -538,8 +541,10 @@ async function submitBooking() {
   }
 }
 
-async function openJobDetail(jobId) {
+async function openJobDetail(jobId, bookingKind, bookingId) {
   activeJobId = jobId;
+  activeBookingKind = bookingKind || null;
+  activeBookingId = bookingId || null;
   try {
     const resp = await fetch(`/api/jobs/${jobId}/`);
     const job = await resp.json();
@@ -556,12 +561,28 @@ async function openJobDetail(jobId) {
     if (job.notes) { document.getElementById("jdNotes").textContent = job.notes; document.getElementById("jdNotesRow").style.display = "flex"; }
     else document.getElementById("jdNotesRow").style.display = "none";
     document.getElementById("jdEditLink").href = `/admin/inventory/job/${jobId}/change/`;
+
+    const unassignBtn = document.getElementById("jdUnassignBtn");
+    unassignBtn.style.display = (activeBookingKind && activeBookingId) ? "inline-flex" : "none";
+
     jobDetailDialog.showModal();
   } catch(e) { console.error(e); }
 }
 
+async function unassignBooking() {
+  if (!activeBookingKind || !activeBookingId) return;
+  const kindLabel = { kit: "kit", staff: "staff member", license: "license" }[activeBookingKind] || "item";
+  if (!confirm(`Unassign this ${kindLabel} from the job? The job itself, and any other assignments on it, will stay.`)) return;
+  const base = ENDPOINTS[activeBookingKind]?.deleteBase;
+  if (!base) return;
+  const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  await fetch(`${base}${activeBookingId}/delete/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
+  jobDetailDialog.close();
+  location.reload();
+}
+
 async function deleteJob() {
-  if (!activeJobId || !confirm("Delete this job and all its bookings?")) return;
+  if (!activeJobId || !confirm("Delete this ENTIRE job and all its bookings (kits, staff, licenses)? This cannot be undone.")) return;
   const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
   await fetch(`/api/jobs/${activeJobId}/delete/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
   jobDetailDialog.close();
