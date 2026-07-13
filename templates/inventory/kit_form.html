@@ -62,6 +62,20 @@
   .form-field input[type="text"]:focus,
   .form-field textarea:focus { outline: none; border-color: var(--accent); }
   .form-field textarea { resize: vertical; min-height: 80px; }
+  .date-input-wrap { position: relative; display: flex; align-items: center; }
+  .date-input-wrap input[type="text"] { padding-right: 38px; }
+  .date-icon-btn {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    background: transparent; border: none; border-radius: 5px; cursor: pointer;
+    color: var(--text-dim); padding: 0;
+  }
+  .date-icon-btn:hover { background: var(--surface); color: var(--accent); }
+  .date-icon-btn svg { width: 16px; height: 16px; }
+  .date-native-hidden {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: 0;
+    overflow: hidden; opacity: 0; pointer-events: none; border: 0;
+  }
   .error-msg {
     background: var(--red-dim);
     color: var(--red);
@@ -228,7 +242,15 @@
     </div>
     <div class="form-field">
       <label for="pdf-event-date">Event date</label>
-      <input type="date" id="pdf-event-date">
+      <div class="date-input-wrap">
+        <input type="text" id="pdf-event-date" placeholder="DD/MM/YYYY" autocomplete="off">
+        <button type="button" class="date-icon-btn" id="pdf-event-date-icon" aria-label="Pick a date">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </button>
+        <input type="date" id="pdf-event-date-native" class="date-native-hidden" tabindex="-1" aria-hidden="true">
+      </div>
     </div>
     <div class="form-field">
       <label for="pdf-gps-tag">GPS tag</label>
@@ -251,16 +273,29 @@
 </div>
 
 <script>
+(function() {
+  const textInput = document.getElementById("pdf-event-date");
+  const nativeInput = document.getElementById("pdf-event-date-native");
+  const iconBtn = document.getElementById("pdf-event-date-icon");
+
+  iconBtn.addEventListener("click", () => {
+    if (typeof nativeInput.showPicker === "function") {
+      nativeInput.showPicker();
+    } else {
+      nativeInput.focus();
+    }
+  });
+
+  nativeInput.addEventListener("change", () => {
+    const [y, m, d] = nativeInput.value.split("-");
+    if (y && m && d) textInput.value = `${d}/${m}/${y}`;
+  });
+})();
+
 function downloadKitPdf(kitId) {
-  const rawDate = document.getElementById("pdf-event-date").value.trim();
-  let eventDate = "";
-  if (rawDate) {
-    const [y, m, d] = rawDate.split("-");
-    eventDate = `${d}/${m}/${y}`;
-  }
   const params = new URLSearchParams({
     packed_by: document.getElementById("pdf-packed-by").value.trim(),
-    event_date: eventDate,
+    event_date: document.getElementById("pdf-event-date").value.trim(),
     gps_tag: document.getElementById("pdf-gps-tag").value.trim(),
     carnet: document.getElementById("pdf-carnet").value.trim(),
     cases: document.getElementById("pdf-cases").value.trim(),
