@@ -76,12 +76,14 @@
   nav.primary .nav a.btn-primary:hover,
   nav.primary .nav button.btn-primary:hover { color: var(--accent-on); }
   .btn {
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    font-family: inherit; line-height: 1.4; margin: 0; box-sizing: border-box;
     background: var(--surface-2); border: 1px solid var(--border-strong);
     color: var(--text); border-radius: 6px; padding: 7px 14px; font-size: 13px;
     cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
   }
   .btn:hover { border-color: var(--accent-deep); }
-  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-on); font-weight: 600; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-on); font-weight: 750; }
   .btn-primary:hover { opacity: 0.9; border-color: var(--accent); }
   .btn-active { background: var(--accent-glow); border-color: var(--accent-deep); color: var(--accent); font-weight: 600; }
   .range-label { color: var(--text-dim); font-size: 13px; min-width: 150px; font-family: var(--mono); }
