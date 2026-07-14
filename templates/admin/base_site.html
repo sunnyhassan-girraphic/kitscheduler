@@ -10,3 +10,26 @@
 {% endblock %}
 
 {% block nav-global %}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  /* Work around a Django 5.2 core admin bug (ticket #36529): below a ~767px
+     effective viewport, #changelist switches from a side-by-side flex row
+     to a stacked column, dumping the filter sidebar below the results
+     table and crushing the date-hierarchy drilldown into a single column.
+     This forces the normal desktop layout regardless of viewport width,
+     since our own custom UI is desktop-first and doesn't need the admin's
+     mobile layout to kick in on ordinary browser windows. */
+  #changelist {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+  }
+  #changelist-filter {
+    position: static !important;
+    flex: 0 0 240px !important;
+    width: 240px !important;
+    margin: 0 0 0 30px !important;
+  }
+</style>
+{% endblock %}
