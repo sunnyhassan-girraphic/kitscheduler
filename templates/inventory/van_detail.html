@@ -1,0 +1,291 @@
+{% extends "inventory/base.html" %}
+{% block title %}{{ vehicle.name }} - Kit scheduler{% endblock %}
+{% block brand_sub %}{{ vehicle.name }}{% if vehicle.registration %} &middot; {{ vehicle.registration }}{% endif %}{% endblock %}
+{% block header_actions %}
+  <a class="btn" href="/vans/{{ vehicle.id }}/edit/">Edit van</a>
+{% endblock %}
+
+{% block extra_style %}
+  .van-page { max-width: 980px; margin: 0 auto; padding: 24px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; margin-bottom: 16px; }
+  .back-link:hover { color: var(--accent); }
+
+  .tab-bar { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .tab-btn {
+    background: none; border: none; color: var(--text-dim); padding: 10px 16px; font-size: 13px;
+    cursor: pointer; border-bottom: 2px solid transparent; font-family: inherit;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  .form-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+  .form-section-head { padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); }
+  .form-section-body { padding: 16px; }
+  .form-field { margin-bottom: 12px; }
+  .form-field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
+  .form-field input, .form-field select, .form-field textarea {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 6px; padding: 7px 10px; font-size: 13px;
+    font-family: inherit; box-sizing: border-box;
+  }
+  .form-field input:focus, .form-field select:focus, .form-field textarea:focus { outline: none; border-color: var(--accent); }
+  .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .form-actions-inline { display: flex; justify-content: flex-end; padding-top: 4px; }
+
+  .log-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .log-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-faint); padding: 8px 10px; border-bottom: 1px solid var(--border-strong); }
+  .log-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .log-table tr:last-child td { border-bottom: none; }
+  .log-empty { padding: 20px; text-align: center; color: var(--text-faint); font-size: 13px; font-style: italic; }
+  .row-delete-btn { background:none; border:none; color:var(--text-faint); cursor:pointer; font-size:16px; line-height:1; padding:2px 4px; }
+  .row-delete-btn:hover { color: var(--red); }
+
+  .checklist-item-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); }
+  .checklist-item-row:first-child { border-top: none; }
+  .checklist-item-row .item-name { flex: 1; font-size: 13px; }
+  .checklist-item-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer; }
+  .checklist-item-row input[type="text"] { width: 220px; font-size: 12px; padding: 5px 8px; }
+
+  .checklist-summary { display: flex; align-items: center; gap: 10px; }
+  .checklist-summary .ok { color: var(--green); }
+  .checklist-summary .issues { color: var(--red); font-weight: 600; }
+  .checklist-detail { display: none; padding: 10px; background: var(--surface-2); border-radius: 6px; margin-top: 6px; font-size: 12px; }
+  .checklist-detail.open { display: block; }
+  .checklist-detail .ci-row { display: flex; gap: 8px; padding: 3px 0; }
+  .checklist-detail .ci-row.bad { color: var(--red); }
+  .expand-btn { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0; }
+{% endblock %}
+
+{% block content %}
+<div class="van-page">
+  <a class="back-link" href="/vans/">&larr; All vans</a>
+
+  <div class="tab-bar">
+    <button type="button" class="tab-btn active" data-tab="usage" onclick="switchVanTab('usage')">Usage Log</button>
+    <button type="button" class="tab-btn" data-tab="maintenance" onclick="switchVanTab('maintenance')">Maintenance Log</button>
+    <button type="button" class="tab-btn" data-tab="checklist" onclick="switchVanTab('checklist')">Bi-Weekly Checklist</button>
+  </div>
+
+  <!-- USAGE TAB -->
+  <div class="tab-pane active" id="tab-usage">
+    <div class="form-section">
+      <div class="form-section-head">Log a trip</div>
+      <div class="form-section-body">
+        <form method="post" action="/vans/{{ vehicle.id }}/usage/add/">
+          {% csrf_token %}
+          <div class="form-row-3">
+            <div class="form-field">
+              <label>Date</label>
+              <input type="date" name="date" value="{{ today }}">
+            </div>
+            <div class="form-field">
+              <label>Driver</label>
+              <select name="driver">
+                <option value="">-</option>
+                {% for s in staff_members %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Destination</label>
+              <input type="text" name="destination" placeholder="e.g. Manchester">
+            </div>
+          </div>
+          <div class="form-field">
+            <label>Purpose / job</label>
+            <input type="text" name="purpose" placeholder="What was the van used for?">
+          </div>
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Start mileage</label>
+              <input type="number" name="start_mileage" min="0">
+            </div>
+            <div class="form-field">
+              <label>End mileage</label>
+              <input type="number" name="end_mileage" min="0">
+            </div>
+          </div>
+          <div class="form-field">
+            <label>Notes</label>
+            <input type="text" name="notes">
+          </div>
+          <div class="form-actions-inline">
+            <button class="btn btn-primary" type="submit">Log trip</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <table class="log-table">
+      <thead><tr><th>Date</th><th>Driver</th><th>Purpose</th><th>Destination</th><th>Mileage</th><th></th></tr></thead>
+      <tbody>
+        {% for log in usage_logs %}
+        <tr>
+          <td>{{ log.date|date:"j M Y" }}</td>
+          <td>{{ log.driver.name|default:"-" }}</td>
+          <td>{{ log.purpose|default:"-" }}</td>
+          <td>{{ log.destination|default:"-" }}</td>
+          <td>{% if log.start_mileage and log.end_mileage %}{{ log.start_mileage }} &rarr; {{ log.end_mileage }} <span style="color:var(--text-faint);">({{ log.distance }} mi)</span>{% elif log.start_mileage %}{{ log.start_mileage }}{% else %}-{% endif %}</td>
+          <td>
+            <form method="post" action="/vans/usage/{{ log.id }}/delete/" onsubmit="return confirm('Delete this trip entry?');">
+              {% csrf_token %}
+              <button type="submit" class="row-delete-btn" title="Delete">&times;</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6"><div class="log-empty">No trips logged yet.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- MAINTENANCE TAB -->
+  <div class="tab-pane" id="tab-maintenance">
+    <div class="form-section">
+      <div class="form-section-head">Log maintenance</div>
+      <div class="form-section-body">
+        <form method="post" action="/vans/{{ vehicle.id }}/maintenance/add/">
+          {% csrf_token %}
+          <div class="form-row-3">
+            <div class="form-field">
+              <label>Date</label>
+              <input type="date" name="date" value="{{ today }}">
+            </div>
+            <div class="form-field">
+              <label>Cost</label>
+              <input type="text" name="cost" placeholder="e.g. 120.00">
+            </div>
+            <div class="form-field">
+              <label>Next due</label>
+              <input type="date" name="next_due_date">
+            </div>
+          </div>
+          <div class="form-field">
+            <label>What was done <span style="color:var(--red);">*</span></label>
+            <input type="text" name="description" placeholder="e.g. Full service, MOT, tyre replacement...">
+          </div>
+          <div class="form-field">
+            <label>Performed by</label>
+            <input type="text" name="performed_by" placeholder="Garage or person">
+          </div>
+          <div class="form-actions-inline">
+            <button class="btn btn-primary" type="submit">Log maintenance</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <table class="log-table">
+      <thead><tr><th>Date</th><th>Description</th><th>Performed by</th><th>Cost</th><th>Next due</th><th></th></tr></thead>
+      <tbody>
+        {% for log in maintenance_logs %}
+        <tr>
+          <td>{{ log.date|date:"j M Y" }}</td>
+          <td>{{ log.description }}</td>
+          <td>{{ log.performed_by|default:"-" }}</td>
+          <td>{% if log.cost %}&pound;{{ log.cost }}{% else %}-{% endif %}</td>
+          <td>{% if log.next_due_date %}{{ log.next_due_date|date:"j M Y" }}{% else %}-{% endif %}</td>
+          <td>
+            <form method="post" action="/vans/maintenance/{{ log.id }}/delete/" onsubmit="return confirm('Delete this maintenance entry?');">
+              {% csrf_token %}
+              <button type="submit" class="row-delete-btn" title="Delete">&times;</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6"><div class="log-empty">No maintenance logged yet.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- CHECKLIST TAB -->
+  <div class="tab-pane" id="tab-checklist">
+    <div class="form-section">
+      <div class="form-section-head">New bi-weekly checklist</div>
+      <div class="form-section-body">
+        <form method="post" action="/vans/{{ vehicle.id }}/checklist/add/">
+          {% csrf_token %}
+          <div class="form-row-2">
+            <div class="form-field">
+              <label>Date</label>
+              <input type="date" name="date" value="{{ today }}">
+            </div>
+            <div class="form-field">
+              <label>Checked by</label>
+              <select name="checked_by">
+                <option value="">-</option>
+                {% for s in staff_members %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label style="margin-bottom:8px;">Items</label>
+            {% for item in checklist_items %}
+            <div class="checklist-item-row">
+              <input type="checkbox" name="item_ok_{{ forloop.counter0 }}" id="ci-{{ forloop.counter0 }}" checked>
+              <label class="item-name" for="ci-{{ forloop.counter0 }}" style="margin:0;">{{ item }}</label>
+              <input type="text" name="item_note_{{ forloop.counter0 }}" placeholder="Note if flagged...">
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="form-field">
+            <label>General notes</label>
+            <input type="text" name="notes">
+          </div>
+          <div class="form-actions-inline">
+            <button class="btn btn-primary" type="submit">Submit checklist</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% for cl in checklists %}
+    <div class="form-section">
+      <div class="form-section-body">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <strong>{{ cl.date|date:"j M Y" }}</strong>
+          <span style="color:var(--text-dim); font-size:12px;">{% if cl.checked_by %}checked by {{ cl.checked_by.name }}{% endif %}</span>
+          <span class="checklist-summary">
+            {% with issues=cl.issues_count %}
+              {% if issues %}<span class="issues">{{ issues }} issue{{ issues|pluralize }} flagged</span>{% else %}<span class="ok">All items OK</span>{% endif %}
+            {% endwith %}
+          </span>
+          <span style="margin-left:auto; display:flex; gap:10px; align-items:center;">
+            <button type="button" class="expand-btn" onclick="document.getElementById('cl-detail-{{ cl.id }}').classList.toggle('open')">View items</button>
+            <form method="post" action="/vans/checklist/{{ cl.id }}/delete/" onsubmit="return confirm('Delete this checklist entry?');">
+              {% csrf_token %}
+              <button type="submit" class="row-delete-btn" title="Delete">&times;</button>
+            </form>
+          </span>
+        </div>
+        {% if cl.notes %}<div style="font-size:12px; color:var(--text-dim); margin-top:6px;">{{ cl.notes }}</div>{% endif %}
+        <div class="checklist-detail" id="cl-detail-{{ cl.id }}">
+          {% for result in cl.items %}
+          <div class="ci-row {% if not result.ok %}bad{% endif %}">
+            <span>{% if result.ok %}&#10003;{% else %}&#10007;{% endif %}</span>
+            <span>{{ result.item }}</span>
+            {% if result.note %}<span style="color:var(--text-faint);">- {{ result.note }}</span>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="log-empty">No checklists submitted yet.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+function switchVanTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
+  document.getElementById("tab-" + tab).classList.add("active");
+}
+</script>
+{% endblock %}

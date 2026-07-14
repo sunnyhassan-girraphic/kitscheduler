@@ -1,0 +1,74 @@
+{% extends "inventory/base.html" %}
+{% block title %}Vans - Kit scheduler{% endblock %}
+{% block brand_sub %}{{ rows|length }} vehicle{{ rows|length|pluralize }}{% endblock %}
+{% block header_actions %}
+  <a class="btn btn-primary" href="/vans/new/">+ Add van</a>
+{% endblock %}
+{% block extra_style %}
+  .van-card { border: 1px solid var(--border); border-radius: 8px; margin: 12px 24px; overflow: hidden; background: var(--surface); }
+  .van-head { display:flex; align-items:center; gap:10px; padding:12px 16px; background:var(--surface-2); border-bottom:1px solid var(--border); }
+  .van-head .vname { font-weight:600; font-size:14px; }
+  .van-head .vreg { font-family:var(--mono); font-size:12px; color:var(--text-dim); }
+  .van-head .vmodel { font-size:12px; color:var(--text-dim); }
+  .van-head .meta { margin-left:auto; display:flex; gap:12px; align-items:center; }
+  .van-body { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0; }
+  .van-stat { padding:12px 16px; border-right:1px solid var(--border); }
+  .van-stat:last-child { border-right:none; }
+  .van-stat .label { font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.03em; margin-bottom:4px; }
+  .van-stat .value { font-size:13px; color:var(--text); }
+  .van-stat .sub { font-size:11px; color:var(--text-dim); margin-top:2px; }
+  .issues-flag { color: var(--red); font-weight: 600; }
+  .ok-flag { color: var(--green); }
+  @media (max-width: 760px) { .van-body { grid-template-columns: 1fr; } .van-stat { border-right:none; border-bottom:1px solid var(--border); } }
+{% endblock %}
+{% block content %}
+{% for row in rows %}
+<div class="van-card">
+  <div class="van-head">
+    <span class="vname">{{ row.vehicle.name }}</span>
+    {% if row.vehicle.registration %}<span class="vreg">{{ row.vehicle.registration }}</span>{% endif %}
+    {% if row.vehicle.make_model %}<span class="vmodel">{{ row.vehicle.make_model }}</span>{% endif %}
+    <span class="meta">
+      {% if row.checklist_issues %}<span class="issues-flag">{{ row.checklist_issues }} issue{{ row.checklist_issues|pluralize }} flagged</span>{% endif %}
+      <a class="btn" href="/vans/{{ row.vehicle.id }}/" style="font-size:12px; padding:4px 10px;">Open</a>
+      <a class="btn" href="/vans/{{ row.vehicle.id }}/edit/" style="font-size:12px; padding:4px 10px;">Edit</a>
+    </span>
+  </div>
+  <div class="van-body">
+    <div class="van-stat">
+      <div class="label">Last usage</div>
+      {% if row.last_usage %}
+        <div class="value">{{ row.last_usage.date|date:"j M Y" }}{% if row.last_usage.driver %} - {{ row.last_usage.driver.name }}{% endif %}</div>
+        {% if row.last_usage.purpose %}<div class="sub">{{ row.last_usage.purpose }}</div>{% endif %}
+      {% else %}
+        <div class="value" style="color:var(--text-faint);">No entries yet</div>
+      {% endif %}
+    </div>
+    <div class="van-stat">
+      <div class="label">Last maintenance</div>
+      {% if row.last_maintenance %}
+        <div class="value">{{ row.last_maintenance.date|date:"j M Y" }}</div>
+        <div class="sub">{{ row.last_maintenance.description|truncatechars:50 }}</div>
+      {% else %}
+        <div class="value" style="color:var(--text-faint);">No entries yet</div>
+      {% endif %}
+    </div>
+    <div class="van-stat">
+      <div class="label">Last checklist</div>
+      {% if row.last_checklist %}
+        <div class="value">{{ row.last_checklist.date|date:"j M Y" }}</div>
+        {% if row.checklist_issues %}
+          <div class="sub issues-flag">{{ row.checklist_issues }} item{{ row.checklist_issues|pluralize }} need{{ row.checklist_issues|pluralize:",s" }} attention</div>
+        {% else %}
+          <div class="sub ok-flag">All items OK</div>
+        {% endif %}
+      {% else %}
+        <div class="value" style="color:var(--text-faint);">No entries yet</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% empty %}
+<div class="empty">No vans yet. <a href="/vans/new/">Add your first van</a>.</div>
+{% endfor %}
+{% endblock %}

@@ -8,6 +8,7 @@ from django.utils.html import format_html
 from .models import (
     Asset, AssetBooking, CategoryColor, Job, Kit,
     KitBooking, StaffBooking, StaffMember, Ticket, TicketHistory,
+    Vehicle, VanUsageLog, VanMaintenanceLog, VanChecklist,
 )
 
 
@@ -326,3 +327,31 @@ class TicketAdmin(admin.ModelAdmin):
                     old_value=original.get_priority_display(), new_value=obj.get_priority_display(),
                 )
         super().save_model(request, obj, form, change)
+
+
+@admin.register(Vehicle)
+class VehicleAdmin(admin.ModelAdmin):
+    list_display = ("name", "registration", "make_model", "active")
+    list_filter = ("active",)
+    search_fields = ("name", "registration", "make_model")
+
+
+@admin.register(VanUsageLog)
+class VanUsageLogAdmin(admin.ModelAdmin):
+    list_display = ("vehicle", "date", "driver", "purpose")
+    list_filter = ("vehicle",)
+    date_hierarchy = "date"
+
+
+@admin.register(VanMaintenanceLog)
+class VanMaintenanceLogAdmin(admin.ModelAdmin):
+    list_display = ("vehicle", "date", "description", "cost", "next_due_date")
+    list_filter = ("vehicle",)
+    date_hierarchy = "date"
+
+
+@admin.register(VanChecklist)
+class VanChecklistAdmin(admin.ModelAdmin):
+    list_display = ("vehicle", "date", "checked_by", "issues_count")
+    list_filter = ("vehicle",)
+    date_hierarchy = "date"

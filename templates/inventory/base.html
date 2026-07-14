@@ -83,7 +83,7 @@
     cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
   }
   .btn:hover { border-color: var(--accent-deep); }
-  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-on); font-weight: 750; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-on); font-weight: 700; }
   .btn-primary:hover { opacity: 0.9; border-color: var(--accent); }
   .btn-active { background: var(--accent-glow); border-color: var(--accent-deep); color: var(--accent); font-weight: 600; }
   .range-label { color: var(--text-dim); font-size: 13px; min-width: 150px; font-family: var(--mono); }
@@ -216,6 +216,7 @@
   <a href="/kits/" class="{% if active_nav == 'kits' %}active{% endif %}">Kits</a>
   <a href="/licenses/" class="{% if active_nav == 'licenses' %}active{% endif %}">Licenses</a>
   <a href="/tickets/" class="{% if active_nav == 'tickets' %}active{% endif %}">Tickets</a>
+  <a href="/vans/" class="{% if active_nav == 'vans' %}active{% endif %}">Vans</a>
   <span class="nav-spacer"></span>
   <div class="nav">{% block header_actions %}{% endblock %}</div>
 </nav>

@@ -328,3 +328,130 @@ class TicketHistory(models.Model):
     def __str__(self):
         who = self.changed_by.get_username() if self.changed_by_id else "Public submission"
         return f"Ticket #{self.ticket_id} - {self.field_changed} by {who}"
+
+
+# ---------------------------------------------------------------------------
+# Van management
+# ---------------------------------------------------------------------------
+
+# Fixed bi-weekly safety checklist items. Edit this list to change what's
+# checked - no migration needed, since results are stored as JSON.
+VAN_CHECKLIST_ITEMS = [
+    "Tyres & tyre pressure",
+    "Lights (headlights, indicators, brake lights)",
+    "Oil level",
+    "Coolant level",
+    "Windscreen, wipers & washer fluid",
+    "Mirrors",
+    "Brakes",
+    "Seatbelts",
+    "Fire extinguisher & first aid kit",
+    "Fuel level",
+    "Bodywork / damage check",
+    "Documents present (insurance, MOT, tax)",
+]
+
+
+class Vehicle(models.Model):
+    name = models.CharField(max_length=80, unique=True, help_text="e.g. 'Van 1' or a nickname.")
+    registration = models.CharField(max_length=20, blank=True, help_text="Number plate.")
+    make_model = models.CharField(max_length=120, blank=True)
+    active = models.BooleanField(
+        default=True,
+        help_text="Uncheck instead of deleting once a vehicle is sold/retired, to keep its history.",
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Vehicle"
+
+    def __str__(self):
+        return self.name
+
+    def last_usage(self):
+        return self.usage_logs.order_by("-date", "-id").first()
+
+    def last_maintenance(self):
+        return self.maintenance_logs.order_by("-date", "-id").first()
+
+    def last_checklist(self):
+        return self.checklists.order_by("-date", "-id").first()
+
+
+class VanUsageLog(models.Model):
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="usage_logs")
+    driver = models.ForeignKey(StaffMember, on_delete=models.SET_NULL, null=True, blank=True, related_name="van_trips")
+    date = models.DateField()
+    purpose = models.CharField(max_length=200, blank=True, help_text="What the van was used for / job.")
+    destination = models.CharField(max_length=200, blank=True)
+    start_mileage = models.PositiveIntegerField(null=True, blank=True)
+    end_mileage = models.PositiveIntegerField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    logged_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-id"]
+
+    def clean(self):
+        if self.start_mileage is not None and self.end_mileage is not None:
+            if self.end_mileage < self.start_mileage:
+                raise ValidationError("End mileage cannot be before start mileage.")
+
+    @property
+    def distance(self):
+        if self.start_mileage is not None and self.end_mileage is not None:
+            return self.end_mileage - self.start_mileage
+        return None
+
+    def __str__(self):
+        return f"{self.vehicle.name} - {self.date}"
+
+
+class VanMaintenanceLog(models.Model):
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="maintenance_logs")
+    date = models.DateField()
+    description = models.TextField(help_text="What was done - service, repair, MOT, etc.")
+    performed_by = models.CharField(max_length=120, blank=True, help_text="Garage or person who did the work.")
+    cost = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    next_due_date = models.DateField(null=True, blank=True, help_text="Next service/MOT due, if known.")
+    logged_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-id"]
+
+    def __str__(self):
+        return f"{self.vehicle.name} - {self.date} - {self.description[:40]}"
+
+
+class VanChecklist(models.Model):
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name="checklists")
+    date = models.DateField()
+    checked_by = models.ForeignKey(StaffMember, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    items = models.JSONField(
+        default=list,
+        help_text="List of {item, ok, note} results for VAN_CHECKLIST_ITEMS at time of submission.",
+    )
+    notes = models.TextField(blank=True)
+    logged_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-id"]
+        verbose_name_plural = "Van checklists"
+
+    def __str__(self):
+        return f"{self.vehicle.name} - {self.date} checklist"
+
+    def issues_count(self):
+        return sum(1 for i in self.items if not i.get("ok"))
