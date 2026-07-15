@@ -223,6 +223,36 @@ def dashboard_view(request):
     return render(request, "inventory/dashboard.html", context)
 
 
+def _kit_member_rows(kit):
+    tags_by_asset_id = {kat.asset_id: kat.tag.name for kat in kit.kit_asset_tags.select_related("tag") if kat.tag_id}
+    rows = []
+    for m in kit.assets.all().order_by("asset_type", "asset_id"):
+        row = {
+            "assetId": m.asset_id,
+            "type": m.get_asset_type_display(),
+            "model": m.make_model or None,
+            "status": m.get_status_display(),
+            "tag": tags_by_asset_id.get(m.id),
+            "nested": [],
+        }
+        if m.asset_type in Asset.CONTAINER_TYPES:
+            for comp in m.nested_assets.all().order_by("asset_id"):
+                row["nested"].append({
+                    "assetId": comp.asset_id, "type": comp.get_asset_type_display(),
+                    "model": comp.make_model or None, "status": comp.get_status_display(),
+                    "indent": False,
+                })
+                if comp.asset_type in Asset.NESTABLE_CONTAINER_TYPES:
+                    for sub in comp.nested_assets.all().order_by("asset_id"):
+                        row["nested"].append({
+                            "assetId": sub.asset_id, "type": sub.get_asset_type_display(),
+                            "model": sub.make_model or None, "status": sub.get_status_display(),
+                            "indent": True,
+                        })
+        rows.append(row)
+    return rows
+
+
 @login_required
 def timeline_view(request):
     range_mode = request.GET.get("range", "week")
@@ -295,25 +325,37 @@ def timeline_view(request):
             "durationEnd": row["item"].license_duration_end.strftime("%d %b %Y") if row["item"].license_duration_end else None,
             "vizTicket": row["item"].viz_ticket or None,
             "status": row["item"].get_status_display(),
+            "archived": row["item"].archived,
             "serial": row["item"].serial or None,
             "notes": row["item"].notes or None,
             "kits": [k.name for k in row["item"].kits.all()],
+            "lastUpdatedBy": row["item"].last_updated_by.name if row["item"].last_updated_by_id else None,
+            "lastUpdatedDate": row["item"].last_updated_date.strftime("%d %b %Y") if row["item"].last_updated_date else None,
+            "lastUpdatedNotes": row["item"].last_updated_notes or None,
         }
         for row in license_rows
     }
 
-    kit_details = {
-        row["item"].id: {
-            "id": row["item"].id,
-            "name": row["item"].name,
-            "editUrl": f"/kits/{row['item'].id}/edit/",
-            "notes": row["item"].notes or None,
-            "members": [
-                f"{m.asset_id} ({m.get_asset_type_display()})" for m in row["item"].assets.all().order_by("asset_type", "asset_id")
-            ],
+    today = datetime.date.today()
+    kit_details = {}
+    for row in kit_rows:
+        kit = row["item"]
+        current_booking = kit.bookings.filter(
+            start_date__lte=today, end_date__gte=today
+        ).select_related("job").first()
+        kit_details[kit.id] = {
+            "id": kit.id,
+            "name": kit.name,
+            "editUrl": f"/kits/{kit.id}/edit/",
+            "notes": kit.notes or None,
+            "memberCount": kit.assets.count(),
+            "members": _kit_member_rows(kit),
+            "currentJob": current_booking.job.name if current_booking else None,
+            "currentJobDates": (
+                f"{current_booking.start_date.strftime('%d %b')} \u2013 {current_booking.end_date.strftime('%d %b %Y')}"
+                if current_booking else None
+            ),
         }
-        for row in kit_rows
-    }
 
     kits_fully_free, kits_partially_free = _week_availability(kits, bookings_by_kit, week_days)
     staff_fully_free, staff_partially_free = _week_availability(staff, bookings_by_staff, week_days)
@@ -701,11 +743,11 @@ CONTAINER_KIND_META = {
         "edit_url": lambda pk: f"/engines/{pk}/edit/",
         "delete_url": lambda pk: f"/engines/{pk}/delete/",
     },
-    Asset.AssetType.SONNET: {
-        "label": "Sonnet Box", "label_plural": "Sonnet Boxes", "active_nav": "sonnet_boxes",
-        "list_url": "/sonnet-boxes/", "new_url": "/sonnet-boxes/new/",
-        "edit_url": lambda pk: f"/sonnet-boxes/{pk}/edit/",
-        "delete_url": lambda pk: f"/sonnet-boxes/{pk}/delete/",
+    Asset.AssetType.IO_DEVICE: {
+        "label": "I/O Device", "label_plural": "I/O Devices", "active_nav": "engines",
+        "list_url": "/engines/?io=1", "new_url": "/admin/inventory/asset/add/",
+        "edit_url": lambda pk: f"/io-devices/{pk}/edit/",
+        "delete_url": lambda pk: f"/io-devices/{pk}/delete/",
     },
 }
 
@@ -781,6 +823,7 @@ def _container_form_context(kind, container=None):
         "kind_label": meta["label"],
         "kind_label_plural": meta["label_plural"],
         "list_url": meta["list_url"],
+        "delete_url": meta["delete_url"](container.id) if container else None,
     }
 
 
@@ -1062,6 +1105,7 @@ def _container_list_view(request, kind):
         "kind": kind,
         "kind_label": "I/O Device" if show_io else meta["label"],
         "kind_label_plural": "I/O Devices" if show_io else meta["label_plural"],
+        "all_tab_label": meta["label_plural"],
         "new_url": "/admin/inventory/asset/add/" if show_io else meta["new_url"],
     }
     return render(request, "inventory/engine_list.html", context)
@@ -1086,6 +1130,17 @@ def engine_delete_view(request, engine_id):
 @login_required
 def engine_list_view(request):
     return _container_list_view(request, Asset.AssetType.ENGINE)
+
+
+@login_required
+def io_device_edit_view(request, io_id):
+    return _container_edit_view(request, Asset.AssetType.IO_DEVICE, io_id)
+
+
+@login_required
+@require_POST
+def io_device_delete_view(request, io_id):
+    return _container_delete_view(request, Asset.AssetType.IO_DEVICE, io_id)
 
 
 

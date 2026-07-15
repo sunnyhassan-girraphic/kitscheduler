@@ -316,7 +316,7 @@
   {% if engine %}
   <div class="delete-zone">
     <p>Permanently delete this {{ kind_label|lower }}. Nested components will be unassigned, not deleted.</p>
-    <form method="post" action="{{ list_url }}{{ engine.id }}/delete/"
+    <form method="post" action="{{ delete_url }}"
           onsubmit="window.__formDirty = false; return confirm('Delete {{ engine.asset_id }}? This removes the {{ kind_label|lower }} and every booking on it. Components inside it will become unassigned. This cannot be undone.');">
       {% csrf_token %}
       <button class="btn" type="submit" style="color:var(--red);">Delete {{ kind_label|lower }}</button>

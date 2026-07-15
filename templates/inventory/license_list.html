@@ -27,16 +27,20 @@
       <a href="?type={{ value }}{% if query %}&q={{ query }}{% endif %}{% if show_archived %}&archived=1{% endif %}{% if selected_func %}&func={{ selected_func }}{% endif %}"
          class="btn {% if selected_type == value %}btn-active{% endif %}">{{ label }}</a>
     {% endfor %}
-    <label class="archived-toggle">
-      <input type="checkbox" onchange="const u=new URL(location.href); if(this.checked){u.searchParams.set('archived','1')}else{u.searchParams.delete('archived')}; location.href=u;" {% if show_archived %}checked{% endif %}>
-      Show archived
-    </label>
-    <select class="filter" onchange="const u=new URL(location.href); if(this.value){u.searchParams.set('func', this.value)}else{u.searchParams.delete('func')}; location.href=u;">
-      <option value="">All functionalities</option>
-      {% for f in functionality_options %}
-        <option value="{{ f.id }}" {% if selected_func == f.id|stringformat:"s" %}selected{% endif %}>{{ f.name }}</option>
-      {% endfor %}
-    </select>
+    <form method="get" style="display:contents;">
+      {% if selected_type %}<input type="hidden" name="type" value="{{ selected_type }}">{% endif %}
+      {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+      <label class="archived-toggle">
+        <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %} onchange="this.form.submit()">
+        Show archived
+      </label>
+      <select class="filter" name="func" onchange="this.form.submit()">
+        <option value="">All functionalities</option>
+        {% for f in functionality_options %}
+          <option value="{{ f.id }}" {% if selected_func == f.id|stringformat:"s" %}selected{% endif %}>{{ f.name }}</option>
+        {% endfor %}
+      </select>
+    </form>
   </div>
   <form method="get" class="filter-bar-right">
     {% if selected_type %}<input type="hidden" name="type" value="{{ selected_type }}">{% endif %}

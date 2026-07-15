@@ -28,16 +28,21 @@
 {% block content %}
 <div class="filter-bar">
   <div class="filter-bar-left">
-    <a href="?{% if query %}q={{ query }}&{% endif %}{% if show_archived %}archived=1{% endif %}" class="btn {% if not selected_make_model and not show_io %}btn-active{% endif %}">All {{ kind_label_plural|lower }}</a>
+    <a href="?{% if query %}q={{ query }}&{% endif %}{% if show_archived %}archived=1{% endif %}" class="btn {% if not selected_make_model and not show_io %}btn-active{% endif %}">All {{ all_tab_label|lower }}</a>
     {% for m in engine_models %}
       <a href="?make_model={{ m|urlencode }}{% if query %}&q={{ query }}{% endif %}{% if show_archived %}&archived=1{% endif %}"
          class="btn {% if selected_make_model == m and not show_io %}btn-active{% endif %}">{{ m }}</a>
     {% endfor %}
     <a href="?io=1{% if query %}&q={{ query }}{% endif %}{% if show_archived %}&archived=1{% endif %}" class="btn {% if show_io %}btn-active{% endif %}">I/O Devices</a>
-    <label class="archived-toggle">
-      <input type="checkbox" onchange="const u=new URL(location.href); if(this.checked){u.searchParams.set('archived','1')}else{u.searchParams.delete('archived')}; location.href=u;" {% if show_archived %}checked{% endif %}>
-      Show archived
-    </label>
+    <form method="get" style="display:contents;">
+      {% if selected_make_model %}<input type="hidden" name="make_model" value="{{ selected_make_model }}">{% endif %}
+      {% if show_io %}<input type="hidden" name="io" value="1">{% endif %}
+      {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+      <label class="archived-toggle">
+        <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %} onchange="this.form.submit()">
+        Show archived
+      </label>
+    </form>
   </div>
   <form method="get" class="filter-bar-right">
     {% if selected_make_model %}<input type="hidden" name="make_model" value="{{ selected_make_model }}">{% endif %}
@@ -56,7 +61,7 @@
     <span class="badge badge-{{ engine.status|lower }}">{{ engine.get_status_display }}</span>
     {% if engine.archived %}<span class="badge badge-archived">Archived</span>{% endif %}
     {% if show_io %}
-      <a class="btn edit-btn" href="/admin/inventory/asset/{{ engine.id }}/change/">Edit</a>
+      <a class="btn edit-btn" href="/io-devices/{{ engine.id }}/edit/">Edit</a>
     {% else %}
       <a class="btn edit-btn" href="{{ list_url }}{{ engine.id }}/edit/">Edit</a>
     {% endif %}

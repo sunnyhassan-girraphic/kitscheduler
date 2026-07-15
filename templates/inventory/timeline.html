@@ -124,13 +124,13 @@
   .gblock.continues-before { border-radius: 0 4px 4px 0; margin-left: 0; }
   .gblock.continues-after  { border-radius: 4px 0 0 4px; margin-right: 0; }
 
-  /* Job detail dialog */
-  dialog#jobDetailDialog {
+  /* Job/License/Kit detail dialogs */
+  dialog#jobDetailDialog, dialog#licenseDetailDialog, dialog#kitDetailDialog {
     background: var(--surface); color: var(--text);
     border: 1px solid var(--border-strong); border-radius: 10px;
     padding: 0; width: 400px; max-width: 92vw;
   }
-  dialog#jobDetailDialog::backdrop { background: rgba(0,0,0,0.6); }
+  dialog#jobDetailDialog::backdrop, dialog#licenseDetailDialog::backdrop, dialog#kitDetailDialog::backdrop { background: rgba(0,0,0,0.6); }
   .jd-header { padding: 16px 80px 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
   .jd-color-bar { width: 4px; border-radius: 2px; min-height: 36px; flex-shrink: 0; }
   .jd-title { font-size: 15px; font-weight: 600; line-height: 1.3; }
@@ -141,6 +141,17 @@
   .jd-value { color: var(--text); }
   .jd-actions { display: flex; gap: 8px; padding: 10px 20px 16px; border-top: 1px solid var(--border); }
   .jd-actions .spacer { flex: 1; }
+  .kd-member-row { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:12px; border-top:1px solid var(--border); flex-wrap:wrap; }
+  .kd-member-row:first-child { border-top: none; }
+  .kd-member-row .kd-aid { font-family: var(--mono); color: var(--text); }
+  .kd-member-row .kd-amodel { color: var(--text-dim); flex:1; }
+  .kd-nested-row { display:flex; align-items:center; gap:8px; padding:5px 0 5px 16px; font-size:11px; color:var(--text-dim); border-top:1px solid var(--border); }
+  .kd-nested-row.indent { padding-left: 30px; }
+  .kd-tag {
+    font-size:9px; padding:1px 6px; border-radius:999px; font-weight:700; text-transform:uppercase;
+    letter-spacing:0.02em; background:var(--accent-glow); color:var(--accent); border:1px solid var(--accent-deep);
+  }
+  .kd-empty { padding: 8px 0; color: var(--text-faint); font-size: 12px; font-style: italic; }
 
   /* Tab switcher in booking dialog */
   .tab-bar { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
@@ -377,6 +388,9 @@
     <div class="jd-row" id="ldSerialRow" style="display:none;"><span class="jd-label">Serial</span><span class="jd-value" id="ldSerial"></span></div>
     <div class="jd-row" id="ldKitsRow" style="display:none;"><span class="jd-label">In kits</span><span class="jd-value" id="ldKits"></span></div>
     <div class="jd-row" id="ldNotesRow" style="display:none;"><span class="jd-label">Notes</span><span class="jd-value" id="ldNotes"></span></div>
+    <div class="jd-row" id="ldUpdatedRow" style="display:none;"><span class="jd-label">Last updated</span><span class="jd-value" id="ldUpdated"></span></div>
+    <div class="jd-row" id="ldUpdatedNotesRow" style="display:none;"><span class="jd-label">What changed</span><span class="jd-value" id="ldUpdatedNotes"></span></div>
+    <div class="jd-row" id="ldArchivedRow" style="display:none;"><span class="jd-label"></span><span class="jd-value badge badge-archived">Archived</span></div>
   </div>
 </dialog>
 
@@ -393,8 +407,10 @@
     </div>
   </div>
   <div class="jd-body">
-    <div class="jd-row" id="kdMembersRow" style="display:none;"><span class="jd-label">Members</span><span class="jd-value" id="kdMembers"></span></div>
+    <div class="jd-row" id="kdCurrentJobRow" style="display:none;"><span class="jd-label">Booked</span><span class="jd-value" id="kdCurrentJob"></span></div>
     <div class="jd-row" id="kdNotesRow" style="display:none;"><span class="jd-label">Notes</span><span class="jd-value" id="kdNotes"></span></div>
+    <div class="jd-label" style="margin:10px 0 4px;">Members</div>
+    <div id="kdMembersList"></div>
   </div>
 </dialog>
 
@@ -715,24 +731,60 @@ function openLicenseDetail(licenseId) {
   setRow("ldSerialRow", "ldSerial", lic.serial);
   setRow("ldKitsRow", "ldKits", lic.kits && lic.kits.length ? lic.kits.join(", ") : "");
   setRow("ldNotesRow", "ldNotes", lic.notes);
+  const updated = lic.lastUpdatedBy || lic.lastUpdatedDate
+    ? `${lic.lastUpdatedBy || ""}${lic.lastUpdatedBy && lic.lastUpdatedDate ? " on " : ""}${lic.lastUpdatedDate || ""}`
+    : "";
+  setRow("ldUpdatedRow", "ldUpdated", updated);
+  setRow("ldUpdatedNotesRow", "ldUpdatedNotes", lic.lastUpdatedNotes);
+  document.getElementById("ldArchivedRow").style.display = lic.archived ? "flex" : "none";
 
   document.getElementById("licenseDetailDialog").showModal();
+}
+
+function kdBadge(status) {
+  return `<span class="badge badge-${status.toLowerCase().replace(/ /g, "_")}" style="font-size:9px; padding:1px 6px;">${status}</span>`;
 }
 
 function openKitDetail(kitId) {
   const kit = KIT_DETAILS[kitId];
   if (!kit) return;
   document.getElementById("kdTitle").textContent = kit.name;
-  document.getElementById("kdMemberCount").textContent = `${kit.members.length} member${kit.members.length === 1 ? "" : "s"}`;
+  document.getElementById("kdMemberCount").textContent = `${kit.memberCount} member${kit.memberCount === 1 ? "" : "s"}`;
   document.getElementById("kdEditLink").href = kit.editUrl;
 
-  const membersRow = document.getElementById("kdMembersRow");
-  if (kit.members.length) { document.getElementById("kdMembers").textContent = kit.members.join(", "); membersRow.style.display = "flex"; }
-  else membersRow.style.display = "none";
+  const jobRow = document.getElementById("kdCurrentJobRow");
+  if (kit.currentJob) {
+    document.getElementById("kdCurrentJob").textContent = `${kit.currentJob} (${kit.currentJobDates})`;
+    jobRow.style.display = "flex";
+  } else jobRow.style.display = "none";
 
   const notesRow = document.getElementById("kdNotesRow");
   if (kit.notes) { document.getElementById("kdNotes").textContent = kit.notes; notesRow.style.display = "flex"; }
   else notesRow.style.display = "none";
+
+  const list = document.getElementById("kdMembersList");
+  if (!kit.members.length) {
+    list.innerHTML = `<div class="kd-empty">No members added yet.</div>`;
+  } else {
+    list.innerHTML = kit.members.map(m => {
+      let html = `
+        <div class="kd-member-row">
+          <span class="kd-aid">${m.assetId}</span>
+          <span class="kd-amodel">${m.type}${m.model ? " &middot; " + m.model : ""}</span>
+          ${m.tag ? `<span class="kd-tag">${m.tag}</span>` : ""}
+          ${kdBadge(m.status)}
+        </div>`;
+      m.nested.forEach(n => {
+        html += `
+          <div class="kd-nested-row ${n.indent ? "indent" : ""}">
+            <span class="kd-aid" style="font-size:11px;">${n.assetId}</span>
+            <span style="flex:1;">${n.type}${n.model ? " &middot; " + n.model : ""}</span>
+            ${kdBadge(n.status)}
+          </div>`;
+      });
+      return html;
+    }).join("");
+  }
 
   document.getElementById("kitDetailDialog").showModal();
 }
