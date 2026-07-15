@@ -1,7 +1,7 @@
 import datetime
 
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import models
 from django.utils.html import format_html
 
@@ -256,13 +256,23 @@ class JobAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         if change:
             original = Job.objects.get(pk=obj.pk)
-            delta = obj.start_date - original.start_date
-            if delta:
+            dates_changed = (
+                obj.start_date != original.start_date
+                or obj.end_date != original.end_date
+            )
+            if dates_changed:
+                updated = 0
                 for related_name in ("kit_bookings", "staff_bookings", "asset_bookings"):
                     for booking in getattr(obj, related_name).all():
-                        booking.start_date += delta
-                        booking.end_date += delta
+                        booking.start_date = obj.start_date
+                        booking.end_date = obj.end_date
                         booking.save(update_fields=["start_date", "end_date"])
+                        updated += 1
+                self.message_user(
+                    request,
+                    f"Updated {updated} booking(s) to match the job's new dates "
+                    f"({obj.start_date} \u2013 {obj.end_date}).",
+                )
         super().save_model(request, obj, form, change)
 
     def color_swatch(self, obj):
