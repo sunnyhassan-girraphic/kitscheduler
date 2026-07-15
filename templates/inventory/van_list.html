@@ -5,42 +5,21 @@
   <a class="btn btn-primary" href="/vans/new/">+ Add van</a>
 {% endblock %}
 {% block extra_style %}
-  .van-card {
-    border: 1px solid var(--border); border-radius: 8px; margin: 12px 24px;
-    overflow: hidden; background: var(--surface); display: flex;
-  }
-  .van-accent { width: 4px; flex-shrink: 0; background: var(--border-strong); }
-  .van-accent.has-issues { background: var(--red); }
-  .van-accent.all-ok { background: var(--green); }
-  .van-card-main { flex: 1; min-width: 0; }
+  .van-card { border: 1px solid var(--border); border-radius: 8px; margin: 12px 24px; overflow: hidden; background: var(--surface); }
   .van-head { display:flex; align-items:center; gap:10px; padding:12px 16px; background:var(--surface-2); border-bottom:1px solid var(--border); }
-  .van-icon {
-    width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0;
-    background: var(--accent-glow); border: 1px solid var(--accent-deep);
-    display: flex; align-items: center; justify-content: center; color: var(--accent);
-  }
-  .van-icon svg { width: 15px; height: 15px; }
   .van-head .vname { font-weight:700; font-size:14px; }
   .van-head .vreg { font-family:var(--mono); font-size:12px; color:var(--text-dim); }
   .van-head .vmodel { font-size:12px; color:var(--text-dim); }
   .van-head .meta { margin-left:auto; display:flex; gap:12px; align-items:center; }
   .van-body { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0; }
-  .van-stat { padding:12px 16px; border-right:1px solid var(--border); border-top: 2px solid transparent; }
+  .van-stat { padding:12px 16px; border-right:1px solid var(--border); }
   .van-stat:last-child { border-right:none; }
-  .van-stat.stat-usage { border-top-color: var(--blue); }
-  .van-stat.stat-maintenance { border-top-color: var(--accent-deep); }
-  .van-stat.stat-checklist.ok { border-top-color: var(--green); }
-  .van-stat.stat-checklist.issues { border-top-color: var(--red); }
   .van-stat .label {
     display: flex; align-items: center; gap: 6px;
     font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.04em;
     font-weight: 600; margin-bottom:6px;
   }
-  .van-stat .label svg { width: 12px; height: 12px; flex-shrink: 0; }
-  .stat-usage .label svg { color: var(--blue); }
-  .stat-maintenance .label svg { color: var(--accent); }
-  .stat-checklist.ok .label svg { color: var(--green); }
-  .stat-checklist.issues .label svg { color: var(--red); }
+  .van-stat .label svg { width: 12px; height: 12px; flex-shrink: 0; color: var(--text-faint); }
   .van-stat .value { font-size:14px; font-weight:600; color:var(--text); }
   .van-stat .sub { font-size:12px; color:var(--text-dim); margin-top:3px; }
   .issues-flag { color: var(--red); font-weight: 600; }
@@ -50,64 +29,56 @@
 {% block content %}
 {% for row in rows %}
 <div class="van-card">
-  <div class="van-accent {% if row.checklist_issues %}has-issues{% elif row.last_checklist %}all-ok{% endif %}"></div>
-  <div class="van-card-main">
-    <div class="van-head">
-      <div class="van-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 17h1a2 2 0 0 0 4 0h8a2 2 0 0 0 4 0h1v-5l-3-4H7L3 12v5z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="17.5" cy="17.5" r="1.5"/>
-        </svg>
+  <div class="van-head">
+    <span class="vname">{{ row.vehicle.name }}</span>
+    {% if row.vehicle.registration %}<span class="vreg">{{ row.vehicle.registration }}</span>{% endif %}
+    {% if row.vehicle.make_model %}<span class="vmodel">{{ row.vehicle.make_model }}</span>{% endif %}
+    <span class="meta">
+      {% if row.checklist_issues %}<span class="issues-flag">{{ row.checklist_issues }} issue{{ row.checklist_issues|pluralize }} flagged</span>{% endif %}
+      <a class="btn" href="/vans/{{ row.vehicle.id }}/" style="font-size:12px; padding:4px 10px;">Open</a>
+      <a class="btn" href="/vans/{{ row.vehicle.id }}/edit/" style="font-size:12px; padding:4px 10px;">Edit</a>
+    </span>
+  </div>
+  <div class="van-body">
+    <div class="van-stat">
+      <div class="label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h1a2 2 0 0 0 4 0h8a2 2 0 0 0 4 0h1v-5l-3-4H7L3 12v5z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="17.5" cy="17.5" r="1.5"/></svg>
+        Last usage
       </div>
-      <span class="vname">{{ row.vehicle.name }}</span>
-      {% if row.vehicle.registration %}<span class="vreg">{{ row.vehicle.registration }}</span>{% endif %}
-      {% if row.vehicle.make_model %}<span class="vmodel">{{ row.vehicle.make_model }}</span>{% endif %}
-      <span class="meta">
-        {% if row.checklist_issues %}<span class="issues-flag">{{ row.checklist_issues }} issue{{ row.checklist_issues|pluralize }} flagged</span>{% endif %}
-        <a class="btn" href="/vans/{{ row.vehicle.id }}/" style="font-size:12px; padding:4px 10px;">Open</a>
-        <a class="btn" href="/vans/{{ row.vehicle.id }}/edit/" style="font-size:12px; padding:4px 10px;">Edit</a>
-      </span>
+      {% if row.last_usage %}
+        <div class="value">{{ row.last_usage.date|date:"j M Y" }}{% if row.last_usage.driver %} - {{ row.last_usage.driver.name }}{% endif %}</div>
+        {% if row.last_usage.purpose %}<div class="sub">{{ row.last_usage.purpose }}</div>{% endif %}
+      {% else %}
+        <div class="value" style="color:var(--text-faint); font-weight:400;">No entries yet</div>
+      {% endif %}
     </div>
-    <div class="van-body">
-      <div class="van-stat stat-usage">
-        <div class="label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h1a2 2 0 0 0 4 0h8a2 2 0 0 0 4 0h1v-5l-3-4H7L3 12v5z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="17.5" cy="17.5" r="1.5"/></svg>
-          Last usage
-        </div>
-        {% if row.last_usage %}
-          <div class="value">{{ row.last_usage.date|date:"j M Y" }}{% if row.last_usage.driver %} - {{ row.last_usage.driver.name }}{% endif %}</div>
-          {% if row.last_usage.purpose %}<div class="sub">{{ row.last_usage.purpose }}</div>{% endif %}
-        {% else %}
-          <div class="value" style="color:var(--text-faint); font-weight:400;">No entries yet</div>
-        {% endif %}
+    <div class="van-stat">
+      <div class="label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.6 5.6L3 18l3 3 6.1-6.1a4 4 0 0 1 5.6-5.6l-3 3-2-2z"/></svg>
+        Last maintenance
       </div>
-      <div class="van-stat stat-maintenance">
-        <div class="label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.6 5.6L3 18l3 3 6.1-6.1a4 4 0 0 1 5.6-5.6l-3 3-2-2z"/></svg>
-          Last maintenance
-        </div>
-        {% if row.last_maintenance %}
-          <div class="value">{{ row.last_maintenance.date|date:"j M Y" }}</div>
-          <div class="sub">{{ row.last_maintenance.description|truncatechars:50 }}</div>
-        {% else %}
-          <div class="value" style="color:var(--text-faint); font-weight:400;">No entries yet</div>
-        {% endif %}
+      {% if row.last_maintenance %}
+        <div class="value">{{ row.last_maintenance.date|date:"j M Y" }}</div>
+        <div class="sub">{{ row.last_maintenance.description|truncatechars:50 }}</div>
+      {% else %}
+        <div class="value" style="color:var(--text-faint); font-weight:400;">No entries yet</div>
+      {% endif %}
+    </div>
+    <div class="van-stat">
+      <div class="label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Last checklist
       </div>
-      <div class="van-stat stat-checklist {% if row.checklist_issues %}issues{% elif row.last_checklist %}ok{% endif %}">
-        <div class="label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          Last checklist
-        </div>
-        {% if row.last_checklist %}
-          <div class="value">{{ row.last_checklist.date|date:"j M Y" }}</div>
-          {% if row.checklist_issues %}
-            <div class="sub issues-flag">{{ row.checklist_issues }} item{{ row.checklist_issues|pluralize }} need{{ row.checklist_issues|pluralize:",s" }} attention</div>
-          {% else %}
-            <div class="sub ok-flag">All items OK</div>
-          {% endif %}
+      {% if row.last_checklist %}
+        <div class="value">{{ row.last_checklist.date|date:"j M Y" }}</div>
+        {% if row.checklist_issues %}
+          <div class="sub issues-flag">{{ row.checklist_issues }} item{{ row.checklist_issues|pluralize }} need{{ row.checklist_issues|pluralize:",s" }} attention</div>
         {% else %}
-          <div class="value" style="color:var(--text-faint); font-weight:400;">No entries yet</div>
+          <div class="sub ok-flag">All items OK</div>
         {% endif %}
-      </div>
+      {% else %}
+        <div class="value" style="color:var(--text-faint); font-weight:400;">No entries yet</div>
+      {% endif %}
     </div>
   </div>
 </div>

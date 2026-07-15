@@ -253,6 +253,18 @@ class JobAdmin(admin.ModelAdmin):
     search_fields = ("name", "notes")
     date_hierarchy = "start_date"
 
+    def save_model(self, request, obj, form, change):
+        if change:
+            original = Job.objects.get(pk=obj.pk)
+            delta = obj.start_date - original.start_date
+            if delta:
+                for related_name in ("kit_bookings", "staff_bookings", "asset_bookings"):
+                    for booking in getattr(obj, related_name).all():
+                        booking.start_date += delta
+                        booking.end_date += delta
+                        booking.save(update_fields=["start_date", "end_date"])
+        super().save_model(request, obj, form, change)
+
     def color_swatch(self, obj):
         color = obj.resolve_color()
         return format_html(

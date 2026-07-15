@@ -46,14 +46,14 @@
   .brand .sub { font-weight: 400; font-size: 12px; color: var(--text-dim); margin-left: 6px; font-family: var(--mono); }
   nav.primary {
     display: flex; align-items: center; gap: 2px;
-    padding: 0 24px; border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: visible;
+    padding: 0 24px; border-bottom: 1px solid var(--border); overflow-x: auto;
   }
-  nav.primary a {
+  nav.primary a:not(.btn) {
     padding: 11px 14px; font-size: 13px; text-decoration: none;
     color: var(--text-dim); border-bottom: 2px solid transparent; white-space: nowrap;
   }
-  nav.primary a:hover { color: var(--text); }
-  nav.primary a.active { color: var(--accent); border-bottom-color: var(--accent); }
+  nav.primary a:not(.btn):hover { color: var(--text); }
+  nav.primary a:not(.btn).active { color: var(--accent); border-bottom-color: var(--accent); }
   nav.primary .nav-spacer { flex: 1; }
   .cog-link {
     display: flex; align-items: center; justify-content: center;
@@ -64,7 +64,7 @@
   .cog-link.active { color: var(--accent); background: var(--accent-glow); }
   .cog-link svg { width: 18px; height: 18px; }
   .nav { display: flex; align-items: center; gap: 8px; }
-  nav.primary .nav { margin: 6px 0 6px 12px; }
+  nav.primary .nav { margin: 0 0 0 12px; }
   nav.primary .nav a,
   nav.primary .nav button {
     padding: 7px 14px; color: var(--text); font-size: 13px;
@@ -81,7 +81,6 @@
     background: var(--surface-2); border: 1px solid var(--border-strong);
     color: var(--text); border-radius: 6px; padding: 7px 14px; font-size: 13px;
     cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
-    white-space: nowrap; flex-shrink: 0;
   }
   .btn:hover { border-color: var(--accent-deep); }
   .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-on); font-weight: 700; }
