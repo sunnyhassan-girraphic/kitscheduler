@@ -13,18 +13,24 @@
 {% block content %}
 <div class="filter-bar">
   <div class="filter-bar-left">
-    <select class="filter" onchange="const u=new URL(location.href); if(this.value){u.searchParams.set('status', this.value)}else{u.searchParams.delete('status')}; location.href=u;">
-      <option value="">All Tickets</option>
-      {% for value, label in statuses %}
-        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+    <a href="?{% if search_query %}q={{ search_query }}{% endif %}{% if selected_priority %}&priority={{ selected_priority }}{% endif %}" class="btn {% if not selected_status %}btn-active{% endif %}">All Tickets</a>
+    {% for value, label in statuses %}
+      <a href="?status={{ value }}{% if search_query %}&q={{ search_query }}{% endif %}{% if selected_priority %}&priority={{ selected_priority }}{% endif %}"
+         class="btn {% if selected_status == value %}btn-active{% endif %}">{{ label }}</a>
+    {% endfor %}
+    <select class="filter" onchange="const u=new URL(location.href); if(this.value){u.searchParams.set('priority', this.value)}else{u.searchParams.delete('priority')}; location.href=u;">
+      <option value="">All priorities</option>
+      {% for value, label in priorities %}
+        <option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
   </div>
   <form method="get" class="filter-bar-right">
     {% if selected_status %}<input type="hidden" name="status" value="{{ selected_status }}">{% endif %}
+    {% if selected_priority %}<input type="hidden" name="priority" value="{{ selected_priority }}">{% endif %}
     <input class="filter" type="text" name="q" value="{{ search_query }}" placeholder="Search asset, reporter, description..." style="width:240px;">
     <button class="btn" type="submit">Search</button>
-    {% if selected_status or search_query %}<a class="btn" href="/tickets/">Clear</a>{% endif %}
+    {% if selected_status or selected_priority or search_query %}<a class="btn" href="/tickets/">Clear</a>{% endif %}
   </form>
 </div>
 

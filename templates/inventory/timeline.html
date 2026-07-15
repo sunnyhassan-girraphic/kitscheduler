@@ -131,7 +131,7 @@
     padding: 0; width: 400px; max-width: 92vw;
   }
   dialog#jobDetailDialog::backdrop { background: rgba(0,0,0,0.6); }
-  .jd-header { padding: 16px 44px 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
+  .jd-header { padding: 16px 80px 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
   .jd-color-bar { width: 4px; border-radius: 2px; min-height: 36px; flex-shrink: 0; }
   .jd-title { font-size: 15px; font-weight: 600; line-height: 1.3; }
   .jd-category { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
@@ -194,7 +194,7 @@
 
   {% for row in kit_rows %}
     <div class="gname">
-      <span class="item-name">{{ row.item.name }}</span>
+      <a class="item-name" href="/kits/{{ row.item.id }}/edit/" onclick="openKitDetail({{ row.item.id }}); return false;">{{ row.item.name }}</a>
       <span class="item-meta">{{ row.item.assets.count }} member{{ row.item.assets.count|pluralize }}</span>
     </div>
     <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
@@ -287,7 +287,7 @@
 
   {% for row in license_rows %}
     <div class="gname">
-      <a class="item-name" href="/licenses/{{ row.item.id }}/edit/">{{ row.item.asset_id }}</a>
+      <a class="item-name" href="/licenses/{{ row.item.id }}/edit/" onclick="openLicenseDetail({{ row.item.id }}); return false;">{{ row.item.asset_id }}</a>
       {% if row.item.serial %}<div class="item-meta">{{ row.item.serial }}</div>{% endif %}
     </div>
     <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
@@ -332,6 +332,9 @@
 
 <!-- Job Detail Dialog -->
 <dialog id="jobDetailDialog">
+  <a class="dialog-edit-icon" id="jdEditLink" href="#" title="Edit" aria-label="Edit job">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+  </a>
   <button type="button" class="dialog-close-x" onclick="document.getElementById('jobDetailDialog').close()" aria-label="Close">&times;</button>
   <div class="jd-header">
     <div class="jd-color-bar" id="jdColorBar"></div>
@@ -348,10 +351,50 @@
   </div>
   <div class="jd-actions">
     <span class="spacer"></span>
-    <a class="btn" id="jdEditLink" href="#">Edit job</a>
     <button class="btn" id="jdCloneBtn" onclick="cloneJob()">Clone</button>
     <button class="btn" id="jdUnassignBtn" style="color:var(--accent);" onclick="unassignBooking()">Unassign</button>
     <button class="btn" id="jdDeleteBtn" style="color:var(--red);" onclick="deleteJob()">Delete job</button>
+  </div>
+</dialog>
+
+<!-- License Detail Dialog -->
+<dialog id="licenseDetailDialog">
+  <a class="dialog-edit-icon" id="ldEditLink" href="#" title="Edit" aria-label="Edit license">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+  </a>
+  <button type="button" class="dialog-close-x" onclick="document.getElementById('licenseDetailDialog').close()" aria-label="Close">&times;</button>
+  <div class="jd-header">
+    <div>
+      <div class="jd-title" id="ldTitle"></div>
+      <div class="jd-category" id="ldStatus"></div>
+    </div>
+  </div>
+  <div class="jd-body">
+    <div class="jd-row" id="ldTypeRow" style="display:none;"><span class="jd-label">Type</span><span class="jd-value" id="ldType"></span></div>
+    <div class="jd-row" id="ldFuncRow" style="display:none;"><span class="jd-label">Functionality</span><span class="jd-value" id="ldFunc"></span></div>
+    <div class="jd-row" id="ldDurationRow" style="display:none;"><span class="jd-label">Duration</span><span class="jd-value" id="ldDuration"></span></div>
+    <div class="jd-row" id="ldVizRow" style="display:none;"><span class="jd-label">Viz Ticket</span><span class="jd-value" id="ldViz"></span></div>
+    <div class="jd-row" id="ldSerialRow" style="display:none;"><span class="jd-label">Serial</span><span class="jd-value" id="ldSerial"></span></div>
+    <div class="jd-row" id="ldKitsRow" style="display:none;"><span class="jd-label">In kits</span><span class="jd-value" id="ldKits"></span></div>
+    <div class="jd-row" id="ldNotesRow" style="display:none;"><span class="jd-label">Notes</span><span class="jd-value" id="ldNotes"></span></div>
+  </div>
+</dialog>
+
+<!-- Kit Detail Dialog -->
+<dialog id="kitDetailDialog">
+  <a class="dialog-edit-icon" id="kdEditLink" href="#" title="Edit" aria-label="Edit kit">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+  </a>
+  <button type="button" class="dialog-close-x" onclick="document.getElementById('kitDetailDialog').close()" aria-label="Close">&times;</button>
+  <div class="jd-header">
+    <div>
+      <div class="jd-title" id="kdTitle"></div>
+      <div class="jd-category" id="kdMemberCount"></div>
+    </div>
+  </div>
+  <div class="jd-body">
+    <div class="jd-row" id="kdMembersRow" style="display:none;"><span class="jd-label">Members</span><span class="jd-value" id="kdMembers"></span></div>
+    <div class="jd-row" id="kdNotesRow" style="display:none;"><span class="jd-label">Notes</span><span class="jd-value" id="kdNotes"></span></div>
   </div>
 </dialog>
 
@@ -460,9 +503,13 @@
   </form>
 </dialog>
 
+{{ license_details_json|json_script:"license-details-data" }}
+{{ kit_details_json|json_script:"kit-details-data" }}
 <script>
 const dialog = document.getElementById("bookingDialog");
 const jobDetailDialog = document.getElementById("jobDetailDialog");
+const LICENSE_DETAILS = JSON.parse(document.getElementById("license-details-data").textContent);
+const KIT_DETAILS = JSON.parse(document.getElementById("kit-details-data").textContent);
 let activeKind = "kit";
 let activeJobId = null;
 let currentBookingId = null;
@@ -646,6 +693,48 @@ async function openJobDetail(jobId, bookingKind, bookingId) {
 
     jobDetailDialog.showModal();
   } catch(e) { console.error(e); }
+}
+
+function openLicenseDetail(licenseId) {
+  const lic = LICENSE_DETAILS[licenseId];
+  if (!lic) return;
+  document.getElementById("ldTitle").textContent = lic.assetId;
+  document.getElementById("ldStatus").textContent = lic.status;
+  document.getElementById("ldEditLink").href = lic.editUrl;
+
+  const setRow = (rowId, valueId, text) => {
+    const row = document.getElementById(rowId);
+    if (text) { document.getElementById(valueId).textContent = text; row.style.display = "flex"; }
+    else row.style.display = "none";
+  };
+  setRow("ldTypeRow", "ldType", lic.type);
+  setRow("ldFuncRow", "ldFunc", lic.functionalities && lic.functionalities.length ? lic.functionalities.join(", ") : "");
+  const duration = (lic.durationStart || lic.durationEnd) ? `${lic.durationStart || "?"} \u2013 ${lic.durationEnd || "?"}` : "";
+  setRow("ldDurationRow", "ldDuration", duration);
+  setRow("ldVizRow", "ldViz", lic.vizTicket);
+  setRow("ldSerialRow", "ldSerial", lic.serial);
+  setRow("ldKitsRow", "ldKits", lic.kits && lic.kits.length ? lic.kits.join(", ") : "");
+  setRow("ldNotesRow", "ldNotes", lic.notes);
+
+  document.getElementById("licenseDetailDialog").showModal();
+}
+
+function openKitDetail(kitId) {
+  const kit = KIT_DETAILS[kitId];
+  if (!kit) return;
+  document.getElementById("kdTitle").textContent = kit.name;
+  document.getElementById("kdMemberCount").textContent = `${kit.members.length} member${kit.members.length === 1 ? "" : "s"}`;
+  document.getElementById("kdEditLink").href = kit.editUrl;
+
+  const membersRow = document.getElementById("kdMembersRow");
+  if (kit.members.length) { document.getElementById("kdMembers").textContent = kit.members.join(", "); membersRow.style.display = "flex"; }
+  else membersRow.style.display = "none";
+
+  const notesRow = document.getElementById("kdNotesRow");
+  if (kit.notes) { document.getElementById("kdNotes").textContent = kit.notes; notesRow.style.display = "flex"; }
+  else notesRow.style.display = "none";
+
+  document.getElementById("kitDetailDialog").showModal();
 }
 
 async function unassignBooking() {

@@ -284,6 +284,37 @@ def timeline_view(request):
         for cell in row["cells"]:
             cell["in_duration"] = bool(start and end and start <= cell["date"] <= end)
 
+    license_details = {
+        row["item"].id: {
+            "id": row["item"].id,
+            "assetId": row["item"].asset_id,
+            "editUrl": f"/licenses/{row['item'].id}/edit/",
+            "type": row["item"].get_license_type_display() or None,
+            "functionalities": [f.name for f in row["item"].functionalities.all()],
+            "durationStart": row["item"].license_duration_start.strftime("%d %b %Y") if row["item"].license_duration_start else None,
+            "durationEnd": row["item"].license_duration_end.strftime("%d %b %Y") if row["item"].license_duration_end else None,
+            "vizTicket": row["item"].viz_ticket or None,
+            "status": row["item"].get_status_display(),
+            "serial": row["item"].serial or None,
+            "notes": row["item"].notes or None,
+            "kits": [k.name for k in row["item"].kits.all()],
+        }
+        for row in license_rows
+    }
+
+    kit_details = {
+        row["item"].id: {
+            "id": row["item"].id,
+            "name": row["item"].name,
+            "editUrl": f"/kits/{row['item'].id}/edit/",
+            "notes": row["item"].notes or None,
+            "members": [
+                f"{m.asset_id} ({m.get_asset_type_display()})" for m in row["item"].assets.all().order_by("asset_type", "asset_id")
+            ],
+        }
+        for row in kit_rows
+    }
+
     kits_fully_free, kits_partially_free = _week_availability(kits, bookings_by_kit, week_days)
     staff_fully_free, staff_partially_free = _week_availability(staff, bookings_by_staff, week_days)
 
@@ -309,6 +340,8 @@ def timeline_view(request):
         "kit_rows": kit_rows,
         "staff_rows": staff_rows,
         "license_rows": license_rows,
+        "license_details_json": license_details,
+        "kit_details_json": kit_details,
         "jobs": jobs,
         "job_categories": Job.Category.choices,
         "today": datetime.date.today(),
@@ -892,6 +925,7 @@ def _container_edit_view(request, kind, container_id):
         last_updated_notes = request.POST.get("last_updated_notes", "").strip()
         component_ids = request.POST.getlist("components")
         selected_ids = [int(i) for i in component_ids if i.isdigit()]
+        kit_tag_id = request.POST.get("kit_tag", "").strip()
 
         form_ctx = _container_form_context(kind, container=container)
         form_ctx.update({
@@ -949,6 +983,13 @@ def _container_edit_view(request, kind, container_id):
         if kind == Asset.AssetType.ENGINE:
             _apply_sonnet_children(selected_ids, request.POST.getlist("sonnet_child"))
 
+        kit_membership = container.kit_asset_tags.first()
+        if kit_membership:
+            new_tag_id = int(kit_tag_id) if kit_tag_id.isdigit() else None
+            if new_tag_id != kit_membership.tag_id:
+                kit_membership.tag_id = new_tag_id
+                kit_membership.save(update_fields=["tag"])
+
         return redirect(meta["list_url"])
 
     form_ctx = _container_form_context(kind, container=container)
@@ -966,6 +1007,8 @@ def _container_edit_view(request, kind, container_id):
         "last_updated_notes": container.last_updated_notes,
         "selected_ids": list(container.nested_assets.values_list("id", flat=True)),
         "sonnet_child_pairs": [],
+        "tags": list(Tag.objects.all()),
+        "kit_membership": container.kit_asset_tags.select_related("kit", "tag").first(),
     })
     return render(request, "inventory/engine_form.html", form_ctx)
 
@@ -982,14 +1025,16 @@ def _container_list_view(request, kind):
     make_model = request.GET.get("make_model", "")
     show_archived = request.GET.get("archived") == "1"
     query = request.GET.get("q", "").strip()
+    show_io = kind == Asset.AssetType.ENGINE and request.GET.get("io") == "1"
+    effective_type = Asset.AssetType.IO_DEVICE if show_io else kind
 
     items = Asset.objects.filter(
-        asset_type=kind
+        asset_type=effective_type
     ).select_related("last_updated_by").prefetch_related("nested_assets", "kits")
 
     if not show_archived:
         items = items.filter(archived=False)
-    if make_model:
+    if make_model and not show_io:
         items = items.filter(make_model=make_model)
     if query:
         items = items.filter(
@@ -1011,12 +1056,13 @@ def _container_list_view(request, kind):
         "engine_models": list(models_qs),
         "selected_make_model": make_model,
         "show_archived": show_archived,
+        "show_io": show_io,
         "query": query,
         "active_nav": meta["active_nav"],
         "kind": kind,
-        "kind_label": meta["label"],
-        "kind_label_plural": meta["label_plural"],
-        "new_url": meta["new_url"],
+        "kind_label": "I/O Device" if show_io else meta["label"],
+        "kind_label_plural": "I/O Devices" if show_io else meta["label_plural"],
+        "new_url": "/admin/inventory/asset/add/" if show_io else meta["new_url"],
     }
     return render(request, "inventory/engine_list.html", context)
 
@@ -1755,6 +1801,10 @@ def ticket_list_view(request):
     if status_filter in Ticket.Status.values:
         tickets = tickets.filter(status=status_filter)
 
+    priority_filter = request.GET.get("priority", "")
+    if priority_filter in Ticket.Priority.values:
+        tickets = tickets.filter(priority=priority_filter)
+
     q = request.GET.get("q", "").strip()
     if q:
         tickets = tickets.filter(
@@ -1768,7 +1818,9 @@ def ticket_list_view(request):
     return render(request, "inventory/ticket_list.html", {
         "tickets": tickets,
         "statuses": Ticket.Status.choices,
+        "priorities": Ticket.Priority.choices,
         "selected_status": status_filter,
+        "selected_priority": priority_filter,
         "search_query": q,
         "open_count": open_count,
         "active_nav": "tickets",

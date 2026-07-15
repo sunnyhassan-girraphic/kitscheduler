@@ -160,8 +160,11 @@
 
 <!-- Job Detail Dialog -->
 <dialog id="jobDetailDialog" style="background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 10px; padding: 0; width: 420px; max-width: 90vw;">
+  <a class="dialog-edit-icon" id="jdEditLink" href="#" title="Edit" aria-label="Edit job">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+  </a>
   <button type="button" class="dialog-close-x" onclick="document.getElementById('jobDetailDialog').close()" aria-label="Close">&times;</button>
-  <div style="display:flex; align-items:center; gap:10px; padding:16px 44px 16px 16px; border-bottom:1px solid var(--border);">
+  <div style="display:flex; align-items:center; gap:10px; padding:16px 80px 16px 16px; border-bottom:1px solid var(--border);">
     <div id="jdColorBar" style="width:6px; height:32px; border-radius:3px; flex-shrink:0;"></div>
     <div>
       <div id="jdTitle" style="font-weight:600; font-size:15px;"></div>
@@ -176,7 +179,6 @@
   </div>
   <div style="display:flex; gap:8px; padding:14px 16px; border-top:1px solid var(--border);">
     <span style="flex:1;"></span>
-    <a class="btn" id="jdEditLink" href="#">Edit job</a>
     <button class="btn" id="jdCloneBtn" onclick="dashCloneJob()">Clone</button>
     <button class="btn" id="jdDeleteBtn" style="color:var(--red);" onclick="dashDeleteJob()">Delete job</button>
   </div>

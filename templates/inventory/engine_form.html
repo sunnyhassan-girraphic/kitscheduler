@@ -198,6 +198,25 @@
           </div>
         </div>
 
+        {% if engine %}
+        <div class="form-field">
+          <label>Kit tag <span style="color:var(--text-faint); font-weight:400;">(what this is used for in its kit &mdash; manage the tag bank in <a href="/settings/" style="color:var(--accent);">Settings</a>)</span></label>
+          {% if kit_membership %}
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span style="font-size:12px; color:var(--text-dim);">In kit <strong>{{ kit_membership.kit.name }}</strong>:</span>
+              <select name="kit_tag" style="max-width:200px;">
+                <option value="">No tag</option>
+                {% for t in tags %}
+                  <option value="{{ t.id }}" {% if kit_membership.tag_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          {% else %}
+            <p style="font-size:12px; color:var(--text-faint); margin:0;">Not currently in a kit &mdash; add it to a kit first, then tags can be set here or on the kit page.</p>
+          {% endif %}
+        </div>
+        {% endif %}
+
         <div class="form-row-3">
           <div class="form-field">
             <label for="f-serial">Serial</label>
