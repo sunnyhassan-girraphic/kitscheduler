@@ -12,14 +12,16 @@
 {% endblock %}
 {% block content %}
 <div class="filter-bar">
-  <form method="get" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex:1;">
-    <select class="filter" name="status" onchange="this.form.submit()">
-      <option value="">All statuses</option>
-      {% for value, label in statuses %}
-        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
-    <input class="filter" type="text" name="q" value="{{ search_query }}" placeholder="Search asset, reporter, description..." style="flex:1; min-width:200px;">
+  <div class="filter-bar-left">
+    <a href="?{% if search_query %}q={{ search_query }}{% endif %}" class="btn {% if not selected_status %}btn-active{% endif %}">All statuses</a>
+    {% for value, label in statuses %}
+      <a href="?status={{ value }}{% if search_query %}&q={{ search_query }}{% endif %}"
+         class="btn {% if selected_status == value %}btn-active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <form method="get" class="filter-bar-right">
+    {% if selected_status %}<input type="hidden" name="status" value="{{ selected_status }}">{% endif %}
+    <input class="filter" type="text" name="q" value="{{ search_query }}" placeholder="Search asset, reporter, description..." style="width:240px;">
     <button class="btn" type="submit">Search</button>
     {% if selected_status or search_query %}<a class="btn" href="/tickets/">Clear</a>{% endif %}
   </form>

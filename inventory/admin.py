@@ -4,6 +4,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.db import models
 from django.utils.html import format_html
+from django.utils import dateformat
 
 from .models import (
     Asset, AssetBooking, CategoryColor, Job, Kit, KitAssetTag,
@@ -199,12 +200,12 @@ class AssetAdmin(admin.ModelAdmin):
         if obj.last_updated_by_id and obj.last_updated_date:
             return format_html(
                 "{} on {}", obj.last_updated_by.name,
-                obj.last_updated_date.strftime("%-d %b %Y")
+                dateformat.format(obj.last_updated_date, "j M Y")
             )
         if obj.last_updated_by_id:
             return obj.last_updated_by.name
         if obj.last_updated_date:
-            return obj.last_updated_date.strftime("%-d %b %Y")
+            return dateformat.format(obj.last_updated_date, "j M Y")
         return "-"
     last_updated_display.short_description = "Last updated"
 

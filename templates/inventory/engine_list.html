@@ -26,21 +26,23 @@
   .no-comp { padding:10px 14px; color:var(--text-faint); font-size:12px; font-style:italic; }
 {% endblock %}
 {% block content %}
-<div class="sub-tabs">
-  <a href="?{% if show_archived %}archived=1&{% endif %}{% if query %}q={{ query }}&{% endif %}" class="{% if not selected_make_model %}active{% endif %}">All {{ kind_label_plural|lower }}</a>
-  {% for m in engine_models %}
-    <a href="?make_model={{ m|urlencode }}{% if show_archived %}&archived=1{% endif %}{% if query %}&q={{ query }}{% endif %}"
-       class="{% if selected_make_model == m %}active{% endif %}">{{ m }}</a>
-  {% endfor %}
-</div>
 <div class="filter-bar">
-  <form method="get" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+  <div class="filter-bar-left">
+    <a href="?{% if query %}q={{ query }}&{% endif %}{% if show_archived %}archived=1{% endif %}" class="btn {% if not selected_make_model %}btn-active{% endif %}">All {{ kind_label_plural|lower }}</a>
+    {% for m in engine_models %}
+      <a href="?make_model={{ m|urlencode }}{% if query %}&q={{ query }}{% endif %}{% if show_archived %}&archived=1{% endif %}"
+         class="btn {% if selected_make_model == m %}btn-active{% endif %}">{{ m }}</a>
+    {% endfor %}
+    <label class="archived-toggle">
+      <input type="checkbox" onchange="const u=new URL(location.href); if(this.checked){u.searchParams.set('archived','1')}else{u.searchParams.delete('archived')}; location.href=u;" {% if show_archived %}checked{% endif %}>
+      Show archived
+    </label>
+  </div>
+  <form method="get" class="filter-bar-right">
     {% if selected_make_model %}<input type="hidden" name="make_model" value="{{ selected_make_model }}">{% endif %}
+    {% if show_archived %}<input type="hidden" name="archived" value="1">{% endif %}
     <input class="filter" type="text" name="q" value="{{ query }}" placeholder="Search by ID, model, or serial&hellip;" style="width:240px;">
     <button class="btn" type="submit">Search</button>
-    <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
-      <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %} onchange="this.form.submit()"> Show archived
-    </label>
   </form>
 </div>
 <div class="engine-grid">

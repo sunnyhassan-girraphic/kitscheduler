@@ -81,6 +81,9 @@
   }
   .gc.weekend { background: #1a1408; }
   .gc.preview { background: var(--accent-glow); }
+  .gc.in-license-duration { background: rgba(52, 199, 89, 0.10); }
+  .gc.in-license-duration.weekend { background: rgba(52, 199, 89, 0.16); }
+  .gc.in-license-duration.today { background: rgba(52, 199, 89, 0.22); }
 
   /* Row cells wrapper: position:relative so .block-layer can overlay it absolutely */
   .grow-cells {
@@ -273,7 +276,7 @@
 {% endif %}{# end show_staff #}
 
 {% if show_licenses %}
-<div class="section-label">Licenses</div>
+<div class="section-label">Licenses <span style="font-weight:400; color:var(--text-faint); text-transform:none; letter-spacing:normal;">&mdash; <span style="display:inline-block; width:10px; height:10px; background:rgba(52,199,89,0.35); border-radius:2px; vertical-align:middle;"></span> shaded days are within the license's active Duration window; drag across days to book a job on it</span></div>
 {% if license_rows %}
 <div class="grid-wrap">
 <div class="cal-grid resizable-grid" data-resize-key="timeline-licenses">
@@ -286,12 +289,18 @@
 
   {% for row in license_rows %}
     <div class="gname">
-      <a class="item-name" href="/admin/inventory/asset/{{ row.item.id }}/change/">{{ row.item.asset_id }}</a>
+      <a class="item-name" href="/licenses/{{ row.item.id }}/edit/">{{ row.item.asset_id }}</a>
       {% if row.item.serial %}<div class="item-meta">{{ row.item.serial }}</div>{% endif %}
+      {% if row.item.license_duration_start or row.item.license_duration_end %}
+        <div class="item-meta" title="Overall active/expiry window for this license">
+          Licensed {{ row.item.license_duration_start|date:"j M"|default:"?" }}&ndash;{{ row.item.license_duration_end|date:"j M Y"|default:"?" }}
+        </div>
+      {% endif %}
     </div>
     <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
       {% for cell in row.cells %}
-        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %}"
+        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %} {% if cell.in_duration %}in-license-duration{% endif %}"
+             title="{% if cell.in_duration %}Licensed and usable on this date{% endif %}"
              data-kind="license"
              data-item-id="{{ row.item.id }}"
              data-item-name="{{ row.item.asset_id }}"
@@ -324,7 +333,7 @@
 </div>
 </div>
 {% else %}
-<div class="empty">No licenses yet. <a href="/admin/inventory/asset/add/">Add a license</a> (set Asset type to License).</div>
+<div class="empty">No licenses yet. <a href="/licenses/new/">Add a license</a>.</div>
 {% endif %}
 {% endif %}{# end show_licenses #}
 

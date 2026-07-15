@@ -108,6 +108,19 @@
   .picker-row .amodel { font-size: 12px; color: var(--text-dim); flex: 1; }
   .picker-row .atype { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
   .picker-row .astatus .badge { font-size: 10px; padding: 2px 6px; }
+  .picker-item { margin-bottom: 6px; }
+  .sonnet-nest {
+    margin: 2px 0 8px 24px; padding: 10px; border-left: 2px solid var(--accent-deep);
+    background: var(--surface); border-radius: 0 6px 6px 0;
+  }
+  .sonnet-nest-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint);
+    margin-bottom: 6px;
+  }
+  .sonnet-nest .picker-row { margin-bottom: 4px; padding: 5px 8px; }
+  .sonnet-nest .picker-empty { padding: 8px; font-size: 11px; }
+  .sonnet-nest .picker-search-wrap input { padding: 6px 8px; font-size: 12px; }
+  .sonnet-nest .picker-results { max-height: 160px; }
   .picker-remove-btn {
     background: none; border: none; color: var(--text-faint); cursor: pointer;
     font-size: 16px; line-height: 1; padding: 2px 4px; flex-shrink: 0;
@@ -220,8 +233,9 @@
       <div class="form-section-head">Components</div>
       <div class="form-section-body">
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
-          Search for assets below to nest them in this {{ kind_label|lower }}.
-          {% if kind == "ENGINE" %}This includes Sonnet Boxes - add one here, then open it to add its own components.{% endif %}
+          Search for assets below to nest them in this {{ kind_label|lower }} &mdash; this includes Sonnet
+          Boxes. When you add a Sonnet Box, a second search box appears under it so you can nest
+          its own components (e.g. a GPU) straight into it in one go.
           To add a component that doesn't exist as an asset yet, create it first in Inventory, then come back here.
         </p>
         <div class="selected-count">
@@ -294,12 +308,18 @@
 </div>
 
 {{ components_json|json_script:"components-data" }}
+{{ nestable_json|json_script:"nestable-data" }}
+{{ sonnet_child_pairs|json_script:"sonnet-pairs-data" }}
 <script>
 (function() {
   const ALL = JSON.parse(document.getElementById("components-data").textContent);
+  const NESTABLE = JSON.parse(document.getElementById("nestable-data").textContent);
+  const RAW_PAIRS = JSON.parse(document.getElementById("sonnet-pairs-data").textContent);
   const initialSelectedIds = new Set([{{ selected_ids|join:"," }}]);
   const byId = {};
   ALL.forEach(a => byId[a.id] = a);
+  const nestableById = {};
+  NESTABLE.forEach(a => nestableById[a.id] = a);
 
   const form = document.getElementById("engine-form");
   const selectedContainer = document.getElementById("picker-selected");
@@ -311,6 +331,25 @@
   const pluralEl = document.getElementById("selected-plural");
 
   let selected = new Set(initialSelectedIds);
+
+  // sonnetId -> Set of nested child ids
+  const sonnetChildren = {};
+  if (RAW_PAIRS.length) {
+    RAW_PAIRS.forEach(p => {
+      const parts = p.split(":");
+      const sid = parseInt(parts[0], 10);
+      const cid = parseInt(parts[1], 10);
+      if (!sonnetChildren[sid]) sonnetChildren[sid] = new Set();
+      sonnetChildren[sid].add(cid);
+    });
+  } else {
+    NESTABLE.forEach(a => {
+      if (a.parentSonnetId) {
+        if (!sonnetChildren[a.parentSonnetId]) sonnetChildren[a.parentSonnetId] = new Set();
+        sonnetChildren[a.parentSonnetId].add(a.id);
+      }
+    });
+  }
 
   // Populate the type filter from whatever types actually exist in the pool
   Array.from(new Set(ALL.map(a => a.type))).sort().forEach(t => {
@@ -324,22 +363,97 @@
     return `<span class="astatus"><span class="badge badge-${a.status}">${a.statusDisplay}</span></span>`;
   }
 
+  function allNestedChildIds() {
+    const used = new Set();
+    Object.values(sonnetChildren).forEach(set => set.forEach(id => used.add(id)));
+    return used;
+  }
+
+  function renderSonnetNest(sonnetId, wrapEl) {
+    const children = sonnetChildren[sonnetId] || new Set();
+    const usedElsewhere = allNestedChildIds();
+
+    const childRows = Array.from(children).filter(id => nestableById[id]).map(id => {
+      const a = nestableById[id];
+      return `
+        <div class="picker-row">
+          <span class="aid">${a.assetId}</span>
+          <span class="amodel">${a.makeModel || ""}</span>
+          <span class="atype">${a.type}</span>
+          ${statusBadge(a)}
+          <button type="button" class="picker-remove-btn sonnet-child-remove" title="Remove" data-sonnet="${sonnetId}" data-id="${id}">&times;</button>
+          <input type="hidden" name="sonnet_child" value="${sonnetId}:${id}">
+        </div>`;
+    }).join("");
+
+    wrapEl.innerHTML = `
+      <div class="sonnet-nest-label">Inside this Sonnet Box</div>
+      <div class="sonnet-children-list">${childRows}</div>
+      ${!children.size ? '<div class="picker-empty">Nothing nested yet. Search below to add a GPU, etc.</div>' : ""}
+      <div class="picker-search-wrap">
+        <input type="text" class="sonnet-child-search" data-sonnet="${sonnetId}" placeholder="Search to nest into this Sonnet Box..." autocomplete="off">
+      </div>
+      <div class="picker-results sonnet-child-results" data-sonnet="${sonnetId}"></div>
+    `;
+
+    const searchEl = wrapEl.querySelector(".sonnet-child-search");
+    const resultsEl = wrapEl.querySelector(".sonnet-child-results");
+
+    function renderChildResults() {
+      const q = searchEl.value.toLowerCase().trim();
+      resultsEl.innerHTML = "";
+      if (!q) return;
+      const matches = NESTABLE.filter(a =>
+        !children.has(a.id) &&
+        !usedElsewhere.has(a.id) &&
+        !selected.has(a.id) &&
+        (a.parentSonnetId === null || a.parentSonnetId === sonnetId) &&
+        (a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q))
+      );
+      if (!matches.length) {
+        resultsEl.innerHTML = `<div class="picker-hint" style="margin-top:6px;">No matching, unassigned assets found.</div>`;
+        return;
+      }
+      matches.forEach(a => {
+        const row = document.createElement("div");
+        row.className = "picker-row";
+        row.innerHTML = `
+          <span class="aid">${a.assetId}</span>
+          <span class="amodel">${a.makeModel || ""}</span>
+          <span class="atype">${a.type}</span>
+          ${statusBadge(a)}
+          <button type="button" class="picker-add-btn sonnet-child-add" data-sonnet="${sonnetId}" data-id="${a.id}">Add</button>
+        `;
+        resultsEl.appendChild(row);
+      });
+    }
+    searchEl.addEventListener("input", renderChildResults);
+  }
+
   function renderSelected() {
     selectedContainer.innerHTML = "";
     const ids = Array.from(selected).filter(id => byId[id]);
     ids.forEach(id => {
       const a = byId[id];
-      const row = document.createElement("div");
-      row.className = "picker-row";
-      row.innerHTML = `
-        <span class="aid">${a.assetId}</span>
-        <span class="amodel">${a.makeModel || ""}</span>
-        <span class="atype">${a.type}</span>
-        ${statusBadge(a)}
-        <button type="button" class="picker-remove-btn" title="Remove" data-id="${id}">&times;</button>
-        <input type="hidden" name="components" value="${id}">
-      `;
-      selectedContainer.appendChild(row);
+      const item = document.createElement("div");
+      item.className = "picker-item";
+      let inner = `
+        <div class="picker-row">
+          <span class="aid">${a.assetId}</span>
+          <span class="amodel">${a.makeModel || ""}</span>
+          <span class="atype">${a.type}</span>
+          ${statusBadge(a)}
+          <button type="button" class="picker-remove-btn" title="Remove" data-id="${id}">&times;</button>
+          <input type="hidden" name="components" value="${id}">
+        </div>`;
+      if (a.isSonnet) {
+        inner += `<div class="sonnet-nest" data-sonnet="${id}"></div>`;
+      }
+      item.innerHTML = inner;
+      selectedContainer.appendChild(item);
+      if (a.isSonnet) {
+        renderSonnetNest(id, item.querySelector(".sonnet-nest"));
+      }
     });
     emptyMsg.style.display = ids.length ? "none" : "block";
     countEl.textContent = ids.length;
@@ -351,8 +465,10 @@
     const typeVal = typeFilter.value;
     resultsContainer.innerHTML = "";
     if (!q && !typeVal) return;
+    const usedAsChildren = allNestedChildIds();
     const matches = ALL.filter(a =>
       !selected.has(a.id) &&
+      !usedAsChildren.has(a.id) &&
       (typeVal === "" || a.type === typeVal) &&
       (q === "" || a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q))
     );
@@ -375,11 +491,32 @@
   }
 
   selectedContainer.addEventListener("click", (e) => {
-    const btn = e.target.closest(".picker-remove-btn");
-    if (!btn) return;
-    selected.delete(parseInt(btn.dataset.id, 10));
-    renderSelected();
-    renderResults();
+    const removeBtn = e.target.closest(".picker-remove-btn:not(.sonnet-child-remove)");
+    if (removeBtn) {
+      const id = parseInt(removeBtn.dataset.id, 10);
+      selected.delete(id);
+      delete sonnetChildren[id];
+      renderSelected();
+      renderResults();
+      return;
+    }
+    const childRemoveBtn = e.target.closest(".sonnet-child-remove");
+    if (childRemoveBtn) {
+      const sid = parseInt(childRemoveBtn.dataset.sonnet, 10);
+      const cid = parseInt(childRemoveBtn.dataset.id, 10);
+      if (sonnetChildren[sid]) sonnetChildren[sid].delete(cid);
+      renderSelected();
+      return;
+    }
+    const childAddBtn = e.target.closest(".sonnet-child-add");
+    if (childAddBtn) {
+      const sid = parseInt(childAddBtn.dataset.sonnet, 10);
+      const cid = parseInt(childAddBtn.dataset.id, 10);
+      if (!sonnetChildren[sid]) sonnetChildren[sid] = new Set();
+      sonnetChildren[sid].add(cid);
+      renderSelected();
+      return;
+    }
   });
 
   resultsContainer.addEventListener("click", (e) => {

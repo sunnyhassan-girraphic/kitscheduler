@@ -278,6 +278,11 @@ def timeline_view(request):
     for b in license_bookings:
         bookings_by_license.setdefault(b.asset_id, []).append(b)
     license_rows = _build_rows(licenses, bookings_by_license, days)
+    for row in license_rows:
+        lic = row["item"]
+        start, end = lic.license_duration_start, lic.license_duration_end
+        for cell in row["cells"]:
+            cell["in_duration"] = bool(start and end and start <= cell["date"] <= end)
 
     kits_fully_free, kits_partially_free = _week_availability(kits, bookings_by_kit, week_days)
     staff_fully_free, staff_partially_free = _week_availability(staff, bookings_by_staff, week_days)
@@ -410,7 +415,9 @@ def kit_list_view(request):
         for m in members:
             m.kit_tag = tags_by_asset_id.get(m.id)
         nested_count = sum(
-            m.nested_assets.count() for m in members if m.asset_type in Asset.CONTAINER_TYPES
+            m.nested_assets.count()
+            + sum(c.nested_assets.count() for c in m.nested_assets.all() if c.asset_type == Asset.AssetType.SONNET)
+            for m in members if m.asset_type in Asset.CONTAINER_TYPES
         )
         current_booking = next(
             (b for b in kit.bookings.all() if b.start_date <= today <= b.end_date), None
@@ -693,14 +700,45 @@ def _container_form_context(kind, container=None):
             "type": a.get_asset_type_display(),
             "status": a.status.lower(),
             "statusDisplay": a.get_status_display(),
+            "isSonnet": a.asset_type == Asset.AssetType.SONNET,
         }
         for a in components
     ]
+
+    # Sonnet Boxes are themselves containers: a GPU (etc.) gets nested INTO
+    # a Sonnet, and the Sonnet then nests into the Engine. Build a second,
+    # separate pool of "nestable into a Sonnet" assets (plain components
+    # only - never another Engine/Sonnet) covering anything unassigned or
+    # already sitting inside one of the Sonnet Boxes available above, so
+    # picking a Sonnet Box reveals what's already inside it.
+    nestable_json = []
+    if kind == Asset.AssetType.ENGINE:
+        sonnet_pool_ids = [a.id for a in components if a.asset_type == Asset.AssetType.SONNET]
+        nestable_qs = Asset.objects.filter(
+            archived=False
+        ).exclude(
+            asset_type__in=Asset.CONTAINER_TYPES
+        ).filter(
+            Q(parent_engine__isnull=True) | Q(parent_engine_id__in=sonnet_pool_ids)
+        ).order_by("asset_type", "asset_id")
+        nestable_json = [
+            {
+                "id": a.id,
+                "assetId": a.asset_id,
+                "makeModel": a.make_model,
+                "type": a.get_asset_type_display(),
+                "status": a.status.lower(),
+                "statusDisplay": a.get_status_display(),
+                "parentSonnetId": a.parent_engine_id if a.parent_engine_id in sonnet_pool_ids else None,
+            }
+            for a in nestable_qs
+        ]
 
     meta = CONTAINER_KIND_META[kind]
     return {
         "components": components,
         "components_json": components_json,
+        "nestable_json": nestable_json,
         "staff_members": list(StaffMember.objects.filter(active=True).order_by("name")),
         "statuses": Asset.Status.choices,
         "active_nav": meta["active_nav"],
@@ -728,6 +766,37 @@ def _apply_component_selection(container, selected_ids, kind=None):
         asset.save(update_fields=["parent_engine"])
 
 
+def _apply_sonnet_children(selected_top_level_ids, raw_pairs):
+    """raw_pairs is a list of 'sonnetId:childId' strings from the form. For
+    every Sonnet Box among the top-level selection, nest/un-nest its
+    children to match what was submitted for it."""
+    by_sonnet = {}
+    for pair in raw_pairs:
+        if ":" not in pair:
+            continue
+        sid, cid = pair.split(":", 1)
+        if sid.isdigit() and cid.isdigit():
+            by_sonnet.setdefault(int(sid), set()).add(int(cid))
+
+    sonnets = Asset.objects.filter(
+        id__in=selected_top_level_ids, asset_type=Asset.AssetType.SONNET
+    )
+    for sonnet in sonnets:
+        wanted_ids = by_sonnet.get(sonnet.id, set())
+        valid_children = set(
+            Asset.objects.filter(
+                id__in=wanted_ids, archived=False
+            ).exclude(asset_type__in=Asset.CONTAINER_TYPES)
+        )
+        currently_nested = set(sonnet.nested_assets.all())
+        for asset in valid_children - currently_nested:
+            asset.parent_engine = sonnet
+            asset.save(update_fields=["parent_engine"])
+        for asset in currently_nested - valid_children:
+            asset.parent_engine = None
+            asset.save(update_fields=["parent_engine"])
+
+
 def _container_create_view(request, kind):
     meta = CONTAINER_KIND_META[kind]
     if request.method == "POST":
@@ -750,6 +819,7 @@ def _container_create_view(request, kind):
             "qty": qty, "status": status, "archived": archived, "notes": notes,
             "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date, "last_updated_notes": last_updated_notes,
             "selected_ids": selected_ids,
+            "sonnet_child_pairs": request.POST.getlist("sonnet_child"),
         })
 
         if not asset_id:
@@ -789,12 +859,15 @@ def _container_create_view(request, kind):
             last_updated_by=last_updated_by, last_updated_date=parsed_date, last_updated_notes=last_updated_notes,
         )
         _apply_component_selection(container, selected_ids)
+        if kind == Asset.AssetType.ENGINE:
+            _apply_sonnet_children(selected_ids, request.POST.getlist("sonnet_child"))
 
         return redirect(meta["list_url"])
 
     form_ctx = _container_form_context(kind)
     form_ctx.update({
         "selected_ids": [], "qty": "1", "status": Asset.Status.AVAILABLE,
+        "sonnet_child_pairs": [],
         "last_updated_date": datetime.date.today().isoformat(),
     })
     return render(request, "inventory/engine_form.html", form_ctx)
@@ -825,6 +898,7 @@ def _container_edit_view(request, kind, container_id):
             "qty": qty, "status": status, "archived": archived, "notes": notes,
             "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date, "last_updated_notes": last_updated_notes,
             "selected_ids": selected_ids,
+            "sonnet_child_pairs": request.POST.getlist("sonnet_child"),
         })
 
         if not asset_id:
@@ -870,6 +944,8 @@ def _container_edit_view(request, kind, container_id):
         container.save()
 
         _apply_component_selection(container, selected_ids)
+        if kind == Asset.AssetType.ENGINE:
+            _apply_sonnet_children(selected_ids, request.POST.getlist("sonnet_child"))
 
         return redirect(meta["list_url"])
 
@@ -887,6 +963,7 @@ def _container_edit_view(request, kind, container_id):
         "last_updated_date": container.last_updated_date.isoformat() if container.last_updated_date else "",
         "last_updated_notes": container.last_updated_notes,
         "selected_ids": list(container.nested_assets.values_list("id", flat=True)),
+        "sonnet_child_pairs": [],
     })
     return render(request, "inventory/engine_form.html", form_ctx)
 
@@ -961,27 +1038,6 @@ def engine_delete_view(request, engine_id):
 @login_required
 def engine_list_view(request):
     return _container_list_view(request, Asset.AssetType.ENGINE)
-
-
-@login_required
-def sonnet_create_view(request):
-    return _container_create_view(request, Asset.AssetType.SONNET)
-
-
-@login_required
-def sonnet_edit_view(request, sonnet_id):
-    return _container_edit_view(request, Asset.AssetType.SONNET, sonnet_id)
-
-
-@login_required
-@require_POST
-def sonnet_delete_view(request, sonnet_id):
-    return _container_delete_view(request, Asset.AssetType.SONNET, sonnet_id)
-
-
-@login_required
-def sonnet_list_view(request):
-    return _container_list_view(request, Asset.AssetType.SONNET)
 
 
 

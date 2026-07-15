@@ -7,10 +7,11 @@
 {% endblock %}
 {% block extra_style %}
   .settings-grid {
-    max-width: 900px; margin: 24px auto; padding: 0 24px;
-    display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;
+    max-width: 1200px; margin: 24px auto; padding: 0 24px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start;
   }
-  @media (max-width: 760px) { .settings-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 1000px) { .settings-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 700px) { .settings-grid { grid-template-columns: 1fr; } }
   .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; }
   .settings-card-head { padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border); font-weight: 600; font-size: 13px; border-radius: 8px 8px 0 0; }
   .settings-row { display:flex; align-items:center; gap:12px; padding:10px 16px; border-top:1px solid var(--border); font-size:13px; }
@@ -20,6 +21,7 @@
   .color-hex { width:80px; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--text); border-radius:4px; padding:5px 8px; font-size:12px; font-family:var(--mono); }
   .export-row { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; font-size:13px; gap: 12px; }
   .export-row p { margin:0; color:var(--text-dim); font-size:12px; }
+  .export-row .btn { flex-shrink: 0; white-space: nowrap; }
   .bank-list { padding: 6px 16px; }
   .bank-chip {
     display: inline-flex; align-items: center; gap: 6px;
@@ -114,7 +116,9 @@
         <button class="btn" type="submit">Add</button>
       </form>
     </div>
+  </div>
 
+  <div>
     <div class="settings-card">
       <div class="settings-card-head">Ticketing</div>
       <div class="export-row">

@@ -5,9 +5,15 @@
   <a class="btn btn-primary" href="/kits/new/">+ New kit</a>
 {% endblock %}
 {% block extra_style %}
+  .kit-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
+    padding: 16px 24px;
+  }
+  @media (max-width: 900px) { .kit-grid { grid-template-columns: 1fr; } }
   .kit-card {
     border: 1px solid var(--border); border-radius: 8px;
-    margin: 12px 24px; overflow: hidden; background: var(--surface);
+    margin: 0; overflow: hidden; background: var(--surface);
+    display: flex; flex-direction: column;
   }
   .kit-head {
     display: flex; align-items: center; gap: 12px; padding: 12px 16px;
@@ -19,7 +25,7 @@
   .kit-head .meta { font-size: 12px; color: var(--text-dim); margin-left: auto; font-family: var(--mono); }
   .member-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 8px 16px; font-size: 13px; border-top: 1px solid var(--border);
+    padding: 8px 16px; font-size: 13px; border-top: 1px solid var(--border); flex-wrap: wrap;
   }
   .member-row .mname { color: var(--text); min-width: 130px; }
   .member-row .mmodel { color: var(--text-dim); flex: 1; }
@@ -27,10 +33,14 @@
   .nested-row {
     display: flex; align-items: center; gap: 10px;
     padding: 6px 16px 6px 40px; font-size: 12px; border-top: 1px solid var(--border);
-    color: var(--text-dim); background: var(--bg);
+    color: var(--text-dim); background: var(--bg); flex-wrap: wrap;
   }
   .nested-row .nname { font-family: var(--mono); min-width: 120px; color: var(--text-dim); }
   .nested-row .nmodel { flex: 1; }
+  .nested-row .subnested-row {
+    padding: 6px 16px 6px 24px; margin-left: -40px; width: calc(100% + 40px);
+  }
+  .subnested-row { padding-left: 60px; }
   .empty-members { padding: 10px 16px; color: var(--text-faint); font-size: 12px; font-style: italic; }
   .kit-tag {
     font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700;
@@ -39,15 +49,15 @@
   }
 {% endblock %}
 {% block content %}
-<div class="sub-tabs">
-  <a href="?tab=all{% if query %}&q={{ query }}{% endif %}" class="{% if tab == 'all' %}active{% endif %}">All kits</a>
-  <a href="?tab=engines{% if query %}&q={{ query }}{% endif %}" class="{% if tab == 'engines' %}active{% endif %}">Has Engine</a>
-  <a href="?tab=licenses{% if query %}&q={{ query }}{% endif %}" class="{% if tab == 'licenses' %}active{% endif %}">Has License</a>
-  <a href="?tab=booked{% if query %}&q={{ query }}{% endif %}" class="{% if tab == 'booked' %}active{% endif %}">Booked today</a>
-  <a href="?tab=empty{% if query %}&q={{ query }}{% endif %}" class="{% if tab == 'empty' %}active{% endif %}">Empty</a>
-</div>
 <div class="filter-bar">
-  <form method="get" style="display:flex; gap:8px; align-items:center;">
+  <div class="filter-bar-left">
+    <a href="?tab=all{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'all' %}btn-active{% endif %}">All kits</a>
+    <a href="?tab=engines{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'engines' %}btn-active{% endif %}">Has Engine</a>
+    <a href="?tab=licenses{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'licenses' %}btn-active{% endif %}">Has License</a>
+    <a href="?tab=booked{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'booked' %}btn-active{% endif %}">Booked today</a>
+    <a href="?tab=empty{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'empty' %}btn-active{% endif %}">Empty</a>
+  </div>
+  <form method="get" class="filter-bar-right">
     <input type="hidden" name="tab" value="{{ tab }}">
     <input class="filter" type="text" name="q" value="{{ query }}" placeholder="Search kits&hellip;" style="width:220px;">
     <button class="btn" type="submit">Search</button>
@@ -55,6 +65,7 @@
   </form>
 </div>
 {% if rows %}
+<div class="kit-grid">
   {% for row in rows %}
   <div class="kit-card">
     <div class="kit-head">
@@ -86,6 +97,15 @@
             <span class="nmodel">{{ comp.get_asset_type_display }}{% if comp.make_model %} &middot; {{ comp.make_model }}{% endif %}</span>
             <span class="badge badge-{{ comp.status|lower }}">{{ comp.get_status_display }}</span>
           </div>
+          {% if comp.asset_type == "SONNET" %}
+            {% for subcomp in comp.nested_assets.all %}
+              <div class="nested-row subnested-row">
+                <span class="nname">{{ subcomp.asset_id }}</span>
+                <span class="nmodel">{{ subcomp.get_asset_type_display }}{% if subcomp.make_model %} &middot; {{ subcomp.make_model }}{% endif %}</span>
+                <span class="badge badge-{{ subcomp.status|lower }}">{{ subcomp.get_status_display }}</span>
+              </div>
+            {% endfor %}
+          {% endif %}
         {% endfor %}
       {% endif %}
     {% empty %}
@@ -93,6 +113,7 @@
     {% endfor %}
   </div>
   {% endfor %}
+</div>
 {% else %}
 <div class="empty">
   No kits{% if query %} match your search. <a href="?tab={{ tab }}">Clear search</a> or{% endif %}.
