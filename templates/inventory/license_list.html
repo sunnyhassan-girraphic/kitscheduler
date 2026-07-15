@@ -2,7 +2,7 @@
 {% block title %}Licenses - Kit scheduler{% endblock %}
 {% block brand_sub %}{{ total }} license{{ total|pluralize }}{% endblock %}
 {% block header_actions %}
-  <a class="btn btn-primary" href="/admin/inventory/asset/add/">+ Add license</a>
+  <a class="btn btn-primary" href="/licenses/new/">+ Add license</a>
 {% endblock %}
 {% block extra_style %}
   table.lic-table { width:100%; border-collapse:collapse; }
@@ -14,12 +14,30 @@
   }
   table.lic-table td { padding:10px 16px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:middle; }
   table.lic-table tr:hover td { background:var(--surface); }
+  table.lic-table tr td:first-child a { color: var(--text); text-decoration: none; }
+  table.lic-table tr td:first-child a:hover { color: var(--accent); }
   .func-tags { display:flex; flex-wrap:wrap; gap:4px; }
   .func-tag { font-size:11px; padding:2px 7px; border-radius:999px; background:var(--surface-2); color:var(--text-dim); font-family:var(--mono); white-space:nowrap; }
 {% endblock %}
 {% block content %}
+<div class="sub-tabs">
+  <a href="?{% if query %}q={{ query }}&{% endif %}{% if show_archived %}archived=1&{% endif %}" class="{% if not selected_type %}active{% endif %}">All types</a>
+  {% for value, label in license_types %}
+    <a href="?type={{ value }}{% if query %}&q={{ query }}{% endif %}{% if show_archived %}&archived=1{% endif %}"
+       class="{% if selected_type == value %}active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
 <div class="filter-bar">
-  <form method="get" style="display:flex; align-items:center; gap:8px;">
+  <form method="get" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    {% if selected_type %}<input type="hidden" name="type" value="{{ selected_type }}">{% endif %}
+    <input class="filter" type="text" name="q" value="{{ query }}" placeholder="Search licenses&hellip;" style="width:200px;">
+    <select class="filter" name="func" onchange="this.form.submit()">
+      <option value="">All functionalities</option>
+      {% for f in functionality_options %}
+        <option value="{{ f.id }}" {% if selected_func == f.id|stringformat:"s" %}selected{% endif %}>{{ f.name }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn" type="submit">Search</button>
     <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
       <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %} onchange="this.form.submit()">
       Show archived
@@ -34,25 +52,32 @@
       <th>License ID</th>
       <th>Type</th>
       <th>Functionality</th>
+      <th>Duration</th>
       <th>In kits</th>
       <th>Status</th>
       <th>Last updated</th>
+      <th></th>
     </tr>
   </thead>
   <tbody>
     {% for lic in licenses %}
     <tr>
       <td style="white-space:nowrap; font-family:var(--mono);">
-        <a href="/admin/inventory/asset/{{ lic.id }}/change/" style="color:var(--text); text-decoration:none;">{{ lic.asset_id }}</a>
+        <a href="/licenses/{{ lic.id }}/edit/">{{ lic.asset_id }}</a>
         {% if lic.archived %}<span class="badge badge-archived" style="margin-left:6px;">Archived</span>{% endif %}
       </td>
-      <td style="color:var(--text-dim);">{{ lic.license_type|default:"-" }}</td>
+      <td style="color:var(--text-dim);">{{ lic.get_license_type_display|default:"-" }}</td>
       <td>
         {% if lic.func_tags %}
-          <div class="func-tags">{% for tag in lic.func_tags %}<span class="func-tag">{{ tag }}</span>{% endfor %}</div>
+          <div class="func-tags">{% for tag in lic.func_tags %}<span class="func-tag">{{ tag.name }}</span>{% endfor %}</div>
         {% else %}
           <span style="color:var(--text-faint);">-</span>
         {% endif %}
+      </td>
+      <td style="color:var(--text-dim); font-size:12px; white-space:nowrap;">
+        {% if lic.license_duration_start or lic.license_duration_end %}
+          {{ lic.license_duration_start|date:"j M Y"|default:"?" }} &ndash; {{ lic.license_duration_end|date:"j M Y"|default:"?" }}
+        {% else %}-{% endif %}
       </td>
       <td style="color:var(--text-dim); font-size:12px;">
         {% for kit in lic.kits.all %}{{ kit.name }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}
@@ -65,12 +90,13 @@
           {% if lic.last_updated_date %}{{ lic.last_updated_date|date:"j M Y" }}{% endif %}
         {% else %}-{% endif %}
       </td>
+      <td style="white-space:nowrap;"><a class="btn" style="font-size:12px; padding:4px 10px;" href="/licenses/{{ lic.id }}/edit/">Edit</a></td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 </div>
 {% else %}
-<div class="empty">No licenses yet. <a href="/admin/inventory/asset/add/">Add a license</a> (set Asset type to License).</div>
+<div class="empty">No licenses{% if query or selected_type or selected_func %} match your filters.{% else %} yet.{% endif %} <a href="/licenses/new/">Add a license</a>.</div>
 {% endif %}
 {% endblock %}

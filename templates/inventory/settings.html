@@ -20,6 +20,24 @@
   .color-hex { width:80px; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--text); border-radius:4px; padding:5px 8px; font-size:12px; font-family:var(--mono); }
   .export-row { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; font-size:13px; gap: 12px; }
   .export-row p { margin:0; color:var(--text-dim); font-size:12px; }
+  .bank-list { padding: 6px 16px; }
+  .bank-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface-2); border: 1px solid var(--border-strong);
+    border-radius: 999px; padding: 4px 6px 4px 10px; font-size: 12px; margin: 4px 4px 4px 0;
+  }
+  .bank-chip form { margin: 0; display: inline-flex; }
+  .bank-chip .chip-del {
+    background: none; border: none; color: var(--text-faint); cursor: pointer;
+    font-size: 14px; line-height: 1; padding: 0 2px;
+  }
+  .bank-chip .chip-del:hover { color: var(--red); }
+  .bank-add-row { display: flex; gap: 8px; padding: 10px 16px 14px; }
+  .bank-add-row input[type="text"] {
+    flex: 1; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 6px; padding: 7px 10px; font-size: 13px; font-family: inherit;
+  }
+  .bank-add-row input[type="color"] { width: 36px; height: 32px; padding: 2px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface-2); cursor: pointer; }
 {% endblock %}
 {% block content %}
 <div class="settings-grid">
@@ -46,6 +64,57 @@
   </div>
 
   <div>
+    <div class="settings-card">
+      <div class="settings-card-head">Kit tags</div>
+      <p style="margin:8px 16px; font-size:12px; color:var(--text-dim);">
+        Tags you can attach to an asset within a kit (e.g. "MAIN" engine) so people know what to use it for.
+      </p>
+      <div class="bank-list">
+        {% for tag in tags %}
+        <span class="bank-chip">
+          {{ tag.name }}
+          <form method="post" action="/settings/tags/{{ tag.id }}/delete/" onsubmit="return confirm('Remove tag &quot;{{ tag.name }}&quot;? Any kit assets using it will lose the tag.');">
+            {% csrf_token %}
+            <button class="chip-del" type="submit" title="Remove tag">&times;</button>
+          </form>
+        </span>
+        {% empty %}
+        <span style="font-size:12px; color:var(--text-faint); font-style:italic;">No tags yet.</span>
+        {% endfor %}
+      </div>
+      <form method="post" action="/settings/tags/add/" class="bank-add-row">
+        {% csrf_token %}
+        <input type="text" name="name" placeholder="New tag, e.g. MAIN" maxlength="40" required>
+        <input type="color" name="color" value="#EAB308" title="Optional color">
+        <button class="btn" type="submit">Add</button>
+      </form>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-card-head">License functionalities</div>
+      <p style="margin:8px 16px; font-size:12px; color:var(--text-dim);">
+        The bank of tickable functionalities available when editing a license (e.g. SDI Out, Unreal Render Blade, Viz).
+      </p>
+      <div class="bank-list">
+        {% for f in functionalities %}
+        <span class="bank-chip">
+          {{ f.name }}
+          <form method="post" action="/settings/functionalities/{{ f.id }}/delete/" onsubmit="return confirm('Remove functionality &quot;{{ f.name }}&quot;? It will be unticked from any licenses that had it.');">
+            {% csrf_token %}
+            <button class="chip-del" type="submit" title="Remove functionality">&times;</button>
+          </form>
+        </span>
+        {% empty %}
+        <span style="font-size:12px; color:var(--text-faint); font-style:italic;">No functionalities yet.</span>
+        {% endfor %}
+      </div>
+      <form method="post" action="/settings/functionalities/add/" class="bank-add-row">
+        {% csrf_token %}
+        <input type="text" name="name" placeholder="New functionality, e.g. Viz" maxlength="80" required>
+        <button class="btn" type="submit">Add</button>
+      </form>
+    </div>
+
     <div class="settings-card">
       <div class="settings-card-head">Ticketing</div>
       <div class="export-row">

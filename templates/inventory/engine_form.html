@@ -1,9 +1,9 @@
 {% extends "inventory/base.html" %}
-{% block title %}{% if engine %}Edit {{ engine.asset_id }}{% else %}New Engine{% endif %} - Kit scheduler{% endblock %}
-{% block brand_sub %}{% if engine %}Editing engine{% else %}New engine{% endif %}{% endblock %}
+{% block title %}{% if engine %}Edit {{ engine.asset_id }}{% else %}New {{ kind_label }}{% endif %} - Kit scheduler{% endblock %}
+{% block brand_sub %}{% if engine %}Editing {{ kind_label|lower }}{% else %}New {{ kind_label|lower }}{% endif %}{% endblock %}
 
 {% block header_actions %}
-  <a class="btn" href="/engines/">Cancel</a>
+  <a class="btn" href="{{ list_url }}" id="cancel-link">Cancel</a>
 {% endblock %}
 
 {% block extra_style %}
@@ -162,7 +162,7 @@
 {% block content %}
 <div class="form-page">
 
-  <a class="back-link" href="/engines/">&larr; All engines</a>
+  <a class="back-link" href="{{ list_url }}">&larr; All {{ kind_label_plural|lower }}</a>
 
   {% if error %}
   <div class="error-msg">{{ error }}</div>
@@ -172,11 +172,11 @@
     {% csrf_token %}
 
     <div class="form-section">
-      <div class="form-section-head">Engine details</div>
+      <div class="form-section-head">{{ kind_label }} details</div>
       <div class="form-section-body">
         <div class="form-row">
           <div class="form-field">
-            <label for="f-asset-id">Engine ID <span style="color:var(--red);">*</span></label>
+            <label for="f-asset-id">{{ kind_label }} ID <span style="color:var(--red);">*</span></label>
             <input type="text" id="f-asset-id" name="asset_id" value="{{ asset_id|default:'' }}" placeholder="" autofocus>
           </div>
           <div class="form-field">
@@ -206,7 +206,7 @@
 
         <div class="form-field">
           <label for="f-notes">Notes <span style="color:var(--text-faint); font-weight:400;">(optional)</span></label>
-          <textarea id="f-notes" name="notes" placeholder="Any notes about this engine...">{{ notes|default:'' }}</textarea>
+          <textarea id="f-notes" name="notes" placeholder="Any notes about this {{ kind_label|lower }}...">{{ notes|default:'' }}</textarea>
         </div>
 
         <div class="checkbox-field">
@@ -217,39 +217,15 @@
     </div>
 
     <div class="form-section">
-      <div class="form-section-head">Last updated</div>
-      <div class="form-section-body">
-        <div class="form-row">
-          <div class="form-field">
-            <label for="f-last-updated-by">Updated by</label>
-            <select id="f-last-updated-by" name="last_updated_by">
-              <option value="">-</option>
-              {% for staff in staff_members %}
-                <option value="{{ staff.id }}" {% if last_updated_by_id == staff.id|stringformat:"s" %}selected{% endif %}>{{ staff.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-field">
-            <label for="f-last-updated-date">Date</label>
-            <input type="date" id="f-last-updated-date" name="last_updated_date" value="{{ last_updated_date|default:'' }}">
-          </div>
-        </div>
-        <div class="form-field">
-          <label for="f-last-updated-notes">What changed? <span style="color:var(--text-faint); font-weight:400;">(optional)</span></label>
-          <textarea id="f-last-updated-notes" name="last_updated_notes" placeholder="e.g. Replaced fan, retested OK" style="min-height:50px;">{{ last_updated_notes|default:'' }}</textarea>
-        </div>
-      </div>
-    </div>
-
-    <div class="form-section">
       <div class="form-section-head">Components</div>
       <div class="form-section-body">
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
-          Search for assets below to nest them in this engine. To add a component that doesn't
-          exist as an asset yet, create it first in Inventory, then come back here.
+          Search for assets below to nest them in this {{ kind_label|lower }}.
+          {% if kind == "ENGINE" %}This includes Sonnet Boxes - add one here, then open it to add its own components.{% endif %}
+          To add a component that doesn't exist as an asset yet, create it first in Inventory, then come back here.
         </p>
         <div class="selected-count">
-          <span id="selected-count">0</span> component<span id="selected-plural">s</span> in this engine
+          <span id="selected-count">0</span> component<span id="selected-plural">s</span> in this {{ kind_label|lower }}
         </div>
 
         <div class="picker-selected" id="picker-selected"></div>
@@ -268,21 +244,49 @@
       </div>
     </div>
 
+    <div class="form-section">
+      <div class="form-section-head">Last updated <span style="color:var(--red); text-transform:none; letter-spacing:normal;">&mdash; required</span></div>
+      <div class="form-section-body">
+        <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
+          Every save needs a date so the team knows this record is current. You can't save until this is filled in.
+        </p>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="f-last-updated-by">Updated by</label>
+            <select id="f-last-updated-by" name="last_updated_by">
+              <option value="">-</option>
+              {% for staff in staff_members %}
+                <option value="{{ staff.id }}" {% if last_updated_by_id == staff.id|stringformat:"s" %}selected{% endif %}>{{ staff.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="f-last-updated-date">Date <span style="color:var(--red);">*</span></label>
+            <input type="date" id="f-last-updated-date" name="last_updated_date" value="{{ last_updated_date|default:'' }}" required>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="f-last-updated-notes">What changed? <span style="color:var(--text-faint); font-weight:400;">(optional)</span></label>
+          <textarea id="f-last-updated-notes" name="last_updated_notes" placeholder="e.g. Replaced fan, retested OK" style="min-height:50px;">{{ last_updated_notes|default:'' }}</textarea>
+        </div>
+      </div>
+    </div>
+
     <div class="form-actions">
-      <a class="btn" href="/engines/">Cancel</a>
+      <a class="btn" href="{{ list_url }}">Cancel</a>
       <button class="btn btn-primary" type="submit">
-        {% if engine %}Save changes{% else %}Create engine{% endif %}
+        {% if engine %}Save changes{% else %}Create {{ kind_label|lower }}{% endif %}
       </button>
     </div>
   </form>
 
   {% if engine %}
   <div class="delete-zone">
-    <p>Permanently delete this engine. Nested components will be unassigned, not deleted.</p>
-    <form method="post" action="/engines/{{ engine.id }}/delete/"
-          onsubmit="return confirm('Delete {{ engine.asset_id }}? This removes the engine and every booking on it. Components inside it will become unassigned. This cannot be undone.');">
+    <p>Permanently delete this {{ kind_label|lower }}. Nested components will be unassigned, not deleted.</p>
+    <form method="post" action="{{ list_url }}{{ engine.id }}/delete/"
+          onsubmit="window.__formDirty = false; return confirm('Delete {{ engine.asset_id }}? This removes the {{ kind_label|lower }} and every booking on it. Components inside it will become unassigned. This cannot be undone.');">
       {% csrf_token %}
-      <button class="btn" type="submit" style="color:var(--red);">Delete engine</button>
+      <button class="btn" type="submit" style="color:var(--red);">Delete {{ kind_label|lower }}</button>
     </form>
   </div>
   {% endif %}
@@ -390,6 +394,34 @@
   typeFilter.addEventListener("change", renderResults);
 
   renderSelected();
+
+  // --- Unsaved changes warning ---
+  let dirty = false;
+  let submitting = false;
+  const markDirty = () => { dirty = true; };
+  form.addEventListener("input", markDirty);
+  form.addEventListener("change", markDirty);
+  selectedContainer.addEventListener("click", markDirty);
+  resultsContainer.addEventListener("click", markDirty);
+  form.addEventListener("submit", () => { submitting = true; });
+
+  window.addEventListener("beforeunload", (e) => {
+    if (dirty && !submitting) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!dirty || submitting) return;
+    const link = e.target.closest("a[href]");
+    if (!link || link.target === "_blank") return;
+    if (!confirm("You have unsaved changes. Leave this page without saving?")) {
+      e.preventDefault();
+    } else {
+      submitting = true;
+    }
+  });
 })();
 </script>
 {% endblock %}

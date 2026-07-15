@@ -14,8 +14,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from .models import (
-    Asset, AssetBooking, CategoryColor, Job, Kit, KitBooking,
-    StaffBooking, StaffMember, Ticket, TicketHistory,
+    Asset, AssetBooking, CategoryColor, Job, Kit, KitAssetTag, KitBooking,
+    LicenseFunctionality, StaffBooking, StaffMember, Tag, Ticket, TicketHistory,
     Vehicle, VanUsageLog, VanMaintenanceLog, VanChecklist, VAN_CHECKLIST_ITEMS,
 )
 from .pdf_utils import build_kit_checklist_pdf, get_kit_checklist_rows
@@ -264,9 +264,9 @@ def timeline_view(request):
 
     licenses = list(Asset.objects.filter(
         asset_type=Asset.AssetType.LICENSE, archived=False
-    ).order_by("asset_id"))
+    ).prefetch_related("functionalities").order_by("asset_id"))
     for lic in licenses:
-        lic.func_tags = [t.strip() for t in lic.license_functionality.split(",")] if lic.license_functionality else []
+        lic.func_tags = [f.name for f in lic.functionalities.all()]
 
     license_bookings = list(
         AssetBooking.objects.select_related("job", "asset").prefetch_related("asset__kits").filter(
@@ -384,18 +384,33 @@ def asset_list_view(request):
 @login_required
 def kit_list_view(request):
     query = request.GET.get("q", "").strip()
+    tab = request.GET.get("tab", "all")
     today = datetime.date.today()
 
-    kits = Kit.objects.prefetch_related("assets__nested_assets", "bookings__job")
+    kits = Kit.objects.prefetch_related(
+        "assets__nested_assets", "bookings__job", "kit_asset_tags__tag"
+    )
     if query:
         kits = kits.filter(name__icontains=query)
     kits = list(kits.order_by("name"))
 
+    if tab == "engines":
+        kits = [k for k in kits if k.assets.filter(asset_type=Asset.AssetType.ENGINE).exists()]
+    elif tab == "licenses":
+        kits = [k for k in kits if k.assets.filter(asset_type=Asset.AssetType.LICENSE).exists()]
+    elif tab == "booked":
+        kits = [k for k in kits if any(b.start_date <= today <= b.end_date for b in k.bookings.all())]
+    elif tab == "empty":
+        kits = [k for k in kits if not k.assets.exists()]
+
     rows = []
     for kit in kits:
+        tags_by_asset_id = {kat.asset_id: kat.tag for kat in kit.kit_asset_tags.all() if kat.tag_id}
         members = list(kit.assets.all().order_by("asset_type", "asset_id"))
+        for m in members:
+            m.kit_tag = tags_by_asset_id.get(m.id)
         nested_count = sum(
-            m.nested_assets.count() for m in members if m.asset_type == Asset.AssetType.ENGINE
+            m.nested_assets.count() for m in members if m.asset_type in Asset.CONTAINER_TYPES
         )
         current_booking = next(
             (b for b in kit.bookings.all() if b.start_date <= today <= b.end_date), None
@@ -410,6 +425,7 @@ def kit_list_view(request):
     context = {
         "rows": rows,
         "query": query,
+        "tab": tab,
         "total_kits": len(kits),
         "active_nav": "kits",
     }
@@ -417,19 +433,28 @@ def kit_list_view(request):
 
 
 def _kit_eligible_assets_qs(current_kit=None):
-    """Assets eligible to be direct kit members: not archived, not COMPONENT
-    type, and not already claimed by a DIFFERENT kit (directly, or nested
-    inside an Engine that's a member of a different kit) - an asset can only
-    live in one kit at a time. Assets already in the current kit are always
-    included so they remain visible/removable even in edge cases."""
+    """Assets eligible to be direct kit members: not archived, not a COMPONENT,
+    not a Sonnet Box already nested inside an Engine (it travels with that
+    Engine automatically), and not already claimed by a DIFFERENT kit
+    (directly, or nested inside a container - Engine or Sonnet Box - that's
+    a member of a different kit) - an asset can only live in one kit at a
+    time. Assets already in the current kit are always included so they
+    remain visible/removable even in edge cases."""
     other_kit_asset_ids = set(
         Kit.objects.exclude(pk=current_kit.pk if current_kit else None)
         .values_list("assets__id", flat=True)
     )
     other_kit_asset_ids.discard(None)
-    other_kit_engine_ids = set(
+    other_kit_container_ids = set(
         Asset.objects.filter(
-            id__in=other_kit_asset_ids, asset_type=Asset.AssetType.ENGINE
+            id__in=other_kit_asset_ids, asset_type__in=Asset.CONTAINER_TYPES
+        ).values_list("id", flat=True)
+    )
+    # Sonnet Boxes nested inside one of those Engines are containers too -
+    # their own nested components must be excluded from the picker as well.
+    other_kit_container_ids |= set(
+        Asset.objects.filter(
+            parent_engine_id__in=other_kit_container_ids, asset_type=Asset.AssetType.SONNET
         ).values_list("id", flat=True)
     )
     current_kit_asset_ids = set(current_kit.assets.values_list("id", flat=True)) if current_kit else set()
@@ -438,14 +463,16 @@ def _kit_eligible_assets_qs(current_kit=None):
         archived=False
     ).exclude(
         asset_type=Asset.AssetType.COMPONENT
+    ).exclude(
+        Q(asset_type=Asset.AssetType.SONNET) & Q(parent_engine__isnull=False)
     ).filter(
         Q(id__in=current_kit_asset_ids)
-        | (~Q(id__in=other_kit_asset_ids) & ~Q(parent_engine_id__in=other_kit_engine_ids))
+        | (~Q(id__in=other_kit_asset_ids) & ~Q(parent_engine_id__in=other_kit_container_ids))
     )
 
 
 def _kit_picker_assets(current_kit=None):
-    """Assets eligible to be direct kit members, with nested-component info for engines."""
+    """Assets eligible to be direct kit members, with nested-component info for engines/Sonnet Boxes."""
     assets = _kit_eligible_assets_qs(current_kit).order_by(
         "asset_type", "asset_id"
     ).prefetch_related("nested_assets")
@@ -453,7 +480,7 @@ def _kit_picker_assets(current_kit=None):
     data = []
     for a in assets:
         nested = []
-        if a.asset_type == Asset.AssetType.ENGINE:
+        if a.asset_type in Asset.CONTAINER_TYPES:
             nested = [
                 {"assetId": n.asset_id, "makeModel": n.make_model}
                 for n in a.nested_assets.all()
@@ -466,37 +493,72 @@ def _kit_picker_assets(current_kit=None):
     return list(assets), data
 
 
+def _tags_json():
+    return [{"id": t.id, "name": t.name, "color": t.color} for t in Tag.objects.all()]
+
+
+def _apply_kit_tag_selection(kit, selected_ids, tag_by_asset_id):
+    """Sync KitAssetTag rows for a kit: keep tags for assets that stay,
+    create rows (with tag) for newly-added assets, remove rows for assets
+    no longer in the kit."""
+    selected_ids = set(selected_ids)
+    existing = {kat.asset_id: kat for kat in kit.kit_asset_tags.all()}
+
+    for asset_id in set(existing) - selected_ids:
+        existing[asset_id].delete()
+
+    for asset_id in selected_ids:
+        tag_id = tag_by_asset_id.get(asset_id)
+        tag_id = tag_id if tag_id else None
+        if asset_id in existing:
+            row = existing[asset_id]
+            if row.tag_id != tag_id:
+                row.tag_id = tag_id
+                row.save(update_fields=["tag"])
+        else:
+            KitAssetTag.objects.create(kit=kit, asset_id=asset_id, tag_id=tag_id)
+
+
 @login_required
 def kit_create_view(request):
     assets, assets_json = _kit_picker_assets()
+    tags_json = _tags_json()
 
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
         notes = request.POST.get("notes", "").strip()
         asset_ids = request.POST.getlist("assets")
         selected_ids = [int(i) for i in asset_ids if i.isdigit()]
+        tag_by_asset_id = {}
+        for aid in selected_ids:
+            raw = request.POST.get(f"tag_{aid}", "").strip()
+            if raw.isdigit():
+                tag_by_asset_id[aid] = int(raw)
 
         if not name:
             return render(request, "inventory/kit_form.html", {
-                "assets": assets, "assets_json": assets_json, "error": "Kit name is required.",
+                "assets": assets, "assets_json": assets_json, "tags_json": tags_json,
+                "error": "Kit name is required.",
                 "selected_ids": selected_ids, "notes": notes, "active_nav": "kits",
             })
 
         if Kit.objects.filter(name=name).exists():
             return render(request, "inventory/kit_form.html", {
-                "assets": assets, "assets_json": assets_json, "error": f'A kit named "{name}" already exists.',
+                "assets": assets, "assets_json": assets_json, "tags_json": tags_json,
+                "error": f'A kit named "{name}" already exists.',
                 "selected_ids": selected_ids, "name": name, "notes": notes, "active_nav": "kits",
             })
 
         kit = Kit.objects.create(name=name, notes=notes)
         if selected_ids:
-            valid_assets = _kit_eligible_assets_qs(kit).filter(id__in=selected_ids)
-            kit.assets.set(valid_assets)
+            valid_ids = list(_kit_eligible_assets_qs(kit).filter(id__in=selected_ids).values_list("id", flat=True))
+            _apply_kit_tag_selection(kit, valid_ids, tag_by_asset_id)
 
         return redirect("/kits/")
 
     return render(request, "inventory/kit_form.html", {
-        "assets": assets, "assets_json": assets_json, "selected_ids": [], "active_nav": "kits",
+        "assets": assets, "assets_json": assets_json, "tags_json": tags_json,
+        "selected_ids": [], "active_nav": "kits",
     })
 
 
@@ -504,22 +566,29 @@ def kit_create_view(request):
 def kit_edit_view(request, kit_id):
     kit = get_object_or_404(Kit, pk=kit_id)
     assets, assets_json = _kit_picker_assets(current_kit=kit)
+    tags_json = _tags_json()
 
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
         notes = request.POST.get("notes", "").strip()
         asset_ids = request.POST.getlist("assets")
         selected_ids = [int(i) for i in asset_ids if i.isdigit()]
+        tag_by_asset_id = {}
+        for aid in selected_ids:
+            raw = request.POST.get(f"tag_{aid}", "").strip()
+            if raw.isdigit():
+                tag_by_asset_id[aid] = int(raw)
 
         if not name:
             return render(request, "inventory/kit_form.html", {
-                "kit": kit, "assets": assets, "assets_json": assets_json, "error": "Kit name is required.",
+                "kit": kit, "assets": assets, "assets_json": assets_json, "tags_json": tags_json,
+                "error": "Kit name is required.",
                 "selected_ids": selected_ids, "notes": notes, "active_nav": "kits",
             })
 
         if Kit.objects.filter(name=name).exclude(pk=kit_id).exists():
             return render(request, "inventory/kit_form.html", {
-                "kit": kit, "assets": assets, "assets_json": assets_json,
+                "kit": kit, "assets": assets, "assets_json": assets_json, "tags_json": tags_json,
                 "error": f'A kit named "{name}" already exists.',
                 "selected_ids": selected_ids, "name": name, "notes": notes, "active_nav": "kits",
             })
@@ -528,16 +597,21 @@ def kit_edit_view(request, kit_id):
         kit.notes = notes
         kit.save()
 
-        valid_assets = _kit_eligible_assets_qs(kit).filter(id__in=selected_ids)
-        kit.assets.set(valid_assets)
+        valid_ids = list(_kit_eligible_assets_qs(kit).filter(id__in=selected_ids).values_list("id", flat=True))
+        _apply_kit_tag_selection(kit, valid_ids, tag_by_asset_id)
 
         return redirect("/kits/")
 
+    selected_tags_json = {
+        kat.asset_id: kat.tag_id for kat in kit.kit_asset_tags.all() if kat.tag_id
+    }
     return render(request, "inventory/kit_form.html", {
         "kit": kit,
         "assets": assets,
         "assets_json": assets_json,
+        "tags_json": tags_json,
         "selected_ids": list(kit.assets.values_list("id", flat=True)),
+        "selected_tags_json": selected_tags_json,
         "name": kit.name,
         "notes": kit.notes,
         "active_nav": "kits",
@@ -579,14 +653,35 @@ def kit_pdf_view(request, kit_id):
     return response
 
 
-def _engine_form_context(engine=None):
-    """Shared context builder for the engine create/edit form."""
+CONTAINER_KIND_META = {
+    Asset.AssetType.ENGINE: {
+        "label": "Engine", "label_plural": "Engines", "active_nav": "engines",
+        "list_url": "/engines/", "new_url": "/engines/new/",
+        "edit_url": lambda pk: f"/engines/{pk}/edit/",
+        "delete_url": lambda pk: f"/engines/{pk}/delete/",
+    },
+    Asset.AssetType.SONNET: {
+        "label": "Sonnet Box", "label_plural": "Sonnet Boxes", "active_nav": "sonnet_boxes",
+        "list_url": "/sonnet-boxes/", "new_url": "/sonnet-boxes/new/",
+        "edit_url": lambda pk: f"/sonnet-boxes/{pk}/edit/",
+        "delete_url": lambda pk: f"/sonnet-boxes/{pk}/delete/",
+    },
+}
+
+
+def _container_form_context(kind, container=None):
+    """Shared context builder for the Engine / Sonnet Box create/edit form."""
+    # An Engine can contain anything except another Engine (including Sonnet
+    # Boxes). A Sonnet Box can't contain another container (Engine or
+    # Sonnet Box) - only components/standalone gear.
+    excluded_types = [Asset.AssetType.ENGINE] if kind == Asset.AssetType.ENGINE else list(Asset.CONTAINER_TYPES)
+
     components_qs = Asset.objects.filter(
         archived=False
     ).exclude(
-        asset_type=Asset.AssetType.ENGINE
+        asset_type__in=excluded_types
     ).filter(
-        Q(parent_engine__isnull=True) | Q(parent_engine=engine)
+        Q(parent_engine__isnull=True) | Q(parent_engine=container)
     ).order_by("asset_type", "asset_id")
 
     components = list(components_qs)
@@ -602,32 +697,39 @@ def _engine_form_context(engine=None):
         for a in components
     ]
 
+    meta = CONTAINER_KIND_META[kind]
     return {
         "components": components,
         "components_json": components_json,
         "staff_members": list(StaffMember.objects.filter(active=True).order_by("name")),
         "statuses": Asset.Status.choices,
-        "active_nav": "engines",
+        "active_nav": meta["active_nav"],
+        "kind": kind,
+        "kind_label": meta["label"],
+        "kind_label_plural": meta["label_plural"],
+        "list_url": meta["list_url"],
     }
 
 
-def _apply_component_selection(engine, selected_ids):
-    """Nest/un-nest components against an engine, mirroring the admin form's save()."""
+def _apply_component_selection(container, selected_ids, kind=None):
+    """Nest/un-nest components against an Engine or Sonnet Box, mirroring the admin form's save()."""
+    kind = kind or container.asset_type
+    excluded_types = [Asset.AssetType.ENGINE] if kind == Asset.AssetType.ENGINE else list(Asset.CONTAINER_TYPES)
     valid_components = Asset.objects.filter(
         id__in=selected_ids, archived=False
-    ).exclude(asset_type=Asset.AssetType.ENGINE)
+    ).exclude(asset_type__in=excluded_types)
     selected = set(valid_components)
-    currently_nested = set(engine.nested_assets.all())
+    currently_nested = set(container.nested_assets.all())
     for asset in selected - currently_nested:
-        asset.parent_engine = engine
+        asset.parent_engine = container
         asset.save(update_fields=["parent_engine"])
     for asset in currently_nested - selected:
         asset.parent_engine = None
         asset.save(update_fields=["parent_engine"])
 
 
-@login_required
-def engine_create_view(request):
+def _container_create_view(request, kind):
+    meta = CONTAINER_KIND_META[kind]
     if request.method == "POST":
         asset_id = request.POST.get("asset_id", "").strip()
         make_model = request.POST.get("make_model", "").strip()
@@ -642,7 +744,7 @@ def engine_create_view(request):
         component_ids = request.POST.getlist("components")
         selected_ids = [int(i) for i in component_ids if i.isdigit()]
 
-        form_ctx = _engine_form_context()
+        form_ctx = _container_form_context(kind)
         form_ctx.update({
             "asset_id": asset_id, "make_model": make_model, "serial": serial,
             "qty": qty, "status": status, "archived": archived, "notes": notes,
@@ -651,7 +753,11 @@ def engine_create_view(request):
         })
 
         if not asset_id:
-            form_ctx["error"] = "Engine ID is required."
+            form_ctx["error"] = f"{meta['label']} ID is required."
+            return render(request, "inventory/engine_form.html", form_ctx)
+
+        if not last_updated_date:
+            form_ctx["error"] = "Last updated date is required before you can save."
             return render(request, "inventory/engine_form.html", form_ctx)
 
         if Asset.objects.filter(asset_id=asset_id).exists():
@@ -670,24 +776,23 @@ def engine_create_view(request):
         if last_updated_by_id.isdigit():
             last_updated_by = StaffMember.objects.filter(pk=last_updated_by_id).first()
 
-        parsed_date = None
-        if last_updated_date:
-            try:
-                parsed_date = datetime.date.fromisoformat(last_updated_date)
-            except ValueError:
-                parsed_date = None
+        try:
+            parsed_date = datetime.date.fromisoformat(last_updated_date)
+        except ValueError:
+            form_ctx["error"] = "Last updated date is invalid."
+            return render(request, "inventory/engine_form.html", form_ctx)
 
-        engine = Asset.objects.create(
-            asset_id=asset_id, asset_type=Asset.AssetType.ENGINE,
+        container = Asset.objects.create(
+            asset_id=asset_id, asset_type=kind,
             make_model=make_model, serial=serial, qty=qty_val, status=status,
             archived=archived, notes=notes,
             last_updated_by=last_updated_by, last_updated_date=parsed_date, last_updated_notes=last_updated_notes,
         )
-        _apply_component_selection(engine, selected_ids)
+        _apply_component_selection(container, selected_ids)
 
-        return redirect("/engines/")
+        return redirect(meta["list_url"])
 
-    form_ctx = _engine_form_context()
+    form_ctx = _container_form_context(kind)
     form_ctx.update({
         "selected_ids": [], "qty": "1", "status": Asset.Status.AVAILABLE,
         "last_updated_date": datetime.date.today().isoformat(),
@@ -695,9 +800,9 @@ def engine_create_view(request):
     return render(request, "inventory/engine_form.html", form_ctx)
 
 
-@login_required
-def engine_edit_view(request, engine_id):
-    engine = get_object_or_404(Asset, pk=engine_id, asset_type=Asset.AssetType.ENGINE)
+def _container_edit_view(request, kind, container_id):
+    meta = CONTAINER_KIND_META[kind]
+    container = get_object_or_404(Asset, pk=container_id, asset_type=kind)
 
     if request.method == "POST":
         asset_id = request.POST.get("asset_id", "").strip()
@@ -713,9 +818,9 @@ def engine_edit_view(request, engine_id):
         component_ids = request.POST.getlist("components")
         selected_ids = [int(i) for i in component_ids if i.isdigit()]
 
-        form_ctx = _engine_form_context(engine=engine)
+        form_ctx = _container_form_context(kind, container=container)
         form_ctx.update({
-            "engine": engine,
+            "engine": container,
             "asset_id": asset_id, "make_model": make_model, "serial": serial,
             "qty": qty, "status": status, "archived": archived, "notes": notes,
             "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date, "last_updated_notes": last_updated_notes,
@@ -723,10 +828,14 @@ def engine_edit_view(request, engine_id):
         })
 
         if not asset_id:
-            form_ctx["error"] = "Engine ID is required."
+            form_ctx["error"] = f"{meta['label']} ID is required."
             return render(request, "inventory/engine_form.html", form_ctx)
 
-        if Asset.objects.filter(asset_id=asset_id).exclude(pk=engine.pk).exists():
+        if not last_updated_date:
+            form_ctx["error"] = "Last updated date is required before you can save."
+            return render(request, "inventory/engine_form.html", form_ctx)
+
+        if Asset.objects.filter(asset_id=asset_id).exclude(pk=container.pk).exists():
             form_ctx["error"] = f'An asset with ID "{asset_id}" already exists.'
             return render(request, "inventory/engine_form.html", form_ctx)
 
@@ -742,74 +851,76 @@ def engine_edit_view(request, engine_id):
         if last_updated_by_id.isdigit():
             last_updated_by = StaffMember.objects.filter(pk=last_updated_by_id).first()
 
-        parsed_date = engine.last_updated_date
-        if last_updated_date:
-            try:
-                parsed_date = datetime.date.fromisoformat(last_updated_date)
-            except ValueError:
-                pass
-        else:
-            parsed_date = None
+        try:
+            parsed_date = datetime.date.fromisoformat(last_updated_date)
+        except ValueError:
+            form_ctx["error"] = "Last updated date is invalid."
+            return render(request, "inventory/engine_form.html", form_ctx)
 
-        engine.asset_id = asset_id
-        engine.make_model = make_model
-        engine.serial = serial
-        engine.qty = qty_val
-        engine.status = status
-        engine.archived = archived
-        engine.notes = notes
-        engine.last_updated_by = last_updated_by
-        engine.last_updated_date = parsed_date
-        engine.last_updated_notes = last_updated_notes
-        engine.save()
+        container.asset_id = asset_id
+        container.make_model = make_model
+        container.serial = serial
+        container.qty = qty_val
+        container.status = status
+        container.archived = archived
+        container.notes = notes
+        container.last_updated_by = last_updated_by
+        container.last_updated_date = parsed_date
+        container.last_updated_notes = last_updated_notes
+        container.save()
 
-        _apply_component_selection(engine, selected_ids)
+        _apply_component_selection(container, selected_ids)
 
-        return redirect("/engines/")
+        return redirect(meta["list_url"])
 
-    form_ctx = _engine_form_context(engine=engine)
+    form_ctx = _container_form_context(kind, container=container)
     form_ctx.update({
-        "engine": engine,
-        "asset_id": engine.asset_id,
-        "make_model": engine.make_model,
-        "serial": engine.serial,
-        "qty": str(engine.qty),
-        "status": engine.status,
-        "archived": engine.archived,
-        "notes": engine.notes,
-        "last_updated_by_id": str(engine.last_updated_by_id) if engine.last_updated_by_id else "",
-        "last_updated_date": engine.last_updated_date.isoformat() if engine.last_updated_date else "", "last_updated_notes": engine.last_updated_notes,
-        "selected_ids": list(engine.nested_assets.values_list("id", flat=True)),
+        "engine": container,
+        "asset_id": container.asset_id,
+        "make_model": container.make_model,
+        "serial": container.serial,
+        "qty": str(container.qty),
+        "status": container.status,
+        "archived": container.archived,
+        "notes": container.notes,
+        "last_updated_by_id": str(container.last_updated_by_id) if container.last_updated_by_id else "",
+        "last_updated_date": container.last_updated_date.isoformat() if container.last_updated_date else "",
+        "last_updated_notes": container.last_updated_notes,
+        "selected_ids": list(container.nested_assets.values_list("id", flat=True)),
     })
     return render(request, "inventory/engine_form.html", form_ctx)
 
 
-@login_required
-@require_POST
-def engine_delete_view(request, engine_id):
-    engine = get_object_or_404(Asset, pk=engine_id, asset_type=Asset.AssetType.ENGINE)
-    engine.delete()
-    return redirect("/engines/")
+def _container_delete_view(request, kind, container_id):
+    meta = CONTAINER_KIND_META[kind]
+    container = get_object_or_404(Asset, pk=container_id, asset_type=kind)
+    container.delete()
+    return redirect(meta["list_url"])
 
 
-@login_required
-def engine_list_view(request):
+def _container_list_view(request, kind):
+    meta = CONTAINER_KIND_META[kind]
     make_model = request.GET.get("make_model", "")
     show_archived = request.GET.get("archived") == "1"
+    query = request.GET.get("q", "").strip()
 
-    engines = Asset.objects.filter(
-        asset_type=Asset.AssetType.ENGINE
+    items = Asset.objects.filter(
+        asset_type=kind
     ).select_related("last_updated_by").prefetch_related("nested_assets", "kits")
 
     if not show_archived:
-        engines = engines.filter(archived=False)
+        items = items.filter(archived=False)
     if make_model:
-        engines = engines.filter(make_model=make_model)
+        items = items.filter(make_model=make_model)
+    if query:
+        items = items.filter(
+            Q(asset_id__icontains=query) | Q(make_model__icontains=query) | Q(serial__icontains=query)
+        )
 
-    engines = list(engines.order_by("make_model", "asset_id"))
+    items = list(items.order_by("make_model", "asset_id"))
 
-    engine_models = (
-        Asset.objects.filter(asset_type=Asset.AssetType.ENGINE, archived=False)
+    models_qs = (
+        Asset.objects.filter(asset_type=kind, archived=False)
         .exclude(make_model="")
         .order_by("make_model")
         .values_list("make_model", flat=True)
@@ -817,33 +928,308 @@ def engine_list_view(request):
     )
 
     context = {
-        "engines": engines,
-        "engine_models": list(engine_models),
+        "engines": items,
+        "engine_models": list(models_qs),
         "selected_make_model": make_model,
         "show_archived": show_archived,
-        "active_nav": "engines",
+        "query": query,
+        "active_nav": meta["active_nav"],
+        "kind": kind,
+        "kind_label": meta["label"],
+        "kind_label_plural": meta["label_plural"],
+        "new_url": meta["new_url"],
     }
     return render(request, "inventory/engine_list.html", context)
 
 
 @login_required
+def engine_create_view(request):
+    return _container_create_view(request, Asset.AssetType.ENGINE)
+
+
+@login_required
+def engine_edit_view(request, engine_id):
+    return _container_edit_view(request, Asset.AssetType.ENGINE, engine_id)
+
+
+@login_required
+@require_POST
+def engine_delete_view(request, engine_id):
+    return _container_delete_view(request, Asset.AssetType.ENGINE, engine_id)
+
+
+@login_required
+def engine_list_view(request):
+    return _container_list_view(request, Asset.AssetType.ENGINE)
+
+
+@login_required
+def sonnet_create_view(request):
+    return _container_create_view(request, Asset.AssetType.SONNET)
+
+
+@login_required
+def sonnet_edit_view(request, sonnet_id):
+    return _container_edit_view(request, Asset.AssetType.SONNET, sonnet_id)
+
+
+@login_required
+@require_POST
+def sonnet_delete_view(request, sonnet_id):
+    return _container_delete_view(request, Asset.AssetType.SONNET, sonnet_id)
+
+
+@login_required
+def sonnet_list_view(request):
+    return _container_list_view(request, Asset.AssetType.SONNET)
+
+
+
+
+
+@login_required
 def license_list_view(request):
     show_archived = request.GET.get("archived") == "1"
+    license_type = request.GET.get("type", "")
+    func_id = request.GET.get("func", "")
+    query = request.GET.get("q", "").strip()
+
     licenses = Asset.objects.filter(
         asset_type=Asset.AssetType.LICENSE
-    ).select_related("last_updated_by").prefetch_related("kits")
+    ).select_related("last_updated_by").prefetch_related("kits", "functionalities")
     if not show_archived:
         licenses = licenses.filter(archived=False)
-    licenses = list(licenses.order_by("asset_id"))
+    if license_type:
+        licenses = licenses.filter(license_type=license_type)
+    if func_id.isdigit():
+        licenses = licenses.filter(functionalities__id=int(func_id))
+    if query:
+        licenses = licenses.filter(Q(asset_id__icontains=query) | Q(notes__icontains=query))
+
+    licenses = list(licenses.order_by("asset_id").distinct())
     for lic in licenses:
-        lic.func_tags = [t.strip() for t in lic.license_functionality.split(",")] if lic.license_functionality else []
+        lic.func_tags = list(lic.functionalities.all())
+
     context = {
         "licenses": licenses,
         "show_archived": show_archived,
         "total": len(licenses),
         "active_nav": "licenses",
+        "license_types": Asset.LicenseType.choices,
+        "selected_type": license_type,
+        "functionality_options": list(LicenseFunctionality.objects.all()),
+        "selected_func": func_id,
+        "query": query,
     }
     return render(request, "inventory/license_list.html", context)
+
+
+def _license_form_context(license_obj=None):
+    return {
+        "staff_members": list(StaffMember.objects.filter(active=True).order_by("name")),
+        "statuses": Asset.Status.choices,
+        "license_types": Asset.LicenseType.choices,
+        "functionality_options": list(LicenseFunctionality.objects.all()),
+        "active_nav": "licenses",
+    }
+
+
+@login_required
+def license_create_view(request):
+    if request.method == "POST":
+        asset_id = request.POST.get("asset_id", "").strip()
+        status = request.POST.get("status", Asset.Status.AVAILABLE)
+        archived = request.POST.get("archived") == "on"
+        notes = request.POST.get("notes", "").strip()
+        license_type = request.POST.get("license_type", "").strip()
+        func_ids = [int(i) for i in request.POST.getlist("functionalities") if i.isdigit()]
+        duration_start = request.POST.get("license_duration_start", "").strip()
+        duration_end = request.POST.get("license_duration_end", "").strip()
+        last_updated_by_id = request.POST.get("last_updated_by", "").strip()
+        last_updated_date = request.POST.get("last_updated_date", "").strip()
+        last_updated_notes = request.POST.get("last_updated_notes", "").strip()
+
+        form_ctx = _license_form_context()
+        form_ctx.update({
+            "asset_id": asset_id, "status": status, "archived": archived, "notes": notes,
+            "license_type": license_type, "selected_func_ids": func_ids,
+            "license_duration_start": duration_start, "license_duration_end": duration_end,
+            "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date,
+            "last_updated_notes": last_updated_notes,
+        })
+
+        if not asset_id:
+            form_ctx["error"] = "License name/ID is required."
+            return render(request, "inventory/license_form.html", form_ctx)
+
+        if not last_updated_date:
+            form_ctx["error"] = "Last updated date is required before you can save."
+            return render(request, "inventory/license_form.html", form_ctx)
+
+        if Asset.objects.filter(asset_id=asset_id).exists():
+            form_ctx["error"] = f'An asset with ID "{asset_id}" already exists.'
+            return render(request, "inventory/license_form.html", form_ctx)
+
+        if status not in Asset.Status.values:
+            status = Asset.Status.AVAILABLE
+        if license_type not in Asset.LicenseType.values:
+            license_type = ""
+
+        last_updated_by = None
+        if last_updated_by_id.isdigit():
+            last_updated_by = StaffMember.objects.filter(pk=last_updated_by_id).first()
+
+        try:
+            parsed_date = datetime.date.fromisoformat(last_updated_date)
+        except ValueError:
+            form_ctx["error"] = "Last updated date is invalid."
+            return render(request, "inventory/license_form.html", form_ctx)
+
+        start_val = None
+        if duration_start:
+            try:
+                start_val = datetime.date.fromisoformat(duration_start)
+            except ValueError:
+                start_val = None
+        end_val = None
+        if duration_end:
+            try:
+                end_val = datetime.date.fromisoformat(duration_end)
+            except ValueError:
+                end_val = None
+        if start_val and end_val and start_val > end_val:
+            form_ctx["error"] = "Duration end cannot be before duration start."
+            return render(request, "inventory/license_form.html", form_ctx)
+
+        lic = Asset.objects.create(
+            asset_id=asset_id, asset_type=Asset.AssetType.LICENSE,
+            status=status, archived=archived, notes=notes,
+            license_type=license_type,
+            license_duration_start=start_val, license_duration_end=end_val,
+            last_updated_by=last_updated_by, last_updated_date=parsed_date,
+            last_updated_notes=last_updated_notes,
+        )
+        lic.functionalities.set(LicenseFunctionality.objects.filter(id__in=func_ids))
+
+        return redirect("/licenses/")
+
+    form_ctx = _license_form_context()
+    form_ctx.update({
+        "status": Asset.Status.AVAILABLE, "selected_func_ids": [],
+        "last_updated_date": datetime.date.today().isoformat(),
+    })
+    return render(request, "inventory/license_form.html", form_ctx)
+
+
+@login_required
+def license_edit_view(request, license_id):
+    lic = get_object_or_404(Asset, pk=license_id, asset_type=Asset.AssetType.LICENSE)
+
+    if request.method == "POST":
+        asset_id = request.POST.get("asset_id", "").strip()
+        status = request.POST.get("status", Asset.Status.AVAILABLE)
+        archived = request.POST.get("archived") == "on"
+        notes = request.POST.get("notes", "").strip()
+        license_type = request.POST.get("license_type", "").strip()
+        func_ids = [int(i) for i in request.POST.getlist("functionalities") if i.isdigit()]
+        duration_start = request.POST.get("license_duration_start", "").strip()
+        duration_end = request.POST.get("license_duration_end", "").strip()
+        last_updated_by_id = request.POST.get("last_updated_by", "").strip()
+        last_updated_date = request.POST.get("last_updated_date", "").strip()
+        last_updated_notes = request.POST.get("last_updated_notes", "").strip()
+
+        form_ctx = _license_form_context(lic)
+        form_ctx.update({
+            "license": lic,
+            "asset_id": asset_id, "status": status, "archived": archived, "notes": notes,
+            "license_type": license_type, "selected_func_ids": func_ids,
+            "license_duration_start": duration_start, "license_duration_end": duration_end,
+            "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date,
+            "last_updated_notes": last_updated_notes,
+        })
+
+        if not asset_id:
+            form_ctx["error"] = "License name/ID is required."
+            return render(request, "inventory/license_form.html", form_ctx)
+
+        if not last_updated_date:
+            form_ctx["error"] = "Last updated date is required before you can save."
+            return render(request, "inventory/license_form.html", form_ctx)
+
+        if Asset.objects.filter(asset_id=asset_id).exclude(pk=lic.pk).exists():
+            form_ctx["error"] = f'An asset with ID "{asset_id}" already exists.'
+            return render(request, "inventory/license_form.html", form_ctx)
+
+        if status not in Asset.Status.values:
+            status = Asset.Status.AVAILABLE
+        if license_type not in Asset.LicenseType.values:
+            license_type = ""
+
+        last_updated_by = None
+        if last_updated_by_id.isdigit():
+            last_updated_by = StaffMember.objects.filter(pk=last_updated_by_id).first()
+
+        try:
+            parsed_date = datetime.date.fromisoformat(last_updated_date)
+        except ValueError:
+            form_ctx["error"] = "Last updated date is invalid."
+            return render(request, "inventory/license_form.html", form_ctx)
+
+        start_val = None
+        if duration_start:
+            try:
+                start_val = datetime.date.fromisoformat(duration_start)
+            except ValueError:
+                start_val = None
+        end_val = None
+        if duration_end:
+            try:
+                end_val = datetime.date.fromisoformat(duration_end)
+            except ValueError:
+                end_val = None
+        if start_val and end_val and start_val > end_val:
+            form_ctx["error"] = "Duration end cannot be before duration start."
+            return render(request, "inventory/license_form.html", form_ctx)
+
+        lic.asset_id = asset_id
+        lic.status = status
+        lic.archived = archived
+        lic.notes = notes
+        lic.license_type = license_type
+        lic.license_duration_start = start_val
+        lic.license_duration_end = end_val
+        lic.last_updated_by = last_updated_by
+        lic.last_updated_date = parsed_date
+        lic.last_updated_notes = last_updated_notes
+        lic.save()
+        lic.functionalities.set(LicenseFunctionality.objects.filter(id__in=func_ids))
+
+        return redirect("/licenses/")
+
+    form_ctx = _license_form_context(lic)
+    form_ctx.update({
+        "license": lic,
+        "asset_id": lic.asset_id,
+        "status": lic.status,
+        "archived": lic.archived,
+        "notes": lic.notes,
+        "license_type": lic.license_type,
+        "selected_func_ids": list(lic.functionalities.values_list("id", flat=True)),
+        "license_duration_start": lic.license_duration_start.isoformat() if lic.license_duration_start else "",
+        "license_duration_end": lic.license_duration_end.isoformat() if lic.license_duration_end else "",
+        "last_updated_by_id": str(lic.last_updated_by_id) if lic.last_updated_by_id else "",
+        "last_updated_date": lic.last_updated_date.isoformat() if lic.last_updated_date else "",
+        "last_updated_notes": lic.last_updated_notes,
+    })
+    return render(request, "inventory/license_form.html", form_ctx)
+
+
+@login_required
+@require_POST
+def license_delete_view(request, license_id):
+    lic = get_object_or_404(Asset, pk=license_id, asset_type=Asset.AssetType.LICENSE)
+    lic.delete()
+    return redirect("/licenses/")
 
 
 @login_required
@@ -863,8 +1249,43 @@ def settings_view(request):
     return render(request, "inventory/settings.html", {
         "categories": categories,
         "colors": colors,
+        "tags": Tag.objects.all(),
+        "functionalities": LicenseFunctionality.objects.all(),
         "active_nav": "settings",
     })
+
+
+@login_required
+@require_POST
+def settings_tag_add(request):
+    name = request.POST.get("name", "").strip()
+    color = request.POST.get("color", "").strip()
+    if name and not Tag.objects.filter(name__iexact=name).exists():
+        Tag.objects.create(name=name, color=color if re.fullmatch(r"#[0-9A-Fa-f]{6}", color or "") else "")
+    return redirect("/settings/")
+
+
+@login_required
+@require_POST
+def settings_tag_delete(request, tag_id):
+    Tag.objects.filter(pk=tag_id).delete()
+    return redirect("/settings/")
+
+
+@login_required
+@require_POST
+def settings_functionality_add(request):
+    name = request.POST.get("name", "").strip()
+    if name and not LicenseFunctionality.objects.filter(name__iexact=name).exists():
+        LicenseFunctionality.objects.create(name=name)
+    return redirect("/settings/")
+
+
+@login_required
+@require_POST
+def settings_functionality_delete(request, func_id):
+    LicenseFunctionality.objects.filter(pk=func_id).delete()
+    return redirect("/settings/")
 
 
 @login_required
@@ -876,22 +1297,29 @@ def export_csv_view(request):
         assets_io = io.StringIO()
         writer = csv.writer(assets_io)
         writer.writerow(["asset_id", "type", "make_model", "serial", "qty", "status",
-                         "archived", "license_type", "license_functionality", "parent_engine", "notes"])
-        for a in Asset.objects.select_related("parent_engine").order_by("asset_type", "asset_id"):
+                         "archived", "license_type", "license_functionalities",
+                         "license_duration_start", "license_duration_end", "parent_engine", "notes"])
+        for a in Asset.objects.select_related("parent_engine").prefetch_related("functionalities").order_by("asset_type", "asset_id"):
             writer.writerow([
                 a.asset_id, a.get_asset_type_display(), a.make_model, a.serial,
                 a.qty, a.get_status_display(), "yes" if a.archived else "no",
-                a.license_type, a.license_functionality,
+                a.get_license_type_display() if a.license_type else "",
+                ", ".join(f.name for f in a.functionalities.all()),
+                a.license_duration_start or "", a.license_duration_end or "",
                 a.parent_engine.asset_id if a.parent_engine_id else "", a.notes,
             ])
         zf.writestr("assets.csv", assets_io.getvalue())
 
         kits_io = io.StringIO()
         writer = csv.writer(kits_io)
-        writer.writerow(["kit_name", "asset_id", "asset_type", "make_model"])
-        for kit in Kit.objects.prefetch_related("assets"):
+        writer.writerow(["kit_name", "asset_id", "asset_type", "make_model", "tag"])
+        for kit in Kit.objects.prefetch_related("assets", "kit_asset_tags__tag"):
+            tag_by_asset = {kat.asset_id: kat.tag.name for kat in kit.kit_asset_tags.all() if kat.tag_id}
             for asset in kit.assets.all():
-                writer.writerow([kit.name, asset.asset_id, asset.get_asset_type_display(), asset.make_model])
+                writer.writerow([
+                    kit.name, asset.asset_id, asset.get_asset_type_display(), asset.make_model,
+                    tag_by_asset.get(asset.id, ""),
+                ])
         zf.writestr("kits.csv", kits_io.getvalue())
 
         jobs_io = io.StringIO()
@@ -911,11 +1339,9 @@ def export_csv_view(request):
 def kit_detail_api(request, kit_id):
     kit = get_object_or_404(Kit, pk=kit_id)
     direct = list(kit.assets.values_list("asset_id", flat=True))
-    nested = list(
-        Asset.objects.filter(
-            parent_engine__in=kit.assets.filter(asset_type=Asset.AssetType.ENGINE)
-        ).values_list("asset_id", flat=True)
-    )
+    all_ids = kit.all_asset_ids()
+    nested_only_ids = all_ids - set(kit.assets.values_list("id", flat=True))
+    nested = list(Asset.objects.filter(id__in=nested_only_ids).values_list("asset_id", flat=True))
     return JsonResponse({"kit_id": kit_id, "name": kit.name, "assets": direct, "nested": nested})
 
 

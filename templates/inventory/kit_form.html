@@ -103,6 +103,11 @@
   .picker-row .amodel { font-size: 12px; color: var(--text-dim); flex: 1; }
   .picker-row .atype { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
   .picker-row .astatus .badge { font-size: 10px; padding: 2px 6px; }
+  .picker-row .tag-select {
+    background: var(--surface); border: 1px solid var(--border-strong); color: var(--text-dim);
+    border-radius: 5px; padding: 3px 6px; font-size: 11px; font-family: inherit; max-width: 120px;
+  }
+  .picker-row .tag-select:focus { outline: none; border-color: var(--accent); }
   .picker-remove-btn {
     background: none; border: none; color: var(--text-faint); cursor: pointer;
     font-size: 16px; line-height: 1; padding: 2px 4px; flex-shrink: 0;
@@ -206,8 +211,10 @@
       <div class="form-section-head">Assets in this kit</div>
       <div class="form-section-body">
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
-          Search below to add Engines and standalone gear. Components inside an Engine travel
-          with it automatically and show up underneath it here.
+          Search below to add Engines and standalone gear. Components inside an Engine (or a
+          Sonnet Box nested in one) travel with it automatically and show up underneath it here.
+          Optionally tag an asset (e.g. "MAIN") so people know what to use it for &mdash;
+          manage the tag bank in <a href="/settings/" style="color:var(--accent);">Settings</a>.
         </p>
         <div class="selected-count">
           <span id="selected-count">0</span> asset<span id="selected-plural">s</span> selected
@@ -351,12 +358,15 @@ function downloadKitPdf(kitId) {
 </script>
 
 {{ assets_json|json_script:"assets-data" }}
+{{ tags_json|json_script:"tags-data" }}
 <script>
 (function() {
   const ALL = JSON.parse(document.getElementById("assets-data").textContent);
+  const TAGS = JSON.parse(document.getElementById("tags-data").textContent);
   const byId = {};
   ALL.forEach(a => byId[a.id] = a);
 
+  const form = document.getElementById("kit-form");
   const selectedContainer = document.getElementById("picker-selected");
   const emptyMsg = document.getElementById("picker-empty");
   const resultsContainer = document.getElementById("picker-results");
@@ -366,6 +376,9 @@ function downloadKitPdf(kitId) {
   const pluralEl = document.getElementById("selected-plural");
 
   let selected = new Set([{{ selected_ids|join:"," }}]);
+  const initialTags = {{ selected_tags_json|default:"{}"|safe }};
+  const assetTags = {};
+  Object.keys(initialTags).forEach(k => { assetTags[k] = initialTags[k]; });
 
   // Populate the type filter from whatever types actually exist in the pool
   Array.from(new Set(ALL.map(a => a.type))).sort().forEach(t => {
@@ -385,6 +398,15 @@ function downloadKitPdf(kitId) {
     return `<div class="picker-nested">${rows}</div>`;
   }
 
+  function tagSelectHtml(id) {
+    if (!TAGS.length) return "";
+    const current = assetTags[id] || "";
+    const options = [`<option value="">No tag</option>`].concat(
+      TAGS.map(t => `<option value="${t.id}" ${String(t.id) === String(current) ? "selected" : ""}>${t.name}</option>`)
+    ).join("");
+    return `<select class="tag-select" data-id="${id}" title="What is this used for in this kit?">${options}</select>`;
+  }
+
   function renderSelected() {
     selectedContainer.innerHTML = "";
     const ids = Array.from(selected).filter(id => byId[id]);
@@ -398,8 +420,10 @@ function downloadKitPdf(kitId) {
           <span class="amodel">${a.makeModel || ""}</span>
           <span class="atype">${a.type}</span>
           ${statusBadge(a)}
+          ${tagSelectHtml(id)}
           <button type="button" class="picker-remove-btn" title="Remove" data-id="${id}">&times;</button>
           <input type="hidden" name="assets" value="${id}">
+          <input type="hidden" name="tag_${id}" value="${assetTags[id] || ""}">
         </div>
         ${nestedHtml(a)}
       `;
@@ -447,6 +471,15 @@ function downloadKitPdf(kitId) {
     renderResults();
   });
 
+  selectedContainer.addEventListener("change", (e) => {
+    const select = e.target.closest(".tag-select");
+    if (!select) return;
+    const id = select.dataset.id;
+    assetTags[id] = select.value;
+    const hidden = select.closest(".picker-row").querySelector(`input[name="tag_${id}"]`);
+    if (hidden) hidden.value = select.value;
+  });
+
   resultsContainer.addEventListener("click", (e) => {
     const btn = e.target.closest(".picker-add-btn");
     if (!btn) return;
@@ -459,6 +492,35 @@ function downloadKitPdf(kitId) {
   typeFilter.addEventListener("change", renderResults);
 
   renderSelected();
+
+  // --- Unsaved changes warning ---
+  let dirty = false;
+  let submitting = false;
+  const markDirty = () => { dirty = true; };
+  form.addEventListener("input", markDirty);
+  form.addEventListener("change", markDirty);
+  selectedContainer.addEventListener("click", markDirty);
+  resultsContainer.addEventListener("click", markDirty);
+  form.addEventListener("submit", () => { submitting = true; });
+
+  window.addEventListener("beforeunload", (e) => {
+    if (dirty && !submitting) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!dirty || submitting) return;
+    const link = e.target.closest("a[href]");
+    if (!link || link.target === "_blank") return;
+    if (link.closest("dialog")) return;
+    if (!confirm("You have unsaved changes. Leave this page without saving?")) {
+      e.preventDefault();
+    } else {
+      submitting = true;
+    }
+  });
 })();
 </script>
 {% endblock %}

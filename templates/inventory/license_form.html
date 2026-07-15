@@ -1,0 +1,281 @@
+{% extends "inventory/base.html" %}
+{% block title %}{% if license %}Edit {{ license.asset_id }}{% else %}New License{% endif %} - Kit scheduler{% endblock %}
+{% block brand_sub %}{% if license %}Editing license{% else %}New license{% endif %}{% endblock %}
+
+{% block header_actions %}
+  <a class="btn" href="/licenses/">Cancel</a>
+{% endblock %}
+
+{% block extra_style %}
+  .form-page {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--text-dim); text-decoration: none; font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .back-link:hover { color: var(--accent); }
+  .form-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .form-section-head {
+    padding: 12px 16px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+  }
+  .form-section-body { padding: 16px; }
+  .form-field { margin-bottom: 14px; }
+  .form-field:last-child { margin-bottom: 0; }
+  .form-field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+  }
+  .form-field input[type="text"],
+  .form-field input[type="date"],
+  .form-field select,
+  .form-field textarea {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    box-sizing: border-box;
+  }
+  .form-field input:focus,
+  .form-field select:focus,
+  .form-field textarea:focus { outline: none; border-color: var(--accent); }
+  .form-field textarea { resize: vertical; min-height: 80px; }
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .tick-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  }
+  .tick-option {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 6px;
+    background: var(--surface-2); font-size: 13px; cursor: pointer;
+  }
+  .tick-option:hover { border-color: var(--accent-deep); }
+  .tick-option input { margin: 0; accent-color: var(--accent); width: auto; }
+  .checkbox-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+    margin-top: 4px;
+  }
+  .checkbox-field input { margin: 0; accent-color: var(--accent); width: auto; }
+  .error-msg {
+    background: var(--red-dim);
+    color: var(--red);
+    border: 1px solid var(--red);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .form-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding-top: 8px;
+  }
+  {% if license %}
+  .delete-zone {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-top: 24px;
+  }
+  .delete-zone p { margin: 0; font-size: 13px; color: var(--text-dim); }
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="form-page">
+
+  <a class="back-link" href="/licenses/">&larr; All licenses</a>
+
+  {% if error %}
+  <div class="error-msg">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" id="license-form">
+    {% csrf_token %}
+
+    <div class="form-section">
+      <div class="form-section-head">License details</div>
+      <div class="form-section-body">
+        <div class="form-row">
+          <div class="form-field">
+            <label for="f-asset-id">License name / ID <span style="color:var(--red);">*</span></label>
+            <input type="text" id="f-asset-id" name="asset_id" value="{{ asset_id|default:'' }}" placeholder="e.g. UK 6" autofocus>
+          </div>
+          <div class="form-field">
+            <label for="f-status">Status</label>
+            <select id="f-status" name="status">
+              {% for value, label in statuses %}
+                <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label>Type <span style="color:var(--text-faint); font-weight:400;">(tick one)</span></label>
+          <div class="tick-grid">
+            {% for value, label in license_types %}
+            <label class="tick-option">
+              <input type="radio" name="license_type" value="{{ value }}" {% if license_type == value %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label>Functionality <span style="color:var(--text-faint); font-weight:400;">(tick all that apply &mdash; manage the list in <a href="/settings/" style="color:var(--accent);">Settings</a>)</span></label>
+          {% if functionality_options %}
+          <div class="tick-grid">
+            {% for f in functionality_options %}
+            <label class="tick-option">
+              <input type="checkbox" name="functionalities" value="{{ f.id }}" {% if f.id in selected_func_ids %}checked{% endif %}>
+              {{ f.name }}
+            </label>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p style="font-size:12px; color:var(--text-faint);">No functionalities defined yet &mdash; add some in <a href="/settings/" style="color:var(--accent);">Settings</a>.</p>
+          {% endif %}
+        </div>
+
+        <div class="form-field">
+          <label>Duration <span style="color:var(--text-faint); font-weight:400;">(overall active/usable window &mdash; shown on the timeline; it can still be assigned to individual jobs for shorter stretches within it)</span></label>
+          <div class="form-row">
+            <div>
+              <label for="f-duration-start" style="font-size:11px;">Start</label>
+              <input type="date" id="f-duration-start" name="license_duration_start" value="{{ license_duration_start|default:'' }}">
+            </div>
+            <div>
+              <label for="f-duration-end" style="font-size:11px;">End</label>
+              <input type="date" id="f-duration-end" name="license_duration_end" value="{{ license_duration_end|default:'' }}">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="f-notes">Notes <span style="color:var(--text-faint); font-weight:400;">(optional)</span></label>
+          <textarea id="f-notes" name="notes" placeholder="Any notes about this license...">{{ notes|default:'' }}</textarea>
+        </div>
+
+        <div class="checkbox-field">
+          <input type="checkbox" id="f-archived" name="archived" {% if archived %}checked{% endif %}>
+          <label for="f-archived" style="margin:0;">Archived <span style="color:var(--text-faint);">(hides from availability and pickers, keeps booking history)</span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-head">Last updated <span style="color:var(--red); text-transform:none; letter-spacing:normal;">&mdash; required</span></div>
+      <div class="form-section-body">
+        <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
+          Every save needs a date so the team knows this record is current. You can't save until this is filled in.
+        </p>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="f-last-updated-by">Updated by</label>
+            <select id="f-last-updated-by" name="last_updated_by">
+              <option value="">-</option>
+              {% for staff in staff_members %}
+                <option value="{{ staff.id }}" {% if last_updated_by_id == staff.id|stringformat:"s" %}selected{% endif %}>{{ staff.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="f-last-updated-date">Date <span style="color:var(--red);">*</span></label>
+            <input type="date" id="f-last-updated-date" name="last_updated_date" value="{{ last_updated_date|default:'' }}" required>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="f-last-updated-notes">What changed? <span style="color:var(--text-faint); font-weight:400;">(optional)</span></label>
+          <textarea id="f-last-updated-notes" name="last_updated_notes" placeholder="e.g. Renewed for another year" style="min-height:50px;">{{ last_updated_notes|default:'' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a class="btn" href="/licenses/">Cancel</a>
+      <button class="btn btn-primary" type="submit">
+        {% if license %}Save changes{% else %}Create license{% endif %}
+      </button>
+    </div>
+  </form>
+
+  {% if license %}
+  <div class="delete-zone">
+    <p>Permanently delete this license.</p>
+    <form method="post" action="/licenses/{{ license.id }}/delete/"
+          onsubmit="window.__formDirty = false; return confirm('Delete {{ license.asset_id }}? This removes the license and every booking on it. This cannot be undone.');">
+      {% csrf_token %}
+      <button class="btn" type="submit" style="color:var(--red);">Delete license</button>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+(function() {
+  const form = document.getElementById("license-form");
+  let dirty = false;
+  let submitting = false;
+  const markDirty = () => { dirty = true; };
+  form.addEventListener("input", markDirty);
+  form.addEventListener("change", markDirty);
+  form.addEventListener("submit", () => { submitting = true; });
+
+  window.addEventListener("beforeunload", (e) => {
+    if (dirty && !submitting) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!dirty || submitting) return;
+    const link = e.target.closest("a[href]");
+    if (!link || link.target === "_blank") return;
+    if (!confirm("You have unsaved changes. Leave this page without saving?")) {
+      e.preventDefault();
+    } else {
+      submitting = true;
+    }
+  });
+})();
+</script>
+{% endblock %}

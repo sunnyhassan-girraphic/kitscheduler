@@ -6,9 +6,9 @@ from django.db import models
 from django.utils.html import format_html
 
 from .models import (
-    Asset, AssetBooking, CategoryColor, Job, Kit,
-    KitBooking, StaffBooking, StaffMember, Ticket, TicketHistory,
-    Vehicle, VanUsageLog, VanMaintenanceLog, VanChecklist,
+    Asset, AssetBooking, CategoryColor, Job, Kit, KitAssetTag,
+    KitBooking, LicenseFunctionality, StaffBooking, StaffMember, Tag,
+    Ticket, TicketHistory, Vehicle, VanUsageLog, VanMaintenanceLog, VanChecklist,
 )
 
 
@@ -41,9 +41,10 @@ class AssetAdmin(admin.ModelAdmin):
         "asset_id", "asset_type", "parent_link", "make_model",
         "serial", "qty", "status_badge", "archived", "last_updated_display",
     )
-    list_filter = ("asset_type", "status", "archived")
+    list_filter = ("asset_type", "status", "archived", "license_type", "functionalities")
     search_fields = ("asset_id", "make_model", "serial", "notes", "license_functionality")
     autocomplete_fields = ("parent_engine",)
+    filter_horizontal = ("functionalities",)
     list_select_related = ("parent_engine", "last_updated_by")
 
     fieldsets = (
@@ -52,7 +53,16 @@ class AssetAdmin(admin.ModelAdmin):
         (
             "License details",
             {
-                "fields": ("license_type", "license_functionality"),
+                "fields": (
+                    "license_type", "functionalities",
+                    "license_duration_start", "license_duration_end",
+                ),
+                "description": (
+                    "License only. Type is a single tick, Functionality supports "
+                    "multiple ticks. Duration is the overall active/expiry window - "
+                    "it can still be assigned to individual jobs for shorter stretches "
+                    "within that window via booking."
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -67,10 +77,11 @@ class AssetAdmin(admin.ModelAdmin):
     )
 
     def get_form(self, request, obj=None, **kwargs):
-        is_engine = obj is not None and obj.asset_type == Asset.AssetType.ENGINE
+        is_container = obj is not None and obj.asset_type in Asset.CONTAINER_TYPES
 
-        if not is_engine:
+        if not is_container:
             form = super().get_form(request, obj, **kwargs)
+            form = self._with_license_widgets(form)
             return self._with_default_update_date(form, obj)
 
         from django.forms import modelform_factory
@@ -78,29 +89,40 @@ class AssetAdmin(admin.ModelAdmin):
 
         real_fields = [
             "asset_id", "asset_type", "status", "archived", "make_model", "serial",
-            "qty", "notes", "license_type", "license_functionality", "parent_engine",
+            "qty", "notes", "license_type", "functionalities",
+            "license_duration_start", "license_duration_end", "parent_engine",
             "last_updated_by", "last_updated_date", "last_updated_notes",
         ]
         base_form = modelform_factory(
             Asset, form=forms.ModelForm, fields=real_fields,
-            widgets={"last_updated_date": AdminDateWidget},
+            widgets={
+                "last_updated_date": AdminDateWidget,
+                "license_duration_start": AdminDateWidget,
+                "license_duration_end": AdminDateWidget,
+                "license_type": forms.RadioSelect,
+                "functionalities": forms.CheckboxSelectMultiple,
+            },
         )
-        engine = obj
+        container = obj
 
-        class EngineAssetForm(base_form):
+        class ContainerAssetForm(base_form):
             components = ComponentPickerField()
 
             def __init__(self_inner, *a, **kw):
                 super().__init__(*a, **kw)
+                excluded_types = (
+                    [Asset.AssetType.ENGINE] if obj.asset_type == Asset.AssetType.ENGINE
+                    else list(Asset.CONTAINER_TYPES)
+                )
                 self_inner.fields["components"].queryset = Asset.objects.filter(
                     archived=False,
                 ).exclude(
-                    asset_type=Asset.AssetType.ENGINE,
+                    asset_type__in=excluded_types,
                 ).filter(
-                    models.Q(parent_engine__isnull=True) | models.Q(parent_engine=engine)
+                    models.Q(parent_engine__isnull=True) | models.Q(parent_engine=container)
                 ).order_by("asset_type", "asset_id")
-                if engine:
-                    self_inner.fields["components"].initial = engine.nested_assets.values_list("pk", flat=True)
+                if container:
+                    self_inner.fields["components"].initial = container.nested_assets.values_list("pk", flat=True)
 
             def save(self_inner, commit=True):
                 instance = super().save(commit=commit)
@@ -114,12 +136,22 @@ class AssetAdmin(admin.ModelAdmin):
                     asset.save(update_fields=["parent_engine"])
                 return instance
 
-        return self._with_default_update_date(EngineAssetForm, obj)
+        return self._with_default_update_date(ContainerAssetForm, obj)
+
+    @staticmethod
+    def _with_license_widgets(form_class):
+        if "license_type" in form_class.base_fields:
+            form_class.base_fields["license_type"].widget = forms.RadioSelect(
+                choices=form_class.base_fields["license_type"].choices
+            )
+        if "functionalities" in form_class.base_fields:
+            form_class.base_fields["functionalities"].widget = forms.CheckboxSelectMultiple()
+        return form_class
 
     def get_fieldsets(self, request, obj=None):
         fieldsets = super().get_fieldsets(request, obj)
-        is_engine = obj is not None and obj.asset_type == Asset.AssetType.ENGINE
-        if not is_engine:
+        is_container = obj is not None and obj.asset_type in Asset.CONTAINER_TYPES
+        if not is_container:
             return fieldsets
         components_section = (
             "Components",
@@ -184,22 +216,51 @@ class StaffMemberAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
+class KitAssetTagInline(admin.TabularInline):
+    model = KitAssetTag
+    extra = 1
+    autocomplete_fields = ("asset",)
+    fields = ("asset", "tag")
+
+
 @admin.register(Kit)
 class KitAdmin(admin.ModelAdmin):
     list_display = ("name", "member_count", "nested_count")
     search_fields = ("name",)
-    filter_horizontal = ("assets",)
+    inlines = [KitAssetTagInline]
 
     def member_count(self, obj):
         return obj.assets.count()
     member_count.short_description = "Members"
 
     def nested_count(self, obj):
-        engine_ids = obj.assets.filter(
-            asset_type=Asset.AssetType.ENGINE
+        container_ids = obj.assets.filter(
+            asset_type__in=Asset.CONTAINER_TYPES
         ).values_list("id", flat=True)
-        return Asset.objects.filter(parent_engine_id__in=engine_ids).count()
+        return Asset.objects.filter(parent_engine_id__in=container_ids).count()
     nested_count.short_description = "Nested"
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ("name", "color_swatch")
+    search_fields = ("name",)
+
+    def color_swatch(self, obj):
+        if not obj.color:
+            return "-"
+        return format_html(
+            '<span style="display:inline-block; width:16px; height:16px; '
+            'border-radius:3px; background:{}; vertical-align:middle;"></span> {}',
+            obj.color, obj.color,
+        )
+    color_swatch.short_description = "Color"
+
+
+@admin.register(LicenseFunctionality)
+class LicenseFunctionalityAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    search_fields = ("name",)
 
 
 class CustomColorField(forms.MultiWidget):

@@ -126,10 +126,25 @@ def _meta_grid(meta=None):
 
 
 def get_kit_checklist_rows(kit):
-    """Direct kit members plus, for Engines, their nested components as
-    sub-rows. Each row includes the real Asset id so the edit-before-export
-    UI (and the override lookup below) can key off something stable."""
+    """Direct kit members plus, for Engines and Sonnet Boxes, their nested
+    components as sub-rows (including components nested inside a Sonnet Box
+    that is itself nested inside an Engine). Each row includes the real
+    Asset id so the edit-before-export UI (and the override lookup below)
+    can key off something stable."""
     rows = []
+
+    def add_nested(container, depth=1):
+        for comp in container.nested_assets.all().order_by("asset_id"):
+            rows.append({
+                "id": comp.id,
+                "item": comp.asset_id,
+                "details": comp.make_model,
+                "qty": comp.qty,
+                "nested": True,
+            })
+            if comp.asset_type == "SONNET":
+                add_nested(comp, depth=depth + 1)
+
     for asset in kit.assets.all().order_by("asset_type", "asset_id"):
         rows.append({
             "id": asset.id,
@@ -138,15 +153,8 @@ def get_kit_checklist_rows(kit):
             "qty": asset.qty,
             "nested": False,
         })
-        if asset.asset_type == "ENGINE":
-            for comp in asset.nested_assets.all().order_by("asset_id"):
-                rows.append({
-                    "id": comp.id,
-                    "item": comp.asset_id,
-                    "details": comp.make_model,
-                    "qty": comp.qty,
-                    "nested": True,
-                })
+        if asset.asset_type in ("ENGINE", "SONNET"):
+            add_nested(asset)
     return rows
 
 

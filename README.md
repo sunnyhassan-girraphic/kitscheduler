@@ -27,12 +27,18 @@ the standard amber accent. See `Job.resolve_color()` in `models.py`.
 ## How the data model works
 
 ```
-Asset (Engine, hardware type lives in make_model, e.g. G2/G3/NUC12DCM)  <─┐
-                  ├─ parent_engine (nested components only)
-Asset (Component)                                                        ┘
+Asset (Engine)  <───────────────────────────┐
+     └─ parent_engine (Sonnet Boxes,        │
+        or components directly)             │
+Asset (Sonnet Box)  <─────────┐              │
+     └─ parent_engine          ├─ nests into ┘
+        (components only)      ┘
+Asset (Component)
 
-Kit ──< many-to-many >── Asset (direct members: engines and/or any loose asset,
-                                 including Licenses)
+Kit ──< KitAssetTag (through) >── Asset (direct members: Engines, Sonnet Boxes,
+                                  and/or any loose asset, including Licenses;
+                                  each membership can carry an optional Tag,
+                                  e.g. "MAIN")
 
 Job ──< KitBooking >── Kit            (date range; locks the kit + everything in it)
 Job ──< AssetBooking >── Asset        (date range; books one asset directly,
@@ -40,31 +46,51 @@ Job ──< AssetBooking >── Asset        (date range; books one asset direc
 Job ──< StaffBooking >── StaffMember  (date range; independent of kits/assets)
 ```
 
-- **Asset** is one table for seven types: Engine, Component, Standalone,
-  Peripheral, Cable, I/O Device, License.
-  - Only **Component** assets nest inside something, and only inside an
-    **Engine** (`parent_engine`). A GPU inside `UK-ENG-30` is a Component
-    with `parent_engine = UK-ENG-30`.
-  - Every asset type, including Engine, uses the same `make_model` field
-    for "what kind/model this is" (e.g. an Engine's `make_model` holds
-    G1/G2/G2 Bantam/G3/NUC11BT/NUC12DCM). There's no separate
-    Engine-only type field &mdash; the Engines page filters and the CSV
-    export both work off `make_model` directly.
-  - **License** assets use their real name as the `asset_id` (e.g. `T9`,
-    not a generated code), plus `license_type` (e.g. Permanent) and
-    `license_functionality` (e.g. "SDI OUT") fields. A License is a normal
-    Asset otherwise &mdash; it can go in a Kit, or be booked directly on a
-    Job on its own via `AssetBooking`, and it's unique like any other
-    asset (can't be double-booked).
+- **Asset** is one table for eight types: Engine, Sonnet Box, Component,
+  Standalone, Peripheral, Cable, I/O Device, License.
+  - **Component** assets nest inside a container (`parent_engine`), which
+    can be either an **Engine** or a **Sonnet Box**. A GPU inside `UK-ENG-30`
+    is a Component with `parent_engine = UK-ENG-30`.
+  - **Sonnet Box** assets are themselves containers (they hold Components,
+    same as an Engine) and can *also* be nested inside an Engine
+    (`parent_engine` pointing at the Engine) so a fully-built Engine can
+    show two levels of nesting: Engine → Sonnet Box → Component. An Engine
+    cannot nest inside anything, and a Sonnet Box cannot nest inside
+    another Sonnet Box.
+  - Every asset type, including Engine and Sonnet Box, uses the same
+    `make_model` field for "what kind/model this is" (e.g. an Engine's
+    `make_model` holds G1/G2/G2 Bantam/G3/NUC11BT/NUC12DCM). There's no
+    separate Engine-only type field &mdash; the Engines/Sonnet Boxes pages
+    filter and the CSV export both work off `make_model` directly.
+  - **License** assets use their real name as the `asset_id` (e.g. `UK 6`,
+    not a generated code). `license_type` is a fixed tick-one choice
+    (Permanent / Network / Dongle / Software), and `functionalities` is a
+    tick-many `ManyToManyField` to `LicenseFunctionality` (a bank managed
+    from Settings, seeded with things like SDI In/Out, NDI, Streaming,
+    Unreal Render Blade, Viz). `license_duration_start`/`_end` is the
+    overall active/expiry window shown on the Timeline; within that window
+    the license can still be booked (via `AssetBooking`) against different
+    jobs for shorter stretches. The old free-text `license_type`/
+    `license_functionality` CharFields are kept on the model for backward
+    compatibility but are no longer written to &mdash; a data migration
+    (`0006_seed_tags_and_functionalities`) moved existing values across on
+    upgrade. A License is a normal Asset otherwise &mdash; it can go in a
+    Kit, or be booked directly on a Job on its own via `AssetBooking`, and
+    it's unique like any other asset (can't be double-booked).
   - Every asset has a `status` (Available / In use / Needs repair /
     Maintenance / Missing) and an `archived` flag, which is a soft-delete:
     archived assets are hidden from pickers and availability but keep
     their booking history.
 - **Kit** is a named, reusable bundle (e.g. "NFL away kit"). Its direct
-  members can be Engines and/or any other loose asset (a spare cable, a
-  License, a standalone monitor). You do **not** need to add an engine's
-  components to the kit separately &mdash; `Kit.all_asset_ids()`
-  automatically includes anything nested inside a member engine.
+  members can be Engines, Sonnet Boxes, and/or any other loose asset (a
+  spare cable, a License, a standalone monitor), via the `KitAssetTag`
+  through model. You do **not** need to add an engine's components (or a
+  nested Sonnet Box's components) to the kit separately &mdash;
+  `Kit.all_asset_ids()` automatically includes anything nested up to two
+  levels deep. Each `KitAssetTag` row can carry an optional `Tag`
+  (e.g. "MAIN", "BACKUP") so people know what a given asset is for within
+  that specific kit &mdash; the tag bank is managed from Settings and is
+  scoped per kit-membership, not per asset globally.
 - **Job** is an event with a date range and one of five categories: Prep,
   Rig, TX, Warehouse, Tech development. Categories are just labels &mdash;
   any job can have zero, one, or many kit bookings, asset bookings, and
@@ -77,7 +103,8 @@ Job ──< StaffBooking >── StaffMember  (date range; independent of kits/a
   overlapping windows for different jobs is blocked.
 - **AssetBooking** links a single Asset directly to a Job for a date
   range, without going through a Kit &mdash; the main use case is booking
-  a License on its own. Same idea as KitBooking, one level down.
+  a License on its own, optionally for one of its ticked functionalities
+  (see the Timeline). Same idea as KitBooking, one level down.
 - **StaffBooking** links a StaffMember to a Job for a date range,
   completely independent of KitBooking/AssetBooking on the same job.
   Unlike kit/asset bookings, overlapping staff bookings are **allowed**
@@ -90,6 +117,9 @@ Job ──< StaffBooking >── StaffMember  (date range; independent of kits/a
   overlapping staff bookings are **allowed** (schedules are often
   provisional) but the calendar flags the overlap with an amber dot so it's
   visible without blocking anyone.
+- **Tag** and **LicenseFunctionality** are small banks (name + optional
+  color for Tag) editable from the Settings page, so the team doesn't have
+  to free-type kit tags or license functionalities each time.
 
 ## Local setup
 

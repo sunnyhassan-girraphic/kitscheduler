@@ -102,6 +102,22 @@
     display: flex; align-items: center; gap: 8px;
     padding: 12px 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap;
   }
+  .sub-tabs {
+    display: flex; align-items: center; gap: 2px;
+    padding: 0 24px; border-bottom: 1px solid var(--border); overflow-x: auto;
+  }
+  .sub-tabs a {
+    padding: 9px 12px; font-size: 12px; text-decoration: none;
+    color: var(--text-dim); border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  .sub-tabs a:hover { color: var(--text); }
+  .sub-tabs a.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .unsaved-banner {
+    display: none; align-items: center; gap: 8px; padding: 8px 24px;
+    background: var(--accent-glow); border-bottom: 1px solid var(--accent-deep);
+    color: var(--accent); font-size: 12px; font-weight: 600;
+  }
+  .unsaved-banner.show { display: flex; }
   .section-label {
     padding: 10px 24px 6px; font-size: 11px; font-weight: 700;
     color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em;
@@ -213,6 +229,7 @@
   <a href="/timeline/" class="{% if active_nav == 'timeline' %}active{% endif %}">Timeline</a>
   <a href="/assets/" class="{% if active_nav == 'assets' %}active{% endif %}">Inventory</a>
   <a href="/engines/" class="{% if active_nav == 'engines' %}active{% endif %}">Engines</a>
+  <a href="/sonnet-boxes/" class="{% if active_nav == 'sonnet_boxes' %}active{% endif %}">Sonnet Boxes</a>
   <a href="/kits/" class="{% if active_nav == 'kits' %}active{% endif %}">Kits</a>
   <a href="/licenses/" class="{% if active_nav == 'licenses' %}active{% endif %}">Licenses</a>
   <a href="/tickets/" class="{% if active_nav == 'tickets' %}active{% endif %}">Tickets</a>

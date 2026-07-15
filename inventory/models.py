@@ -21,9 +21,25 @@ class StaffMember(models.Model):
         return self.name
 
 
+class LicenseFunctionality(models.Model):
+    """Bank of tickable License functionalities (e.g. SDI Out, Unreal Render
+    Blade, Viz), editable from Settings instead of typed freehand."""
+    name = models.CharField(max_length=80, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "License functionality"
+        verbose_name_plural = "License functionalities"
+
+    def __str__(self):
+        return self.name
+
+
 class Asset(models.Model):
     class AssetType(models.TextChoices):
         ENGINE = "ENGINE", "Engine"
+        SONNET = "SONNET", "Sonnet Box"
         COMPONENT = "COMPONENT", "Component"
         STANDALONE = "STANDALONE", "Standalone"
         PERIPHERAL = "PERIPHERAL", "Peripheral"
@@ -31,12 +47,21 @@ class Asset(models.Model):
         IO_DEVICE = "IO_DEVICE", "I/O Device"
         LICENSE = "LICENSE", "License"
 
+    # Types that other assets can be physically nested inside of.
+    CONTAINER_TYPES = (AssetType.ENGINE, AssetType.SONNET)
+
     class Status(models.TextChoices):
         AVAILABLE = "AVAILABLE", "Available"
         IN_USE = "IN_USE", "In use"
         NEEDS_REPAIR = "NEEDS_REPAIR", "Needs repair"
         MAINTENANCE = "MAINTENANCE", "Maintenance"
         MISSING = "MISSING", "Missing"
+
+    class LicenseType(models.TextChoices):
+        PERMANENT = "PERMANENT", "Permanent"
+        NETWORK = "NETWORK", "Network"
+        DONGLE = "DONGLE", "Dongle"
+        SOFTWARE = "SOFTWARE", "Software"
 
     asset_id = models.CharField(max_length=64, unique=True)
     asset_type = models.CharField(max_length=20, choices=AssetType.choices)
@@ -49,16 +74,38 @@ class Asset(models.Model):
         help_text="Archived assets are hidden from availability and pickers, but kept for booking history. Use this instead of deleting.",
     )
     notes = models.TextField(blank=True)
-    license_type = models.CharField(max_length=60, blank=True)
-    license_functionality = models.CharField(max_length=200, blank=True)
+    license_type = models.CharField(
+        max_length=20, choices=LicenseType.choices, blank=True,
+        help_text="License only. Tick one: Permanent, Network, Dongle, or Software.",
+    )
+    license_functionality = models.CharField(
+        max_length=200, blank=True,
+        help_text="Deprecated free-text field, kept for old data. Use 'functionalities' instead.",
+    )
+    functionalities = models.ManyToManyField(
+        "LicenseFunctionality",
+        blank=True,
+        related_name="licenses",
+        help_text="License only. Tick every functionality this license unlocks (e.g. SDI Out, Unreal Render Blade, Viz).",
+    )
+    license_duration_start = models.DateField(
+        null=True, blank=True,
+        help_text="License only. Start of the overall period this license is usable/active for.",
+    )
+    license_duration_end = models.DateField(
+        null=True, blank=True,
+        help_text="License only. End of the overall period this license is usable/active for "
+                   "(the 'Duration' / expiry shown on the timeline). Within this window it can "
+                   "still be assigned to different jobs for shorter stretches.",
+    )
     parent_engine = models.ForeignKey(
         "self",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="nested_assets",
-        limit_choices_to={"asset_type": AssetType.ENGINE},
-        help_text="The Engine this item is physically installed in, if any.",
+        limit_choices_to={"asset_type__in": CONTAINER_TYPES},
+        help_text="The Engine or Sonnet Box this item is physically installed in, if any.",
     )
     last_updated_by = models.ForeignKey(
         "StaffMember",
@@ -84,15 +131,42 @@ class Asset(models.Model):
     def clean(self):
         if self.parent_engine_id:
             if self.asset_type == self.AssetType.ENGINE:
-                raise ValidationError("An Engine cannot be nested inside another Engine.")
+                raise ValidationError("An Engine cannot be nested inside another Engine or Sonnet Box.")
+            if self.asset_type == self.AssetType.SONNET and self.parent_engine.asset_type != self.AssetType.ENGINE:
+                raise ValidationError("A Sonnet Box can only be nested inside an Engine, not another Sonnet Box.")
             if self.parent_engine_id == self.pk:
                 raise ValidationError("An asset cannot be its own parent.")
-        if (self.license_type or self.license_functionality) and self.asset_type != self.AssetType.LICENSE:
+        if (self.license_type or self.license_functionality or self.license_duration_start or self.license_duration_end) \
+                and self.asset_type != self.AssetType.LICENSE:
             raise ValidationError("License fields can only be set on License assets.")
+        if self.license_duration_start and self.license_duration_end and self.license_duration_start > self.license_duration_end:
+            raise ValidationError({"license_duration_end": "Duration end cannot be before duration start."})
 
     @property
     def is_nested(self):
         return self.parent_engine_id is not None
+
+    @property
+    def is_container(self):
+        return self.asset_type in self.CONTAINER_TYPES
+
+
+class Tag(models.Model):
+    """Bank of tags that can be attached to an asset within a specific kit,
+    e.g. 'MAIN', 'BACKUP', 'SPARE' - editable from Settings."""
+    name = models.CharField(max_length=40, unique=True)
+    color = models.CharField(max_length=7, blank=True, help_text="Optional hex color, e.g. #EAB308.")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        if self.color and not re.fullmatch(r"#[0-9A-Fa-f]{6}", self.color):
+            raise ValidationError({"color": "Enter a hex color like #EA9B08."})
 
 
 class Kit(models.Model):
@@ -101,11 +175,13 @@ class Kit(models.Model):
     assets = models.ManyToManyField(
         Asset,
         blank=True,
+        through="KitAssetTag",
         related_name="kits",
         help_text=(
             "Direct members of this kit - Engines and/or loose assets "
             "(including Licenses). Components nested inside a member Engine "
-            "travel with it automatically and do not need to be added here separately."
+            "(or a Sonnet Box nested in one) travel with it automatically and "
+            "do not need to be added here separately."
         ),
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -119,9 +195,45 @@ class Kit(models.Model):
 
     def all_asset_ids(self):
         direct_ids = set(self.assets.values_list("id", flat=True))
-        engine_ids = list(self.assets.filter(asset_type=Asset.AssetType.ENGINE).values_list("id", flat=True))
-        nested_ids = set(Asset.objects.filter(parent_engine_id__in=engine_ids).values_list("id", flat=True))
-        return direct_ids | nested_ids
+        container_ids = set(
+            Asset.objects.filter(
+                id__in=direct_ids, asset_type__in=Asset.CONTAINER_TYPES
+            ).values_list("id", flat=True)
+        )
+        # Sonnet Boxes nested inside a member Engine also act as containers.
+        nested_sonnets = set(
+            Asset.objects.filter(
+                parent_engine_id__in=container_ids, asset_type=Asset.AssetType.SONNET
+            ).values_list("id", flat=True)
+        )
+        all_container_ids = container_ids | nested_sonnets
+        nested_ids = set(
+            Asset.objects.filter(parent_engine_id__in=all_container_ids).values_list("id", flat=True)
+        )
+        return direct_ids | nested_sonnets | nested_ids
+
+
+class KitAssetTag(models.Model):
+    """Through model for Kit<->Asset membership, so a specific asset can be
+    tagged (e.g. 'MAIN engine') within the context of one particular kit."""
+    kit = models.ForeignKey(Kit, on_delete=models.CASCADE, related_name="kit_asset_tags")
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name="kit_asset_tags")
+    tag = models.ForeignKey(
+        Tag, null=True, blank=True, on_delete=models.SET_NULL, related_name="kit_asset_tags",
+        help_text="Optional label for what this asset is used for in this kit, e.g. MAIN.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["kit", "asset__asset_id"]
+        constraints = [
+            models.UniqueConstraint(fields=["kit", "asset"], name="unique_asset_per_kit"),
+        ]
+
+    def __str__(self):
+        if self.tag_id:
+            return f"{self.asset.asset_id} in {self.kit.name} ({self.tag.name})"
+        return f"{self.asset.asset_id} in {self.kit.name}"
 
 
 class Job(models.Model):

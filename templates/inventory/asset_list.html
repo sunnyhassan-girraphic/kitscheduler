@@ -51,15 +51,23 @@
     {% for asset in assets %}
     <tr class="{% if asset.is_nested %}nested{% endif %}">
       <td style="white-space:nowrap;">
-        <a href="/admin/inventory/asset/{{ asset.id }}/change/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
+        {% if asset.asset_type == "ENGINE" %}
+          <a href="/engines/{{ asset.id }}/edit/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
+        {% elif asset.asset_type == "SONNET" %}
+          <a href="/sonnet-boxes/{{ asset.id }}/edit/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
+        {% elif asset.asset_type == "LICENSE" %}
+          <a href="/licenses/{{ asset.id }}/edit/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
+        {% else %}
+          <a href="/admin/inventory/asset/{{ asset.id }}/change/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
+        {% endif %}
         {% if asset.is_nested %}<span style="color:var(--text-faint);"> (in {{ asset.parent_engine.asset_id }})</span>{% endif %}
         {% if asset.archived %}<span class="badge badge-archived" style="margin-left:6px;">Archived</span>{% endif %}
       </td>
       <td><span class="badge badge-type">{{ asset.get_asset_type_display }}</span></td>
       <td style="color:var(--text-dim);">
         {{ asset.make_model|default:"-" }}
-        {% if asset.asset_type == "LICENSE" and asset.license_functionality %}
-          <div style="font-size:11px; color:var(--text-faint);">{{ asset.license_functionality }}</div>
+        {% if asset.asset_type == "LICENSE" and asset.functionalities.all %}
+          <div style="font-size:11px; color:var(--text-faint);">{% for f in asset.functionalities.all %}{{ f.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
         {% endif %}
       </td>
       <td style="color:var(--text-dim); font-family:monospace; font-size:12px;">{{ asset.serial|default:"-" }}</td>

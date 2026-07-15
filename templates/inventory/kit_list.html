@@ -32,13 +32,26 @@
   .nested-row .nname { font-family: var(--mono); min-width: 120px; color: var(--text-dim); }
   .nested-row .nmodel { flex: 1; }
   .empty-members { padding: 10px 16px; color: var(--text-faint); font-size: 12px; font-style: italic; }
+  .kit-tag {
+    font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.03em; background: var(--accent-glow); color: var(--accent);
+    border: 1px solid var(--accent-deep);
+  }
 {% endblock %}
 {% block content %}
+<div class="sub-tabs">
+  <a href="?tab=all{% if query %}&q={{ query }}{% endif %}" class="{% if tab == 'all' %}active{% endif %}">All kits</a>
+  <a href="?tab=engines{% if query %}&q={{ query }}{% endif %}" class="{% if tab == 'engines' %}active{% endif %}">Has Engine</a>
+  <a href="?tab=licenses{% if query %}&q={{ query }}{% endif %}" class="{% if tab == 'licenses' %}active{% endif %}">Has License</a>
+  <a href="?tab=booked{% if query %}&q={{ query }}{% endif %}" class="{% if tab == 'booked' %}active{% endif %}">Booked today</a>
+  <a href="?tab=empty{% if query %}&q={{ query }}{% endif %}" class="{% if tab == 'empty' %}active{% endif %}">Empty</a>
+</div>
 <div class="filter-bar">
   <form method="get" style="display:flex; gap:8px; align-items:center;">
+    <input type="hidden" name="tab" value="{{ tab }}">
     <input class="filter" type="text" name="q" value="{{ query }}" placeholder="Search kits&hellip;" style="width:220px;">
     <button class="btn" type="submit">Search</button>
-    {% if query %}<a class="btn" href="/kits/">Clear</a>{% endif %}
+    {% if query %}<a class="btn" href="?tab={{ tab }}">Clear</a>{% endif %}
   </form>
 </div>
 {% if rows %}
@@ -60,12 +73,13 @@
       <div class="member-row">
         <span class="mname">{{ member.asset_id }}</span>
         <span class="mmodel">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
-        {% if member.asset_type == "ENGINE" %}
+        {% if member.kit_tag %}<span class="kit-tag">{{ member.kit_tag.name }}</span>{% endif %}
+        {% if member.asset_type == "ENGINE" or member.asset_type == "SONNET" %}
           <span class="mnested">{{ member.nested_assets.count }} component{{ member.nested_assets.count|pluralize }}</span>
         {% endif %}
         <span class="badge badge-{{ member.status|lower }}">{{ member.get_status_display }}</span>
       </div>
-      {% if member.asset_type == "ENGINE" %}
+      {% if member.asset_type == "ENGINE" or member.asset_type == "SONNET" %}
         {% for comp in member.nested_assets.all %}
           <div class="nested-row">
             <span class="nname">{{ comp.asset_id }}</span>
@@ -81,7 +95,7 @@
   {% endfor %}
 {% else %}
 <div class="empty">
-  No kits{% if query %} match your search. <a href="/kits/">Clear search</a> or{% endif %}.
+  No kits{% if query %} match your search. <a href="?tab={{ tab }}">Clear search</a> or{% endif %}.
   <a href="/kits/new/">Create your first kit</a>.
 </div>
 {% endif %}

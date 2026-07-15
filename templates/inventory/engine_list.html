@@ -1,39 +1,49 @@
 {% extends "inventory/base.html" %}
-{% block title %}Engines - Kit scheduler{% endblock %}
-{% block brand_sub %}{{ engines|length }} engine{{ engines|length|pluralize }}{% endblock %}
+{% block title %}{{ kind_label_plural }} - Kit scheduler{% endblock %}
+{% block brand_sub %}{{ engines|length }} {{ kind_label_plural|lower }}{% endblock %}
 {% block header_actions %}
-  <a class="btn btn-primary" href="/engines/new/">+ Add engine</a>
+  <a class="btn btn-primary" href="{{ new_url }}">+ Add {{ kind_label|lower }}</a>
 {% endblock %}
 {% block extra_style %}
-  .engine-card { border: 1px solid var(--border); border-radius: 8px; margin: 12px 24px; overflow: hidden; background: var(--surface); }
-  .engine-head { display:flex; align-items:center; gap:10px; padding:12px 16px; background:var(--surface-2); border-bottom:1px solid var(--border); }
+  .engine-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    padding: 16px 24px;
+  }
+  @media (max-width: 1100px) { .engine-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 700px) { .engine-grid { grid-template-columns: 1fr; } }
+  .engine-card { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); margin: 0; display: flex; flex-direction: column; }
+  .engine-head { display:flex; align-items:center; gap:8px; padding:12px 14px; background:var(--surface-2); border-bottom:1px solid var(--border); flex-wrap: wrap; }
   .engine-head .eid { font-family:var(--mono); font-weight:600; font-size:13px; }
   .engine-head .emodel { font-size:12px; color:var(--text-dim); }
-  .engine-head .meta { margin-left:auto; font-size:12px; color:var(--text-dim); font-family:var(--mono); display:flex; gap:12px; align-items:center; }
-  .edit-btn { font-size:12px; padding:3px 10px; }
-  .comp-row { display:flex; align-items:center; gap:10px; padding:7px 16px; font-size:12px; border-top:1px solid var(--border); }
-  .comp-row .cid { font-family:var(--mono); min-width:130px; color:var(--text); }
-  .comp-row .ctype { color:var(--text-dim); flex:1; }
+  .engine-body { padding: 6px 0; flex: 1; }
+  .engine-foot { padding: 8px 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .edit-btn { font-size:12px; padding:3px 10px; margin-left: auto; }
+  .comp-row { display:flex; align-items:center; gap:8px; padding:6px 14px; font-size:12px; border-top:1px solid var(--border); }
+  .comp-row .cid { font-family:var(--mono); min-width:0; flex-shrink:0; color:var(--text); }
+  .comp-row .ctype { color:var(--text-dim); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .comp-row .cserial { font-family:var(--mono); font-size:11px; color:var(--text-faint); }
   .cmodel { font-size:12px; color:var(--text-dim); }
-  .no-comp { padding:8px 16px; color:var(--text-faint); font-size:12px; font-style:italic; }
+  .no-comp { padding:10px 14px; color:var(--text-faint); font-size:12px; font-style:italic; }
 {% endblock %}
 {% block content %}
+<div class="sub-tabs">
+  <a href="?{% if show_archived %}archived=1&{% endif %}{% if query %}q={{ query }}&{% endif %}" class="{% if not selected_make_model %}active{% endif %}">All {{ kind_label_plural|lower }}</a>
+  {% for m in engine_models %}
+    <a href="?make_model={{ m|urlencode }}{% if show_archived %}&archived=1{% endif %}{% if query %}&q={{ query }}{% endif %}"
+       class="{% if selected_make_model == m %}active{% endif %}">{{ m }}</a>
+  {% endfor %}
+</div>
 <div class="filter-bar">
   <form method="get" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-    {% if engine_models %}
-    <select class="filter" name="make_model" onchange="this.form.submit()">
-      <option value="">All types</option>
-      {% for m in engine_models %}
-        <option value="{{ m }}" {% if selected_make_model == m %}selected{% endif %}>{{ m }}</option>
-      {% endfor %}
-    </select>
-    {% endif %}
+    {% if selected_make_model %}<input type="hidden" name="make_model" value="{{ selected_make_model }}">{% endif %}
+    <input class="filter" type="text" name="q" value="{{ query }}" placeholder="Search by ID, model, or serial&hellip;" style="width:240px;">
+    <button class="btn" type="submit">Search</button>
     <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
       <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %} onchange="this.form.submit()"> Show archived
     </label>
   </form>
 </div>
+<div class="engine-grid">
 {% for engine in engines %}
 <div class="engine-card">
   <div class="engine-head">
@@ -41,31 +51,33 @@
     {% if engine.make_model %}<span class="emodel">{{ engine.make_model }}</span>{% endif %}
     <span class="badge badge-{{ engine.status|lower }}">{{ engine.get_status_display }}</span>
     {% if engine.archived %}<span class="badge badge-archived">Archived</span>{% endif %}
-    <span class="meta">
-      {% if engine.serial %}<span>S/N {{ engine.serial }}</span>{% endif %}
-      <span>{{ engine.nested_assets.count }} component{{ engine.nested_assets.count|pluralize }}</span>
-      {% with k=engine.kits.all %}
-        {% if k %}<span>in {% for kit in k %}{{ kit.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
-      {% endwith %}
-      {% if engine.last_updated_by or engine.last_updated_date %}
-        <span>Last updated{% if engine.last_updated_by %} by {{ engine.last_updated_by.name }}{% endif %}{% if engine.last_updated_date %} on {{ engine.last_updated_date|date:"j M Y" }}{% endif %}</span>
-      {% endif %}
-      <a class="btn edit-btn" href="/engines/{{ engine.id }}/edit/">Edit</a>
-    </span>
+    <a class="btn edit-btn" href="{{ list_url }}{{ engine.id }}/edit/">Edit</a>
   </div>
+  <div class="engine-body">
   {% for comp in engine.nested_assets.all %}
     <div class="comp-row">
       <span class="cid">{{ comp.asset_id }}</span>
-      <span class="ctype">{{ comp.get_asset_type_display }}</span>
-      {% if comp.make_model %}<span class="cmodel">{{ comp.make_model }}</span>{% endif %}
+      <span class="ctype">{{ comp.get_asset_type_display }}{% if comp.make_model %} &middot; {{ comp.make_model }}{% endif %}</span>
       {% if comp.serial %}<span class="cserial">{{ comp.serial }}</span>{% endif %}
       <span class="badge badge-{{ comp.status|lower }}">{{ comp.get_status_display }}</span>
     </div>
   {% empty %}
-    <div class="no-comp">No components configured for this engine yet.</div>
+    <div class="no-comp">No components configured yet.</div>
   {% endfor %}
+  </div>
+  <div class="engine-foot">
+    {% if engine.serial %}<span>S/N {{ engine.serial }}</span>{% endif %}
+    <span>{{ engine.nested_assets.count }} component{{ engine.nested_assets.count|pluralize }}</span>
+    {% with k=engine.kits.all %}
+      {% if k %}<span>in {% for kit in k %}{{ kit.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+    {% endwith %}
+    {% if engine.last_updated_by or engine.last_updated_date %}
+      <span>Updated{% if engine.last_updated_by %} by {{ engine.last_updated_by.name }}{% endif %}{% if engine.last_updated_date %} {{ engine.last_updated_date|date:"j M Y" }}{% endif %}</span>
+    {% endif %}
+  </div>
 </div>
 {% empty %}
-<div class="empty">No engines yet. <a href="/engines/new/">Add your first engine</a>.</div>
+<div class="empty">No {{ kind_label_plural|lower }} yet. <a href="{{ new_url }}">Add your first {{ kind_label|lower }}</a>.</div>
 {% endfor %}
+</div>
 {% endblock %}
