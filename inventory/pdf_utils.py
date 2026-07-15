@@ -142,7 +142,7 @@ def get_kit_checklist_rows(kit):
                 "qty": comp.qty,
                 "nested": True,
             })
-            if comp.asset_type == "SONNET":
+            if comp.asset_type in ("SONNET", "IO_DEVICE"):
                 add_nested(comp, depth=depth + 1)
 
     for asset in kit.assets.all().order_by("asset_type", "asset_id"):
@@ -153,7 +153,7 @@ def get_kit_checklist_rows(kit):
             "qty": asset.qty,
             "nested": False,
         })
-        if asset.asset_type in ("ENGINE", "SONNET"):
+        if asset.asset_type in ("ENGINE", "SONNET", "IO_DEVICE"):
             add_nested(asset)
     return rows
 

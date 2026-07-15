@@ -79,7 +79,7 @@
   </div>
 </div>
 {% empty %}
-<div class="empty">No {{ kind_label_plural|lower }} yet. <a href="{{ new_url }}">Add your first {{ kind_label|lower }}</a>.</div>
+<div class="empty" style="grid-column: 1 / -1;">No {{ kind_label_plural|lower }}{% if query or selected_make_model %} match your filters.{% else %} yet.{% endif %} <a href="{{ new_url }}">Add your first {{ kind_label|lower }}</a>.</div>
 {% endfor %}
 </div>
 {% endblock %}

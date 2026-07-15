@@ -48,7 +48,12 @@ class Asset(models.Model):
         LICENSE = "LICENSE", "License"
 
     # Types that other assets can be physically nested inside of.
-    CONTAINER_TYPES = (AssetType.ENGINE, AssetType.SONNET)
+    # Types that other assets can be physically nested inside of. ENGINE is
+    # the top-level container; SONNET and IO_DEVICE are containers that can
+    # themselves nest inside an Engine (e.g. a Sonnet Box or an I/O device
+    # chassis holding a GPU, which then sits inside the Engine).
+    NESTABLE_CONTAINER_TYPES = (AssetType.SONNET, AssetType.IO_DEVICE)
+    CONTAINER_TYPES = (AssetType.ENGINE,) + NESTABLE_CONTAINER_TYPES
 
     class Status(models.TextChoices):
         AVAILABLE = "AVAILABLE", "Available"
@@ -98,6 +103,10 @@ class Asset(models.Model):
                    "(the 'Duration' / expiry shown on the timeline). Within this window it can "
                    "still be assigned to different jobs for shorter stretches.",
     )
+    viz_ticket = models.CharField(
+        max_length=120, blank=True,
+        help_text="License only. The Viz ticket number/reference that authorized the current Duration.",
+    )
     parent_engine = models.ForeignKey(
         "self",
         null=True,
@@ -131,12 +140,15 @@ class Asset(models.Model):
     def clean(self):
         if self.parent_engine_id:
             if self.asset_type == self.AssetType.ENGINE:
-                raise ValidationError("An Engine cannot be nested inside another Engine or Sonnet Box.")
-            if self.asset_type == self.AssetType.SONNET and self.parent_engine.asset_type != self.AssetType.ENGINE:
-                raise ValidationError("A Sonnet Box can only be nested inside an Engine, not another Sonnet Box.")
+                raise ValidationError("An Engine cannot be nested inside another Engine or container.")
+            if self.asset_type in self.NESTABLE_CONTAINER_TYPES and self.parent_engine.asset_type != self.AssetType.ENGINE:
+                raise ValidationError(
+                    f"A {self.get_asset_type_display()} can only be nested inside an Engine, not another container."
+                )
             if self.parent_engine_id == self.pk:
                 raise ValidationError("An asset cannot be its own parent.")
-        if (self.license_type or self.license_functionality or self.license_duration_start or self.license_duration_end) \
+        if (self.license_type or self.license_functionality or self.license_duration_start
+                or self.license_duration_end or self.viz_ticket) \
                 and self.asset_type != self.AssetType.LICENSE:
             raise ValidationError("License fields can only be set on License assets.")
         if self.license_duration_start and self.license_duration_end and self.license_duration_start > self.license_duration_end:
@@ -200,10 +212,10 @@ class Kit(models.Model):
                 id__in=direct_ids, asset_type__in=Asset.CONTAINER_TYPES
             ).values_list("id", flat=True)
         )
-        # Sonnet Boxes nested inside a member Engine also act as containers.
+        # Sonnet Boxes/I-O devices nested inside a member Engine also act as containers.
         nested_sonnets = set(
             Asset.objects.filter(
-                parent_engine_id__in=container_ids, asset_type=Asset.AssetType.SONNET
+                parent_engine_id__in=container_ids, asset_type__in=Asset.NESTABLE_CONTAINER_TYPES
             ).values_list("id", flat=True)
         )
         all_container_ids = container_ids | nested_sonnets

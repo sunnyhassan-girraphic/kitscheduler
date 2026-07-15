@@ -186,6 +186,10 @@
               <input type="date" id="f-duration-end" name="license_duration_end" value="{{ license_duration_end|default:'' }}">
             </div>
           </div>
+          <div style="margin-top:10px;">
+            <label for="f-viz-ticket" style="font-size:11px;">Viz Ticket <span style="color:var(--text-faint); font-weight:400;">(the ticket Viz gave us to authorize this Duration)</span></label>
+            <input type="text" id="f-viz-ticket" name="viz_ticket" value="{{ viz_ticket|default:'' }}" placeholder="e.g. VIZ-4821">
+          </div>
         </div>
 
         <div class="form-field">

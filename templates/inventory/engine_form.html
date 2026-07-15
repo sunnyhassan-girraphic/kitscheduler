@@ -233,9 +233,9 @@
       <div class="form-section-head">Components</div>
       <div class="form-section-body">
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
-          Search for assets below to nest them in this {{ kind_label|lower }} &mdash; this includes Sonnet
-          Boxes. When you add a Sonnet Box, a second search box appears under it so you can nest
-          its own components (e.g. a GPU) straight into it in one go.
+          Search for assets below to nest them in this {{ kind_label|lower }} &mdash; this includes
+          Sonnet Boxes and I/O Devices. When you add one of those, a second search box appears
+          under it so you can nest its own components (e.g. a GPU) straight into it in one go.
           To add a component that doesn't exist as an asset yet, create it first in Inventory, then come back here.
         </p>
         <div class="selected-count">
@@ -387,11 +387,11 @@
     }).join("");
 
     wrapEl.innerHTML = `
-      <div class="sonnet-nest-label">Inside this Sonnet Box</div>
+      <div class="sonnet-nest-label">Inside this container</div>
       <div class="sonnet-children-list">${childRows}</div>
       ${!children.size ? '<div class="picker-empty">Nothing nested yet. Search below to add a GPU, etc.</div>' : ""}
       <div class="picker-search-wrap">
-        <input type="text" class="sonnet-child-search" data-sonnet="${sonnetId}" placeholder="Search to nest into this Sonnet Box..." autocomplete="off">
+        <input type="text" class="sonnet-child-search" data-sonnet="${sonnetId}" placeholder="Search to nest into this container..." autocomplete="off">
       </div>
       <div class="picker-results sonnet-child-results" data-sonnet="${sonnetId}"></div>
     `;
@@ -446,12 +446,12 @@
           <button type="button" class="picker-remove-btn" title="Remove" data-id="${id}">&times;</button>
           <input type="hidden" name="components" value="${id}">
         </div>`;
-      if (a.isSonnet) {
+      if (a.isContainer) {
         inner += `<div class="sonnet-nest" data-sonnet="${id}"></div>`;
       }
       item.innerHTML = inner;
       selectedContainer.appendChild(item);
-      if (a.isSonnet) {
+      if (a.isContainer) {
         renderSonnetNest(id, item.querySelector(".sonnet-nest"));
       }
     });

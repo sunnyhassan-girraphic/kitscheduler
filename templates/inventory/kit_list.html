@@ -85,19 +85,19 @@
         <span class="mname">{{ member.asset_id }}</span>
         <span class="mmodel">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
         {% if member.kit_tag %}<span class="kit-tag">{{ member.kit_tag.name }}</span>{% endif %}
-        {% if member.asset_type == "ENGINE" or member.asset_type == "SONNET" %}
+        {% if member.asset_type == "ENGINE" or member.asset_type == "SONNET" or member.asset_type == "IO_DEVICE" %}
           <span class="mnested">{{ member.nested_assets.count }} component{{ member.nested_assets.count|pluralize }}</span>
         {% endif %}
         <span class="badge badge-{{ member.status|lower }}">{{ member.get_status_display }}</span>
       </div>
-      {% if member.asset_type == "ENGINE" or member.asset_type == "SONNET" %}
+      {% if member.asset_type == "ENGINE" or member.asset_type == "SONNET" or member.asset_type == "IO_DEVICE" %}
         {% for comp in member.nested_assets.all %}
           <div class="nested-row">
             <span class="nname">{{ comp.asset_id }}</span>
             <span class="nmodel">{{ comp.get_asset_type_display }}{% if comp.make_model %} &middot; {{ comp.make_model }}{% endif %}</span>
             <span class="badge badge-{{ comp.status|lower }}">{{ comp.get_status_display }}</span>
           </div>
-          {% if comp.asset_type == "SONNET" %}
+          {% if comp.asset_type == "SONNET" or comp.asset_type == "IO_DEVICE" %}
             {% for subcomp in comp.nested_assets.all %}
               <div class="nested-row subnested-row">
                 <span class="nname">{{ subcomp.asset_id }}</span>

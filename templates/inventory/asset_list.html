@@ -6,28 +6,33 @@
   <a class="btn btn-primary" href="/admin/inventory/asset/add/">+ Add asset</a>
 {% endblock %}
 {% block extra_style %}
-  .filter-bar form { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 {% endblock %}
 {% block content %}
 <div class="filter-bar">
-  <form method="get">
-    <input class="filter" type="text" name="q" value="{{ query }}" placeholder="Search ID, model, serial..." style="width:200px;">
-    <select class="filter" name="type">
+  <div class="filter-bar-left">
+    <select class="filter" onchange="const u=new URL(location.href); if(this.value){u.searchParams.set('type', this.value)}else{u.searchParams.delete('type')}; location.href=u;">
       <option value="">All types</option>
       {% for value, label in asset_types %}
         <option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>{{ label }} ({{ type_counts|get_item:value|default:0 }})</option>
       {% endfor %}
     </select>
-    <select class="filter" name="status">
+    <select class="filter" onchange="const u=new URL(location.href); if(this.value){u.searchParams.set('status', this.value)}else{u.searchParams.delete('status')}; location.href=u;">
       <option value="">All statuses</option>
       {% for value, label in statuses %}
         <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
-    <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim);">
-      <input type="checkbox" name="archived" value="1" {% if show_archived %}checked{% endif %}> Show archived
+    <label class="archived-toggle">
+      <input type="checkbox" onchange="const u=new URL(location.href); if(this.checked){u.searchParams.set('archived','1')}else{u.searchParams.delete('archived')}; location.href=u;" {% if show_archived %}checked{% endif %}>
+      Show archived
     </label>
-    <button class="btn" type="submit">Filter</button>
+  </div>
+  <form method="get" class="filter-bar-right">
+    {% if selected_type %}<input type="hidden" name="type" value="{{ selected_type }}">{% endif %}
+    {% if selected_status %}<input type="hidden" name="status" value="{{ selected_status }}">{% endif %}
+    {% if show_archived %}<input type="hidden" name="archived" value="1">{% endif %}
+    <input class="filter" type="text" name="q" value="{{ query }}" placeholder="Search ID, model, serial..." style="width:220px;">
+    <button class="btn" type="submit">Search</button>
     {% if query or selected_type or selected_status or show_archived %}
       <a class="btn" href="/assets/">Clear</a>
     {% endif %}
@@ -53,8 +58,12 @@
       <td style="white-space:nowrap;">
         {% if asset.asset_type == "ENGINE" %}
           <a href="/engines/{{ asset.id }}/edit/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
-        {% elif asset.asset_type == "SONNET" %}
-          <a href="/sonnet-boxes/{{ asset.id }}/edit/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
+        {% elif asset.asset_type == "SONNET" or asset.asset_type == "IO_DEVICE" %}
+          {% if asset.parent_engine_id and asset.parent_engine.asset_type == "ENGINE" %}
+            <a href="/engines/{{ asset.parent_engine_id }}/edit/" style="color:var(--text); text-decoration:none;" title="Edit its contents on the parent Engine">{{ asset.asset_id }}</a>
+          {% else %}
+            <a href="/admin/inventory/asset/{{ asset.id }}/change/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
+          {% endif %}
         {% elif asset.asset_type == "LICENSE" %}
           <a href="/licenses/{{ asset.id }}/edit/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
         {% else %}

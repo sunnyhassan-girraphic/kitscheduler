@@ -56,13 +56,14 @@ class AssetAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "license_type", "functionalities",
-                    "license_duration_start", "license_duration_end",
+                    "license_duration_start", "license_duration_end", "viz_ticket",
                 ),
                 "description": (
                     "License only. Type is a single tick, Functionality supports "
                     "multiple ticks. Duration is the overall active/expiry window - "
                     "it can still be assigned to individual jobs for shorter stretches "
-                    "within that window via booking."
+                    "within that window via booking. Viz Ticket is the reference Viz "
+                    "gave us to authorize the current Duration."
                 ),
                 "classes": ("collapse",),
             },
@@ -91,7 +92,7 @@ class AssetAdmin(admin.ModelAdmin):
         real_fields = [
             "asset_id", "asset_type", "status", "archived", "make_model", "serial",
             "qty", "notes", "license_type", "functionalities",
-            "license_duration_start", "license_duration_end", "parent_engine",
+            "license_duration_start", "license_duration_end", "viz_ticket", "parent_engine",
             "last_updated_by", "last_updated_date", "last_updated_notes",
         ]
         base_form = modelform_factory(

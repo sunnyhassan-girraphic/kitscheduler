@@ -230,8 +230,8 @@ def timeline_view(request):
         range_mode = "week"
 
     show_kits = request.GET.get("kits", "1") != "0"
-    show_staff = request.GET.get("staff", "1") != "0"
-    show_licenses = request.GET.get("licenses", "0") != "0"
+    show_staff = request.GET.get("staff", "0") != "0"
+    show_licenses = request.GET.get("licenses", "1") != "0"
 
     anchor = _parse_anchor(request, range_mode=range_mode)
     if range_mode == "month":
@@ -373,7 +373,7 @@ def asset_list_view(request):
 
     context = {
         "assets": assets,
-        "asset_types": Asset.AssetType.choices,
+        "asset_types": [c for c in Asset.AssetType.choices if c[0] != Asset.AssetType.SONNET],
         "statuses": Asset.Status.choices,
         "type_counts": type_counts,
         "total_active": total_active,
@@ -416,7 +416,7 @@ def kit_list_view(request):
             m.kit_tag = tags_by_asset_id.get(m.id)
         nested_count = sum(
             m.nested_assets.count()
-            + sum(c.nested_assets.count() for c in m.nested_assets.all() if c.asset_type == Asset.AssetType.SONNET)
+            + sum(c.nested_assets.count() for c in m.nested_assets.all() if c.asset_type in Asset.NESTABLE_CONTAINER_TYPES)
             for m in members if m.asset_type in Asset.CONTAINER_TYPES
         )
         current_booking = next(
@@ -457,11 +457,12 @@ def _kit_eligible_assets_qs(current_kit=None):
             id__in=other_kit_asset_ids, asset_type__in=Asset.CONTAINER_TYPES
         ).values_list("id", flat=True)
     )
-    # Sonnet Boxes nested inside one of those Engines are containers too -
-    # their own nested components must be excluded from the picker as well.
+    # Sonnet Boxes/I-O devices nested inside one of those Engines are
+    # containers too - their own nested components must be excluded from
+    # the picker as well.
     other_kit_container_ids |= set(
         Asset.objects.filter(
-            parent_engine_id__in=other_kit_container_ids, asset_type=Asset.AssetType.SONNET
+            parent_engine_id__in=other_kit_container_ids, asset_type__in=Asset.NESTABLE_CONTAINER_TYPES
         ).values_list("id", flat=True)
     )
     current_kit_asset_ids = set(current_kit.assets.values_list("id", flat=True)) if current_kit else set()
@@ -471,7 +472,7 @@ def _kit_eligible_assets_qs(current_kit=None):
     ).exclude(
         asset_type=Asset.AssetType.COMPONENT
     ).exclude(
-        Q(asset_type=Asset.AssetType.SONNET) & Q(parent_engine__isnull=False)
+        Q(asset_type__in=Asset.NESTABLE_CONTAINER_TYPES) & Q(parent_engine__isnull=False)
     ).filter(
         Q(id__in=current_kit_asset_ids)
         | (~Q(id__in=other_kit_asset_ids) & ~Q(parent_engine_id__in=other_kit_container_ids))
@@ -700,20 +701,21 @@ def _container_form_context(kind, container=None):
             "type": a.get_asset_type_display(),
             "status": a.status.lower(),
             "statusDisplay": a.get_status_display(),
-            "isSonnet": a.asset_type == Asset.AssetType.SONNET,
+            "isContainer": a.asset_type in Asset.NESTABLE_CONTAINER_TYPES,
         }
         for a in components
     ]
 
-    # Sonnet Boxes are themselves containers: a GPU (etc.) gets nested INTO
-    # a Sonnet, and the Sonnet then nests into the Engine. Build a second,
-    # separate pool of "nestable into a Sonnet" assets (plain components
-    # only - never another Engine/Sonnet) covering anything unassigned or
-    # already sitting inside one of the Sonnet Boxes available above, so
-    # picking a Sonnet Box reveals what's already inside it.
+    # Sonnet Boxes and I/O Devices are themselves containers: a GPU (etc.)
+    # gets nested INTO one, and it then nests into the Engine. Build a
+    # second, separate pool of "nestable into a sub-container" assets
+    # (plain components only - never another Engine/Sonnet/I-O device)
+    # covering anything unassigned or already sitting inside one of the
+    # sub-containers available above, so picking one reveals what's
+    # already inside it.
     nestable_json = []
     if kind == Asset.AssetType.ENGINE:
-        sonnet_pool_ids = [a.id for a in components if a.asset_type == Asset.AssetType.SONNET]
+        sonnet_pool_ids = [a.id for a in components if a.asset_type in Asset.NESTABLE_CONTAINER_TYPES]
         nestable_qs = Asset.objects.filter(
             archived=False
         ).exclude(
@@ -767,9 +769,9 @@ def _apply_component_selection(container, selected_ids, kind=None):
 
 
 def _apply_sonnet_children(selected_top_level_ids, raw_pairs):
-    """raw_pairs is a list of 'sonnetId:childId' strings from the form. For
-    every Sonnet Box among the top-level selection, nest/un-nest its
-    children to match what was submitted for it."""
+    """raw_pairs is a list of 'containerId:childId' strings from the form.
+    For every Sonnet Box / I-O Device among the top-level selection, nest/
+    un-nest its children to match what was submitted for it."""
     by_sonnet = {}
     for pair in raw_pairs:
         if ":" not in pair:
@@ -779,7 +781,7 @@ def _apply_sonnet_children(selected_top_level_ids, raw_pairs):
             by_sonnet.setdefault(int(sid), set()).add(int(cid))
 
     sonnets = Asset.objects.filter(
-        id__in=selected_top_level_ids, asset_type=Asset.AssetType.SONNET
+        id__in=selected_top_level_ids, asset_type__in=Asset.NESTABLE_CONTAINER_TYPES
     )
     for sonnet in sonnets:
         wanted_ids = by_sonnet.get(sonnet.id, set())
@@ -1101,6 +1103,7 @@ def license_create_view(request):
         func_ids = [int(i) for i in request.POST.getlist("functionalities") if i.isdigit()]
         duration_start = request.POST.get("license_duration_start", "").strip()
         duration_end = request.POST.get("license_duration_end", "").strip()
+        viz_ticket = request.POST.get("viz_ticket", "").strip()
         last_updated_by_id = request.POST.get("last_updated_by", "").strip()
         last_updated_date = request.POST.get("last_updated_date", "").strip()
         last_updated_notes = request.POST.get("last_updated_notes", "").strip()
@@ -1110,6 +1113,7 @@ def license_create_view(request):
             "asset_id": asset_id, "status": status, "archived": archived, "notes": notes,
             "license_type": license_type, "selected_func_ids": func_ids,
             "license_duration_start": duration_start, "license_duration_end": duration_end,
+            "viz_ticket": viz_ticket,
             "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date,
             "last_updated_notes": last_updated_notes,
         })
@@ -1162,6 +1166,7 @@ def license_create_view(request):
             status=status, archived=archived, notes=notes,
             license_type=license_type,
             license_duration_start=start_val, license_duration_end=end_val,
+            viz_ticket=viz_ticket,
             last_updated_by=last_updated_by, last_updated_date=parsed_date,
             last_updated_notes=last_updated_notes,
         )
@@ -1190,6 +1195,7 @@ def license_edit_view(request, license_id):
         func_ids = [int(i) for i in request.POST.getlist("functionalities") if i.isdigit()]
         duration_start = request.POST.get("license_duration_start", "").strip()
         duration_end = request.POST.get("license_duration_end", "").strip()
+        viz_ticket = request.POST.get("viz_ticket", "").strip()
         last_updated_by_id = request.POST.get("last_updated_by", "").strip()
         last_updated_date = request.POST.get("last_updated_date", "").strip()
         last_updated_notes = request.POST.get("last_updated_notes", "").strip()
@@ -1200,6 +1206,7 @@ def license_edit_view(request, license_id):
             "asset_id": asset_id, "status": status, "archived": archived, "notes": notes,
             "license_type": license_type, "selected_func_ids": func_ids,
             "license_duration_start": duration_start, "license_duration_end": duration_end,
+            "viz_ticket": viz_ticket,
             "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date,
             "last_updated_notes": last_updated_notes,
         })
@@ -1254,6 +1261,7 @@ def license_edit_view(request, license_id):
         lic.license_type = license_type
         lic.license_duration_start = start_val
         lic.license_duration_end = end_val
+        lic.viz_ticket = viz_ticket
         lic.last_updated_by = last_updated_by
         lic.last_updated_date = parsed_date
         lic.last_updated_notes = last_updated_notes
@@ -1273,6 +1281,7 @@ def license_edit_view(request, license_id):
         "selected_func_ids": list(lic.functionalities.values_list("id", flat=True)),
         "license_duration_start": lic.license_duration_start.isoformat() if lic.license_duration_start else "",
         "license_duration_end": lic.license_duration_end.isoformat() if lic.license_duration_end else "",
+        "viz_ticket": lic.viz_ticket,
         "last_updated_by_id": str(lic.last_updated_by_id) if lic.last_updated_by_id else "",
         "last_updated_date": lic.last_updated_date.isoformat() if lic.last_updated_date else "",
         "last_updated_notes": lic.last_updated_notes,
@@ -1519,6 +1528,15 @@ def create_booking(request):
             custom_color=new_job_color, start_date=start, end_date=end,
         )
 
+    same_job_existing = KitBooking.objects.filter(
+        kit=kit, job=job, start_date__lte=end, end_date__gte=start
+    ).first()
+    if same_job_existing:
+        same_job_existing.start_date = start
+        same_job_existing.end_date = end
+        same_job_existing.save(update_fields=["start_date", "end_date"])
+        return JsonResponse({"ok": True, "booking_id": same_job_existing.id, "job_id": job.id})
+
     conflict = KitBooking.objects.filter(kit=kit, start_date__lte=end, end_date__gte=start).exclude(job=job)
     if conflict.exists():
         return JsonResponse({"error": f"{kit.name} is already booked on {conflict.first().job.name} in that window."}, status=409)
@@ -1574,6 +1592,12 @@ def create_staff_booking(request):
             custom_color=new_job_color, start_date=start, end_date=end,
         )
 
+    existing = StaffBooking.objects.filter(
+        staff_member=staff_member, job=job, start_date=start, end_date=end
+    ).first()
+    if existing:
+        return JsonResponse({"ok": True, "booking_id": existing.id, "job_id": job.id})
+
     booking = StaffBooking.objects.create(staff_member=staff_member, job=job, start_date=start, end_date=end)
     return JsonResponse({"ok": True, "booking_id": booking.id, "job_id": job.id})
 
@@ -1625,6 +1649,21 @@ def create_license_booking(request):
             name=new_job_name, category=category, notes=new_job_notes,
             custom_color=new_job_color, start_date=start, end_date=end,
         )
+
+    # If this license already has a booking on THIS job that overlaps the
+    # requested window, treat this as an update (e.g. re-ticking
+    # functionalities, or nudging the dates) rather than creating a second
+    # row - a second row for the same job/asset/window would violate the
+    # unique_asset_booking_per_job_window constraint.
+    same_job_existing = AssetBooking.objects.filter(
+        asset=asset, job=job, start_date__lte=end, end_date__gte=start
+    ).first()
+    if same_job_existing:
+        same_job_existing.start_date = start
+        same_job_existing.end_date = end
+        same_job_existing.functionalities = functionalities
+        same_job_existing.save(update_fields=["start_date", "end_date", "functionalities"])
+        return JsonResponse({"ok": True, "booking_id": same_job_existing.id, "job_id": job.id})
 
     conflict = AssetBooking.objects.filter(asset=asset, start_date__lte=end, end_date__gte=start).exclude(job=job)
     if conflict.exists():

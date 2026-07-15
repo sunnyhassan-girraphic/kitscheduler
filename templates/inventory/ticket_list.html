@@ -13,11 +13,12 @@
 {% block content %}
 <div class="filter-bar">
   <div class="filter-bar-left">
-    <a href="?{% if search_query %}q={{ search_query }}{% endif %}" class="btn {% if not selected_status %}btn-active{% endif %}">All statuses</a>
-    {% for value, label in statuses %}
-      <a href="?status={{ value }}{% if search_query %}&q={{ search_query }}{% endif %}"
-         class="btn {% if selected_status == value %}btn-active{% endif %}">{{ label }}</a>
-    {% endfor %}
+    <select class="filter" onchange="const u=new URL(location.href); if(this.value){u.searchParams.set('status', this.value)}else{u.searchParams.delete('status')}; location.href=u;">
+      <option value="">All Tickets</option>
+      {% for value, label in statuses %}
+        <option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
   </div>
   <form method="get" class="filter-bar-right">
     {% if selected_status %}<input type="hidden" name="status" value="{{ selected_status }}">{% endif %}

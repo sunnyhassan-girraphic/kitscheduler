@@ -79,6 +79,7 @@
         {% if lic.license_duration_start or lic.license_duration_end %}
           {{ lic.license_duration_start|date:"j M Y"|default:"?" }} &ndash; {{ lic.license_duration_end|date:"j M Y"|default:"?" }}
         {% else %}-{% endif %}
+        {% if lic.viz_ticket %}<div style="font-size:11px; color:var(--text-faint); font-family:var(--mono);">Viz: {{ lic.viz_ticket }}</div>{% endif %}
       </td>
       <td style="color:var(--text-dim); font-size:12px;">
         {% for kit in lic.kits.all %}{{ kit.name }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}

@@ -81,9 +81,7 @@
   }
   .gc.weekend { background: #1a1408; }
   .gc.preview { background: var(--accent-glow); }
-  .gc.in-license-duration { background: rgba(52, 199, 89, 0.10); }
-  .gc.in-license-duration.weekend { background: rgba(52, 199, 89, 0.16); }
-  .gc.in-license-duration.today { background: rgba(52, 199, 89, 0.22); }
+  .gc.in-license-duration { background: rgba(52, 199, 89, 0.14); }
 
   /* Row cells wrapper: position:relative so .block-layer can overlay it absolutely */
   .grow-cells {
@@ -177,8 +175,8 @@
     <span style="width:1px; height:16px; background:var(--border); margin:0 4px;"></span>
     <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em;">Show</span>
     <a class="btn {% if show_kits %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'0,1' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Kits</a>
-    <a class="btn {% if show_staff %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'0,1' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Staff</a>
     <a class="btn {% if show_licenses %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'0,1' }}&start={{ anchor|date:'Y-m-d' }}">Licenses</a>
+    <a class="btn {% if show_staff %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'0,1' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Staff</a>
   </span>
 </div>
 
@@ -291,11 +289,6 @@
     <div class="gname">
       <a class="item-name" href="/licenses/{{ row.item.id }}/edit/">{{ row.item.asset_id }}</a>
       {% if row.item.serial %}<div class="item-meta">{{ row.item.serial }}</div>{% endif %}
-      {% if row.item.license_duration_start or row.item.license_duration_end %}
-        <div class="item-meta" title="Overall active/expiry window for this license">
-          Licensed {{ row.item.license_duration_start|date:"j M"|default:"?" }}&ndash;{{ row.item.license_duration_end|date:"j M Y"|default:"?" }}
-        </div>
-      {% endif %}
     </div>
     <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
       {% for cell in row.cells %}
