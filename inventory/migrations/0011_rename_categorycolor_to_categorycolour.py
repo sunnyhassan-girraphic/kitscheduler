@@ -13,7 +13,7 @@
 # this, confirmed the same row count and same data present under the new
 # table/column names afterward, and confirmed the reverse migration
 # (`migrate inventory 0010`) renames everything back correctly too.
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):

@@ -5,3 +5,4 @@ dj-database-url
 Pillow
 openpyxl
 reportlab
+whitenoise
