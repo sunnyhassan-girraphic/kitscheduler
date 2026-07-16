@@ -238,52 +238,6 @@
 {% endif %}
 {% endif %}{# end show_kits #}
 
-{% if show_staff %}
-<div class="section-label">Staff</div>
-{% if staff_rows %}
-<div class="grid-wrap">
-<div class="cal-grid resizable-grid" data-resize-key="timeline-staff">
-  <div class="gh namecol-header">Person</div>
-  {% for d in days %}
-    <div class="gh {% if d == today %}today{% endif %} {% if d.weekday >= 5 %}weekend{% endif %}">
-      {% if range_mode == "month" %}{{ d|date:"j" }}{% else %}{{ d|date:"D" }}<br>{{ d|date:"j" }}{% endif %}
-    </div>
-  {% endfor %}
-
-  {% for row in staff_rows %}
-    <div class="gname">
-      <span class="item-name">{{ row.item.name }}</span>
-    </div>
-    <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
-      {% for cell in row.cells %}
-        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %}"
-             data-kind="staff"
-             data-item-id="{{ row.item.id }}"
-             data-item-name="{{ row.item.name }}"
-             data-date="{{ cell.date|date:'Y-m-d' }}">
-        </div>
-      {% endfor %}
-      <div class="block-layer">
-        {% for span in row.spans %}
-          <div class="gblock {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
-               style="grid-column: {{ span.grid_col_start }} / {{ span.grid_col_end }};
-                      grid-row: {{ span.grid_row }};
-                      background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
-               data-job-id="{{ span.booking.job.id }}"
-               onclick="openJobDetail({{ span.booking.job.id }}, 'staff', {{ span.booking.id }});">
-            {{ span.booking.job.name }}
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endfor %}
-</div>
-</div>
-{% else %}
-<div class="empty">No staff yet. <a href="/admin/inventory/staffmember/add/">Add your first team member</a>.</div>
-{% endif %}
-{% endif %}{# end show_staff #}
-
 {% if show_licenses %}
 <div class="section-label">Licenses <span style="font-weight:400; color:var(--text-faint); text-transform:none; letter-spacing:normal;">&mdash; <span style="display:inline-block; width:10px; height:10px; background:rgba(52,199,89,0.35); border-radius:2px; vertical-align:middle;"></span> shaded days are within the license's active Duration window; drag across days to book a job on it</span></div>
 {% if license_rows %}
@@ -340,6 +294,52 @@
 <div class="empty">No licenses yet. <a href="/licenses/new/">Add a license</a>.</div>
 {% endif %}
 {% endif %}{# end show_licenses #}
+
+{% if show_staff %}
+<div class="section-label">Staff</div>
+{% if staff_rows %}
+<div class="grid-wrap">
+<div class="cal-grid resizable-grid" data-resize-key="timeline-staff">
+  <div class="gh namecol-header">Person</div>
+  {% for d in days %}
+    <div class="gh {% if d == today %}today{% endif %} {% if d.weekday >= 5 %}weekend{% endif %}">
+      {% if range_mode == "month" %}{{ d|date:"j" }}{% else %}{{ d|date:"D" }}<br>{{ d|date:"j" }}{% endif %}
+    </div>
+  {% endfor %}
+
+  {% for row in staff_rows %}
+    <div class="gname">
+      <span class="item-name">{{ row.item.name }}</span>
+    </div>
+    <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
+      {% for cell in row.cells %}
+        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %}"
+             data-kind="staff"
+             data-item-id="{{ row.item.id }}"
+             data-item-name="{{ row.item.name }}"
+             data-date="{{ cell.date|date:'Y-m-d' }}">
+        </div>
+      {% endfor %}
+      <div class="block-layer">
+        {% for span in row.spans %}
+          <div class="gblock {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
+               style="grid-column: {{ span.grid_col_start }} / {{ span.grid_col_end }};
+                      grid-row: {{ span.grid_row }};
+                      background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
+               data-job-id="{{ span.booking.job.id }}"
+               onclick="openJobDetail({{ span.booking.job.id }}, 'staff', {{ span.booking.id }});">
+            {{ span.booking.job.name }}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+</div>
+{% else %}
+<div class="empty">No staff yet. <a href="/admin/inventory/staffmember/add/">Add your first team member</a>.</div>
+{% endif %}
+{% endif %}{# end show_staff #}
 
 <!-- Job Detail Dialog -->
 <dialog id="jobDetailDialog">
