@@ -48,19 +48,19 @@
     <form method="post">
       {% csrf_token %}
       <div class="settings-card">
-        <div class="settings-card-head">Category colors</div>
+        <div class="settings-card-head">Category colours</div>
         {% for value, label in categories %}
         <div class="settings-row">
           <label>{{ label }}</label>
-          <input class="color-input" type="color" name="color_{{ value }}" value="{{ colors|get_item:value|default:'#EAB308' }}"
+          <input class="color-input" type="color" name="colour_{{ value }}" value="{{ colours|get_item:value|default:'#EAB308' }}"
                  oninput="document.getElementById('hex_{{ value }}').value=this.value">
-          <input class="color-hex" type="text" id="hex_{{ value }}" value="{{ colors|get_item:value|default:'#EAB308' }}"
-                 oninput="document.querySelector('[name=color_{{ value }}]').value=this.value" maxlength="7">
+          <input class="color-hex" type="text" id="hex_{{ value }}" value="{{ colours|get_item:value|default:'#EAB308' }}"
+                 oninput="document.querySelector('[name=colour_{{ value }}]').value=this.value" maxlength="7">
         </div>
         {% endfor %}
       </div>
       <div style="text-align:right;">
-        <button class="btn btn-primary" type="submit">Save colors</button>
+        <button class="btn btn-primary" type="submit">Save colours</button>
       </div>
     </form>
   </div>

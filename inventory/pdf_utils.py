@@ -10,7 +10,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import (
-    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak,
+    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer,
 )
 
 GOLD = colors.HexColor("#F1C232")
