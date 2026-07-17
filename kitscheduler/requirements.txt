@@ -1,7 +1,0 @@
-Django>=5.2,<6.0
-django-environ
-psycopg2-binary
-dj-database-url
-Pillow
-openpyxl
-reportlab

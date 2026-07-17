@@ -21,7 +21,6 @@ class LicenseFunctionality(models.Model):
 class Asset(models.Model):
     class AssetType(models.TextChoices):
         ENGINE = "ENGINE", "Engine"
-        SONNET = "SONNET", "Sonnet Box"
         COMPONENT = "COMPONENT", "Component"
         STANDALONE = "STANDALONE", "Standalone"
         PERIPHERAL = "PERIPHERAL", "Peripheral"
@@ -30,10 +29,10 @@ class Asset(models.Model):
         LICENSE = "LICENSE", "License"
 
     # Types that other assets can be physically nested inside of. ENGINE is
-    # the top-level container; SONNET and IO_DEVICE are containers that can
-    # themselves nest inside an Engine (e.g. a Sonnet Box or an I/O device
-    # chassis holding a GPU, which then sits inside the Engine).
-    NESTABLE_CONTAINER_TYPES = (AssetType.SONNET, AssetType.IO_DEVICE)
+    # the top-level container; IO_DEVICE is a container that can itself nest
+    # inside an Engine (e.g. an I/O device chassis holding a GPU, which then
+    # sits inside the Engine).
+    NESTABLE_CONTAINER_TYPES = (AssetType.IO_DEVICE,)
     CONTAINER_TYPES = (AssetType.ENGINE,) + NESTABLE_CONTAINER_TYPES
 
     class Status(models.TextChoices):
@@ -95,7 +94,7 @@ class Asset(models.Model):
         on_delete=models.SET_NULL,
         related_name="nested_assets",
         limit_choices_to={"asset_type__in": CONTAINER_TYPES},
-        help_text="The Engine or Sonnet Box this item is physically installed in, if any.",
+        help_text="The Engine or I/O Device this item is physically installed in, if any.",
     )
     last_updated_by = models.ForeignKey(
         "StaffMember",

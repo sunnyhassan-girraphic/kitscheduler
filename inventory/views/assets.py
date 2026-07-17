@@ -64,7 +64,7 @@ def asset_list_view(request):
 
     context = {
         "assets": assets,
-        "asset_types": [c for c in Asset.AssetType.choices if c[0] != Asset.AssetType.SONNET],
+        "asset_types": Asset.AssetType.choices,
         "statuses": Asset.Status.choices,
         "type_counts": type_counts,
         "total_active": total_active,
@@ -78,10 +78,10 @@ def asset_list_view(request):
 
 
 def _container_form_context(kind, container=None):
-    """Shared context builder for the Engine / Sonnet Box create/edit form."""
-    # An Engine can contain anything except another Engine (including Sonnet
-    # Boxes). A Sonnet Box can't contain another container (Engine or
-    # Sonnet Box) - only components/standalone gear.
+    """Shared context builder for the Engine / I/O Device create/edit form."""
+    # An Engine can contain anything except another Engine (including I/O
+    # Devices). An I/O Device can't contain another container (Engine or
+    # I/O Device) - only components/standalone gear.
     excluded_types = [Asset.AssetType.ENGINE] if kind == Asset.AssetType.ENGINE else list(Asset.CONTAINER_TYPES)
 
     components_qs = Asset.objects.filter(
@@ -106,22 +106,21 @@ def _container_form_context(kind, container=None):
         for a in components
     ]
 
-    # Sonnet Boxes and I/O Devices are themselves containers: a GPU (etc.)
-    # gets nested INTO one, and it then nests into the Engine. Build a
-    # second, separate pool of "nestable into a sub-container" assets
-    # (plain components only - never another Engine/Sonnet/I-O device)
-    # covering anything unassigned or already sitting inside one of the
-    # sub-containers available above, so picking one reveals what's
-    # already inside it.
+    # I/O Devices are themselves containers: a GPU (etc.) gets nested INTO
+    # one, and it then nests into the Engine. Build a second, separate pool
+    # of "nestable into a sub-container" assets (plain components only -
+    # never another Engine/I-O device) covering anything unassigned or
+    # already sitting inside one of the sub-containers available above, so
+    # picking one reveals what's already inside it.
     nestable_json = []
     if kind == Asset.AssetType.ENGINE:
-        sonnet_pool_ids = [a.id for a in components if a.asset_type in Asset.NESTABLE_CONTAINER_TYPES]
+        container_pool_ids = [a.id for a in components if a.asset_type in Asset.NESTABLE_CONTAINER_TYPES]
         nestable_qs = Asset.objects.filter(
             archived=False
         ).exclude(
             asset_type__in=Asset.CONTAINER_TYPES
         ).filter(
-            Q(parent_engine__isnull=True) | Q(parent_engine_id__in=sonnet_pool_ids)
+            Q(parent_engine__isnull=True) | Q(parent_engine_id__in=container_pool_ids)
         ).order_by("asset_type", "asset_id")
         nestable_json = [
             {
@@ -131,7 +130,7 @@ def _container_form_context(kind, container=None):
                 "type": a.get_asset_type_display(),
                 "status": a.status.lower(),
                 "statusDisplay": a.get_status_display(),
-                "parentSonnetId": a.parent_engine_id if a.parent_engine_id in sonnet_pool_ids else None,
+                "parentContainerId": a.parent_engine_id if a.parent_engine_id in container_pool_ids else None,
             }
             for a in nestable_qs
         ]
@@ -153,7 +152,7 @@ def _container_form_context(kind, container=None):
 
 
 def _apply_component_selection(container, selected_ids, kind=None):
-    """Nest/un-nest components against an Engine or Sonnet Box, mirroring the admin form's save()."""
+    """Nest/un-nest components against an Engine or I/O Device, mirroring the admin form's save()."""
     kind = kind or container.asset_type
     excluded_types = [Asset.AssetType.ENGINE] if kind == Asset.AssetType.ENGINE else list(Asset.CONTAINER_TYPES)
     valid_components = Asset.objects.filter(
@@ -169,31 +168,31 @@ def _apply_component_selection(container, selected_ids, kind=None):
         asset.save(update_fields=["parent_engine"])
 
 
-def _apply_sonnet_children(selected_top_level_ids, raw_pairs):
+def _apply_container_children(selected_top_level_ids, raw_pairs):
     """raw_pairs is a list of 'containerId:childId' strings from the form.
-    For every Sonnet Box / I-O Device among the top-level selection, nest/
-    un-nest its children to match what was submitted for it."""
-    by_sonnet = {}
+    For every I/O Device among the top-level selection, nest/un-nest its
+    children to match what was submitted for it."""
+    by_container = {}
     for pair in raw_pairs:
         if ":" not in pair:
             continue
-        sid, cid = pair.split(":", 1)
-        if sid.isdigit() and cid.isdigit():
-            by_sonnet.setdefault(int(sid), set()).add(int(cid))
+        cid_str, child_id_str = pair.split(":", 1)
+        if cid_str.isdigit() and child_id_str.isdigit():
+            by_container.setdefault(int(cid_str), set()).add(int(child_id_str))
 
-    sonnets = Asset.objects.filter(
+    containers = Asset.objects.filter(
         id__in=selected_top_level_ids, asset_type__in=Asset.NESTABLE_CONTAINER_TYPES
     )
-    for sonnet in sonnets:
-        wanted_ids = by_sonnet.get(sonnet.id, set())
+    for container in containers:
+        wanted_ids = by_container.get(container.id, set())
         valid_children = set(
             Asset.objects.filter(
                 id__in=wanted_ids, archived=False
             ).exclude(asset_type__in=Asset.CONTAINER_TYPES)
         )
-        currently_nested = set(sonnet.nested_assets.all())
+        currently_nested = set(container.nested_assets.all())
         for asset in valid_children - currently_nested:
-            asset.parent_engine = sonnet
+            asset.parent_engine = container
             asset.save(update_fields=["parent_engine"])
         for asset in currently_nested - valid_children:
             asset.parent_engine = None
@@ -222,7 +221,7 @@ def _container_create_view(request, kind):
             "qty": qty, "status": status, "archived": archived, "notes": notes,
             "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date, "last_updated_notes": last_updated_notes,
             "selected_ids": selected_ids,
-            "sonnet_child_pairs": request.POST.getlist("sonnet_child"),
+            "container_child_pairs": request.POST.getlist("container_child"),
         })
 
         if not asset_id:
@@ -263,14 +262,14 @@ def _container_create_view(request, kind):
         )
         _apply_component_selection(container, selected_ids)
         if kind == Asset.AssetType.ENGINE:
-            _apply_sonnet_children(selected_ids, request.POST.getlist("sonnet_child"))
+            _apply_container_children(selected_ids, request.POST.getlist("container_child"))
 
         return redirect(meta["list_url"])
 
     form_ctx = _container_form_context(kind)
     form_ctx.update({
         "selected_ids": [], "qty": "1", "status": Asset.Status.AVAILABLE,
-        "sonnet_child_pairs": [],
+        "container_child_pairs": [],
         "last_updated_date": datetime.date.today().isoformat(),
     })
     return render(request, "inventory/engine_form.html", form_ctx)
@@ -302,7 +301,7 @@ def _container_edit_view(request, kind, container_id):
             "qty": qty, "status": status, "archived": archived, "notes": notes,
             "last_updated_by_id": last_updated_by_id, "last_updated_date": last_updated_date, "last_updated_notes": last_updated_notes,
             "selected_ids": selected_ids,
-            "sonnet_child_pairs": request.POST.getlist("sonnet_child"),
+            "container_child_pairs": request.POST.getlist("container_child"),
         })
 
         if not asset_id:
@@ -349,7 +348,7 @@ def _container_edit_view(request, kind, container_id):
 
         _apply_component_selection(container, selected_ids)
         if kind == Asset.AssetType.ENGINE:
-            _apply_sonnet_children(selected_ids, request.POST.getlist("sonnet_child"))
+            _apply_container_children(selected_ids, request.POST.getlist("container_child"))
 
         kit_membership = container.kit_asset_tags.first()
         if kit_membership:
@@ -374,7 +373,7 @@ def _container_edit_view(request, kind, container_id):
         "last_updated_date": container.last_updated_date.isoformat() if container.last_updated_date else "",
         "last_updated_notes": container.last_updated_notes,
         "selected_ids": list(container.nested_assets.values_list("id", flat=True)),
-        "sonnet_child_pairs": [],
+        "container_child_pairs": [],
         "tags": list(Tag.objects.all()),
         "kit_membership": container.kit_asset_tags.select_related("kit", "tag").first(),
     })

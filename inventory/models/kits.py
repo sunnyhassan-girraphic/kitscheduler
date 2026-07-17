@@ -14,7 +14,7 @@ class Kit(models.Model):
         help_text=(
             "Direct members of this kit - Engines and/or loose assets "
             "(including Licenses). Components nested inside a member Engine "
-            "(or a Sonnet Box nested in one) travel with it automatically and "
+            "(or an I/O Device nested in one) travel with it automatically and "
             "do not need to be added here separately."
         ),
     )
@@ -34,17 +34,17 @@ class Kit(models.Model):
                 id__in=direct_ids, asset_type__in=Asset.CONTAINER_TYPES
             ).values_list("id", flat=True)
         )
-        # Sonnet Boxes/I-O devices nested inside a member Engine also act as containers.
-        nested_sonnets = set(
+        # I/O Devices nested inside a member Engine also act as containers.
+        nested_containers = set(
             Asset.objects.filter(
                 parent_engine_id__in=container_ids, asset_type__in=Asset.NESTABLE_CONTAINER_TYPES
             ).values_list("id", flat=True)
         )
-        all_container_ids = container_ids | nested_sonnets
+        all_container_ids = container_ids | nested_containers
         nested_ids = set(
             Asset.objects.filter(parent_engine_id__in=all_container_ids).values_list("id", flat=True)
         )
-        return direct_ids | nested_sonnets | nested_ids
+        return direct_ids | nested_containers | nested_ids
 
 
 class KitAssetTag(models.Model):

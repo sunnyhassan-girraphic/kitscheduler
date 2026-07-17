@@ -126,8 +126,8 @@ def _meta_grid(meta=None):
 
 
 def get_kit_checklist_rows(kit):
-    """Direct kit members plus, for Engines and Sonnet Boxes, their nested
-    components as sub-rows (including components nested inside a Sonnet Box
+    """Direct kit members plus, for Engines and I/O Devices, their nested
+    components as sub-rows (including components nested inside an I/O Device
     that is itself nested inside an Engine). Each row includes the real
     Asset id so the edit-before-export UI (and the override lookup below)
     can key off something stable."""
@@ -142,7 +142,7 @@ def get_kit_checklist_rows(kit):
                 "qty": comp.qty,
                 "nested": True,
             })
-            if comp.asset_type in ("SONNET", "IO_DEVICE"):
+            if comp.asset_type == "IO_DEVICE":
                 add_nested(comp, depth=depth + 1)
 
     for asset in kit.assets.all().order_by("asset_type", "asset_id"):
@@ -153,7 +153,7 @@ def get_kit_checklist_rows(kit):
             "qty": asset.qty,
             "nested": False,
         })
-        if asset.asset_type in ("ENGINE", "SONNET", "IO_DEVICE"):
+        if asset.asset_type in ("ENGINE", "IO_DEVICE"):
             add_nested(asset)
     return rows
 

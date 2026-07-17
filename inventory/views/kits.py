@@ -65,9 +65,9 @@ def kit_list_view(request):
 
 def _kit_eligible_assets_qs(current_kit=None):
     """Assets eligible to be direct kit members: not archived, not a COMPONENT,
-    not a Sonnet Box already nested inside an Engine (it travels with that
+    not an I/O Device already nested inside an Engine (it travels with that
     Engine automatically), and not already claimed by a DIFFERENT kit
-    (directly, or nested inside a container - Engine or Sonnet Box - that's
+    (directly, or nested inside a container - Engine or I/O Device - that's
     a member of a different kit) - an asset can only live in one kit at a
     time. Assets already in the current kit are always included so they
     remain visible/removable even in edge cases."""
@@ -81,9 +81,8 @@ def _kit_eligible_assets_qs(current_kit=None):
             id__in=other_kit_asset_ids, asset_type__in=Asset.CONTAINER_TYPES
         ).values_list("id", flat=True)
     )
-    # Sonnet Boxes/I-O devices nested inside one of those Engines are
-    # containers too - their own nested components must be excluded from
-    # the picker as well.
+    # I/O Devices nested inside one of those Engines are containers too -
+    # their own nested components must be excluded from the picker as well.
     other_kit_container_ids |= set(
         Asset.objects.filter(
             parent_engine_id__in=other_kit_container_ids, asset_type__in=Asset.NESTABLE_CONTAINER_TYPES
@@ -104,7 +103,7 @@ def _kit_eligible_assets_qs(current_kit=None):
 
 
 def _kit_picker_assets(current_kit=None):
-    """Assets eligible to be direct kit members, with nested-component info for engines/Sonnet Boxes."""
+    """Assets eligible to be direct kit members, with nested-component info for engines/I-O devices."""
     assets = _kit_eligible_assets_qs(current_kit).order_by(
         "asset_type", "asset_id"
     ).prefetch_related("nested_assets")

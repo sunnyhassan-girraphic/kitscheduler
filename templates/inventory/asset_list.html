@@ -59,12 +59,6 @@
       <td style="white-space:nowrap;">
         {% if asset.asset_type == "ENGINE" %}
           <a href="/engines/{{ asset.id }}/edit/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
-        {% elif asset.asset_type == "SONNET" %}
-          {% if asset.parent_engine_id and asset.parent_engine.asset_type == "ENGINE" %}
-            <a href="/engines/{{ asset.parent_engine_id }}/edit/" style="color:var(--text); text-decoration:none;" title="Edit its contents on the parent Engine">{{ asset.asset_id }}</a>
-          {% else %}
-            <a href="/admin/inventory/asset/{{ asset.id }}/change/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
-          {% endif %}
         {% elif asset.asset_type == "IO_DEVICE" %}
           {% if asset.parent_engine_id and asset.parent_engine.asset_type == "ENGINE" %}
             <a href="/engines/{{ asset.parent_engine_id }}/edit/" style="color:var(--text); text-decoration:none;" title="Edit its contents on the parent Engine">{{ asset.asset_id }}</a>

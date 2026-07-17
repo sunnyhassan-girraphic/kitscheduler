@@ -7,7 +7,7 @@ had to change.
     common.py     -> shared date/range/table-building helpers (no views)
     dashboard.py  -> dashboard_view
     timeline.py   -> timeline/calendar views + booking & job APIs
-    assets.py     -> asset list + engine/sonnet/I-O device CRUD
+    assets.py     -> asset list + engine/I-O device CRUD
     kits.py       -> kit list/create/edit/delete/PDF
     licenses.py   -> license list/create/edit/delete
     settings.py   -> settings page, tags, functionalities, CSV export

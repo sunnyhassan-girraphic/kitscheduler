@@ -109,18 +109,18 @@
   .picker-row .atype { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
   .picker-row .astatus .badge { font-size: 10px; padding: 2px 6px; }
   .picker-item { margin-bottom: 6px; }
-  .sonnet-nest {
+  .container-nest {
     margin: 2px 0 8px 24px; padding: 10px; border-left: 2px solid var(--accent-deep);
     background: var(--surface); border-radius: 0 6px 6px 0;
   }
-  .sonnet-nest-label {
+  .container-nest-label {
     font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint);
     margin-bottom: 6px;
   }
-  .sonnet-nest .picker-row { margin-bottom: 4px; padding: 5px 8px; }
-  .sonnet-nest .picker-empty { padding: 8px; font-size: 11px; }
-  .sonnet-nest .picker-search-wrap input { padding: 6px 8px; font-size: 12px; }
-  .sonnet-nest .picker-results { max-height: 160px; }
+  .container-nest .picker-row { margin-bottom: 4px; padding: 5px 8px; }
+  .container-nest .picker-empty { padding: 8px; font-size: 11px; }
+  .container-nest .picker-search-wrap input { padding: 6px 8px; font-size: 12px; }
+  .container-nest .picker-results { max-height: 160px; }
   .picker-remove-btn {
     background: none; border: none; color: var(--text-faint); cursor: pointer;
     font-size: 16px; line-height: 1; padding: 2px 4px; flex-shrink: 0;
@@ -253,7 +253,7 @@
       <div class="form-section-body">
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
           Search for assets below to nest them in this {{ kind_label|lower }} &mdash; this includes
-          Sonnet Boxes and I/O Devices. When you add one of those, a second search box appears
+          I/O Devices. When you add one of those, a second search box appears
           under it so you can nest its own components (e.g. a GPU) straight into it in one go.
           To add a component that doesn't exist as an asset yet, create it first in Inventory, then come back here.
         </p>
@@ -328,12 +328,12 @@
 
 {{ components_json|json_script:"components-data" }}
 {{ nestable_json|json_script:"nestable-data" }}
-{{ sonnet_child_pairs|json_script:"sonnet-pairs-data" }}
+{{ container_child_pairs|json_script:"container-pairs-data" }}
 <script>
 (function() {
   const ALL = JSON.parse(document.getElementById("components-data").textContent);
   const NESTABLE = JSON.parse(document.getElementById("nestable-data").textContent);
-  const RAW_PAIRS = JSON.parse(document.getElementById("sonnet-pairs-data").textContent);
+  const RAW_PAIRS = JSON.parse(document.getElementById("container-pairs-data").textContent);
   const initialSelectedIds = new Set([{{ selected_ids|join:"," }}]);
   const byId = {};
   ALL.forEach(a => byId[a.id] = a);
@@ -351,21 +351,21 @@
 
   let selected = new Set(initialSelectedIds);
 
-  // sonnetId -> Set of nested child ids
-  const sonnetChildren = {};
+  // containerId -> Set of nested child ids
+  const containerChildren = {};
   if (RAW_PAIRS.length) {
     RAW_PAIRS.forEach(p => {
       const parts = p.split(":");
-      const sid = parseInt(parts[0], 10);
+      const containerId = parseInt(parts[0], 10);
       const cid = parseInt(parts[1], 10);
-      if (!sonnetChildren[sid]) sonnetChildren[sid] = new Set();
-      sonnetChildren[sid].add(cid);
+      if (!containerChildren[containerId]) containerChildren[containerId] = new Set();
+      containerChildren[containerId].add(cid);
     });
   } else {
     NESTABLE.forEach(a => {
-      if (a.parentSonnetId) {
-        if (!sonnetChildren[a.parentSonnetId]) sonnetChildren[a.parentSonnetId] = new Set();
-        sonnetChildren[a.parentSonnetId].add(a.id);
+      if (a.parentContainerId) {
+        if (!containerChildren[a.parentContainerId]) containerChildren[a.parentContainerId] = new Set();
+        containerChildren[a.parentContainerId].add(a.id);
       }
     });
   }
@@ -384,12 +384,12 @@
 
   function allNestedChildIds() {
     const used = new Set();
-    Object.values(sonnetChildren).forEach(set => set.forEach(id => used.add(id)));
+    Object.values(containerChildren).forEach(set => set.forEach(id => used.add(id)));
     return used;
   }
 
-  function renderSonnetNest(sonnetId, wrapEl) {
-    const children = sonnetChildren[sonnetId] || new Set();
+  function renderContainerNest(containerId, wrapEl) {
+    const children = containerChildren[containerId] || new Set();
     const usedElsewhere = allNestedChildIds();
 
     const childRows = Array.from(children).filter(id => nestableById[id]).map(id => {
@@ -400,23 +400,23 @@
           <span class="amodel">${a.makeModel || ""}</span>
           <span class="atype">${a.type}</span>
           ${statusBadge(a)}
-          <button type="button" class="picker-remove-btn sonnet-child-remove" title="Remove" data-sonnet="${sonnetId}" data-id="${id}">&times;</button>
-          <input type="hidden" name="sonnet_child" value="${sonnetId}:${id}">
+          <button type="button" class="picker-remove-btn container-child-remove" title="Remove" data-container="${containerId}" data-id="${id}">&times;</button>
+          <input type="hidden" name="container_child" value="${containerId}:${id}">
         </div>`;
     }).join("");
 
     wrapEl.innerHTML = `
-      <div class="sonnet-nest-label">Inside this container</div>
-      <div class="sonnet-children-list">${childRows}</div>
+      <div class="container-nest-label">Inside this container</div>
+      <div class="container-children-list">${childRows}</div>
       ${!children.size ? '<div class="picker-empty">Nothing nested yet. Search below to add a GPU, etc.</div>' : ""}
       <div class="picker-search-wrap">
-        <input type="text" class="sonnet-child-search" data-sonnet="${sonnetId}" placeholder="Search to nest into this container..." autocomplete="off">
+        <input type="text" class="container-child-search" data-container="${containerId}" placeholder="Search to nest into this container..." autocomplete="off">
       </div>
-      <div class="picker-results sonnet-child-results" data-sonnet="${sonnetId}"></div>
+      <div class="picker-results container-child-results" data-container="${containerId}"></div>
     `;
 
-    const searchEl = wrapEl.querySelector(".sonnet-child-search");
-    const resultsEl = wrapEl.querySelector(".sonnet-child-results");
+    const searchEl = wrapEl.querySelector(".container-child-search");
+    const resultsEl = wrapEl.querySelector(".container-child-results");
 
     function renderChildResults() {
       const q = searchEl.value.toLowerCase().trim();
@@ -426,7 +426,7 @@
         !children.has(a.id) &&
         !usedElsewhere.has(a.id) &&
         !selected.has(a.id) &&
-        (a.parentSonnetId === null || a.parentSonnetId === sonnetId) &&
+        (a.parentContainerId === null || a.parentContainerId === containerId) &&
         (a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q))
       );
       if (!matches.length) {
@@ -441,7 +441,7 @@
           <span class="amodel">${a.makeModel || ""}</span>
           <span class="atype">${a.type}</span>
           ${statusBadge(a)}
-          <button type="button" class="picker-add-btn sonnet-child-add" data-sonnet="${sonnetId}" data-id="${a.id}">Add</button>
+          <button type="button" class="picker-add-btn container-child-add" data-container="${containerId}" data-id="${a.id}">Add</button>
         `;
         resultsEl.appendChild(row);
       });
@@ -466,12 +466,12 @@
           <input type="hidden" name="components" value="${id}">
         </div>`;
       if (a.isContainer) {
-        inner += `<div class="sonnet-nest" data-sonnet="${id}"></div>`;
+        inner += `<div class="container-nest" data-container="${id}"></div>`;
       }
       item.innerHTML = inner;
       selectedContainer.appendChild(item);
       if (a.isContainer) {
-        renderSonnetNest(id, item.querySelector(".sonnet-nest"));
+        renderContainerNest(id, item.querySelector(".container-nest"));
       }
     });
     emptyMsg.style.display = ids.length ? "none" : "block";
@@ -510,29 +510,29 @@
   }
 
   selectedContainer.addEventListener("click", (e) => {
-    const removeBtn = e.target.closest(".picker-remove-btn:not(.sonnet-child-remove)");
+    const removeBtn = e.target.closest(".picker-remove-btn:not(.container-child-remove)");
     if (removeBtn) {
       const id = parseInt(removeBtn.dataset.id, 10);
       selected.delete(id);
-      delete sonnetChildren[id];
+      delete containerChildren[id];
       renderSelected();
       renderResults();
       return;
     }
-    const childRemoveBtn = e.target.closest(".sonnet-child-remove");
+    const childRemoveBtn = e.target.closest(".container-child-remove");
     if (childRemoveBtn) {
-      const sid = parseInt(childRemoveBtn.dataset.sonnet, 10);
+      const containerId = parseInt(childRemoveBtn.dataset.container, 10);
       const cid = parseInt(childRemoveBtn.dataset.id, 10);
-      if (sonnetChildren[sid]) sonnetChildren[sid].delete(cid);
+      if (containerChildren[containerId]) containerChildren[containerId].delete(cid);
       renderSelected();
       return;
     }
-    const childAddBtn = e.target.closest(".sonnet-child-add");
+    const childAddBtn = e.target.closest(".container-child-add");
     if (childAddBtn) {
-      const sid = parseInt(childAddBtn.dataset.sonnet, 10);
+      const containerId = parseInt(childAddBtn.dataset.container, 10);
       const cid = parseInt(childAddBtn.dataset.id, 10);
-      if (!sonnetChildren[sid]) sonnetChildren[sid] = new Set();
-      sonnetChildren[sid].add(cid);
+      if (!containerChildren[containerId]) containerChildren[containerId] = new Set();
+      containerChildren[containerId].add(cid);
       renderSelected();
       return;
     }
