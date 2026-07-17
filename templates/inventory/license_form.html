@@ -159,10 +159,14 @@
 {% endblock %}
 
 {% block content %}
-{% if license %}<div class="form-page-wide"><div class="detail-columns"><div>{% endif %}
+{% if license %}
+<div class="form-page-wide">
+  <a class="back-link" href="/licenses/">&larr; All licenses</a>
+  <div class="detail-columns"><div>
+{% endif %}
 <div class="form-page">
 
-  <a class="back-link" href="/licenses/">&larr; All licenses</a>
+  {% if not license %}<a class="back-link" href="/licenses/">&larr; All licenses</a>{% endif %}
 
   {% if error %}
   <div class="error-msg">{{ error }}</div>

@@ -215,10 +215,14 @@
 {% endblock %}
 
 {% block content %}
-{% if engine %}<div class="form-page-wide"><div class="detail-columns"><div>{% endif %}
+{% if engine %}
+<div class="form-page-wide">
+  <a class="back-link" href="{{ list_url }}">&larr; All {{ kind_label_plural|lower }}</a>
+  <div class="detail-columns"><div>
+{% endif %}
 <div class="form-page">
 
-  <a class="back-link" href="{{ list_url }}">&larr; All {{ kind_label_plural|lower }}</a>
+  {% if not engine %}<a class="back-link" href="{{ list_url }}">&larr; All {{ kind_label_plural|lower }}</a>{% endif %}
 
   {% if error %}
   <div class="error-msg">{{ error }}</div>
