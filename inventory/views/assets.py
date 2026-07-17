@@ -98,6 +98,7 @@ def _container_form_context(kind, container=None):
             "id": a.id,
             "assetId": a.asset_id,
             "makeModel": a.make_model,
+            "serial": a.serial,
             "type": a.get_asset_type_display(),
             "status": a.status.lower(),
             "statusDisplay": a.get_status_display(),
@@ -127,6 +128,7 @@ def _container_form_context(kind, container=None):
                 "id": a.id,
                 "assetId": a.asset_id,
                 "makeModel": a.make_model,
+                "serial": a.serial,
                 "type": a.get_asset_type_display(),
                 "status": a.status.lower(),
                 "statusDisplay": a.get_status_display(),
@@ -267,9 +269,11 @@ def _container_create_view(request, kind):
         return redirect(meta["list_url"])
 
     form_ctx = _container_form_context(kind)
+    current_staff = StaffMember.for_user(request.user)
     form_ctx.update({
         "selected_ids": [], "qty": "1", "status": Asset.Status.AVAILABLE,
         "container_child_pairs": [],
+        "last_updated_by_id": str(current_staff.id) if current_staff else "",
         "last_updated_date": datetime.date.today().isoformat(),
     })
     return render(request, "inventory/engine_form.html", form_ctx)
@@ -360,6 +364,7 @@ def _container_edit_view(request, kind, container_id):
         return redirect(meta["list_url"])
 
     form_ctx = _container_form_context(kind, container=container)
+    current_staff = StaffMember.for_user(request.user)
     form_ctx.update({
         "engine": container,
         "asset_id": container.asset_id,
@@ -369,8 +374,11 @@ def _container_edit_view(request, kind, container_id):
         "status": container.status,
         "archived": container.archived,
         "notes": container.notes,
-        "last_updated_by_id": str(container.last_updated_by_id) if container.last_updated_by_id else "",
-        "last_updated_date": container.last_updated_date.isoformat() if container.last_updated_date else "",
+        # Defaults to whoever's signed in now and today's date - not the
+        # previously-saved value - since opening this form means you're
+        # about to log a new update, not review the last one.
+        "last_updated_by_id": str(current_staff.id) if current_staff else "",
+        "last_updated_date": datetime.date.today().isoformat(),
         "last_updated_notes": container.last_updated_notes,
         "selected_ids": list(container.nested_assets.values_list("id", flat=True)),
         "container_child_pairs": [],

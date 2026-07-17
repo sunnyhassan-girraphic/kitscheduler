@@ -138,8 +138,10 @@ def license_create_view(request):
         return redirect("/licenses/")
 
     form_ctx = _license_form_context()
+    current_staff = StaffMember.for_user(request.user)
     form_ctx.update({
         "status": Asset.Status.AVAILABLE, "selected_func_ids": [],
+        "last_updated_by_id": str(current_staff.id) if current_staff else "",
         "last_updated_date": datetime.date.today().isoformat(),
     })
     return render(request, "inventory/license_form.html", form_ctx)
@@ -234,6 +236,7 @@ def license_edit_view(request, license_id):
         return redirect("/licenses/")
 
     form_ctx = _license_form_context(lic)
+    current_staff = StaffMember.for_user(request.user)
     form_ctx.update({
         "license": lic,
         "asset_id": lic.asset_id,
@@ -245,8 +248,11 @@ def license_edit_view(request, license_id):
         "license_duration_start": lic.license_duration_start.isoformat() if lic.license_duration_start else "",
         "license_duration_end": lic.license_duration_end.isoformat() if lic.license_duration_end else "",
         "viz_ticket": lic.viz_ticket,
-        "last_updated_by_id": str(lic.last_updated_by_id) if lic.last_updated_by_id else "",
-        "last_updated_date": lic.last_updated_date.isoformat() if lic.last_updated_date else "",
+        # Defaults to whoever's signed in now and today's date - not the
+        # previously-saved value - since opening this form means you're
+        # about to log a new update, not review the last one.
+        "last_updated_by_id": str(current_staff.id) if current_staff else "",
+        "last_updated_date": datetime.date.today().isoformat(),
         "last_updated_notes": lic.last_updated_notes,
     })
     return render(request, "inventory/license_form.html", form_ctx)

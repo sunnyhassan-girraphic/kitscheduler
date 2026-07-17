@@ -266,7 +266,7 @@
 
         <div class="picker-filter-row">
           <div class="picker-search-wrap" style="flex:1;">
-            <input type="text" id="component-search" placeholder="Search by ID or model to add a component..." autocomplete="off">
+            <input type="text" id="component-search" placeholder="Search by ID, model, or serial to add a component..." autocomplete="off">
           </div>
           <select id="component-type-filter" class="filter">
             <option value="">All types</option>
@@ -410,7 +410,7 @@
       <div class="container-children-list">${childRows}</div>
       ${!children.size ? '<div class="picker-empty">Nothing nested yet. Search below to add a GPU, etc.</div>' : ""}
       <div class="picker-search-wrap">
-        <input type="text" class="container-child-search" data-container="${containerId}" placeholder="Search to nest into this container..." autocomplete="off">
+        <input type="text" class="container-child-search" data-container="${containerId}" placeholder="Search by ID, model, or serial to nest into this container..." autocomplete="off">
       </div>
       <div class="picker-results container-child-results" data-container="${containerId}"></div>
     `;
@@ -427,7 +427,7 @@
         !usedElsewhere.has(a.id) &&
         !selected.has(a.id) &&
         (a.parentContainerId === null || a.parentContainerId === containerId) &&
-        (a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q))
+        (a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q) || (a.serial || "").toLowerCase().includes(q))
       );
       if (!matches.length) {
         resultsEl.innerHTML = `<div class="picker-hint" style="margin-top:6px;">No matching, unassigned assets found.</div>`;
@@ -489,7 +489,7 @@
       !selected.has(a.id) &&
       !usedAsChildren.has(a.id) &&
       (typeVal === "" || a.type === typeVal) &&
-      (q === "" || a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q))
+      (q === "" || a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q) || (a.serial || "").toLowerCase().includes(q))
     );
     if (!matches.length) {
       resultsContainer.innerHTML = `<div class="picker-hint" style="margin-top:8px;">No matching, unassigned assets found.</div>`;

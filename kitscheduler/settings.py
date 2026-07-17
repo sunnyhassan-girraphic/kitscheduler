@@ -30,6 +30,13 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+# Lets people log in regardless of the case they type their username in
+# (e.g. "Sunny" or "sunny" both work for a user created as "sunny").
+# See inventory/auth_backends.py for details.
+AUTHENTICATION_BACKENDS = [
+    "inventory.auth_backends.CaseInsensitiveModelBackend",
+]
+
 ROOT_URLCONF = "kitscheduler.urls"
 
 TEMPLATES = [
