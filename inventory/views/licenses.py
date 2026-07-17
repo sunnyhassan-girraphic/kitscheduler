@@ -5,7 +5,8 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from ..models import Asset, LicenseFunctionality, StaffMember
+from ..models import Asset, LicenseFunctionality, StaffMember, AssetHistory
+from ..models.assets import ASSET_HISTORY_SHARED_FIELDS, ASSET_HISTORY_LICENSE_FIELDS
 
 
 @login_required
@@ -135,6 +136,10 @@ def license_create_view(request):
         )
         lic.functionalities.set(LicenseFunctionality.objects.filter(id__in=func_ids))
 
+        AssetHistory.objects.create(asset=lic, changed_by=last_updated_by, field_changed="created")
+        AssetHistory.record_note(lic, last_updated_by, "", last_updated_notes)
+        AssetHistory.record_functionality_changes(lic, [], last_updated_by)
+
         return redirect("/licenses/")
 
     form_ctx = _license_form_context()
@@ -150,6 +155,13 @@ def license_create_view(request):
 @login_required
 def license_edit_view(request, license_id):
     lic = get_object_or_404(Asset, pk=license_id, asset_type=Asset.AssetType.LICENSE)
+    history_mode = request.GET.get("history", "month")
+    if history_mode not in ("week", "month", "all"):
+        history_mode = "month"
+    try:
+        history_page = int(request.GET.get("history_page", "1"))
+    except ValueError:
+        history_page = 1
 
     if request.method == "POST":
         asset_id = request.POST.get("asset_id", "").strip()
@@ -219,6 +231,12 @@ def license_edit_view(request, license_id):
             form_ctx["error"] = "Duration end cannot be before duration start."
             return render(request, "inventory/license_form.html", form_ctx)
 
+        before_values = {
+            field: getattr(lic, field) for field in ASSET_HISTORY_SHARED_FIELDS + ASSET_HISTORY_LICENSE_FIELDS
+        }
+        before_note = lic.last_updated_notes
+        before_func_ids = list(lic.functionalities.values_list("id", flat=True))
+
         lic.asset_id = asset_id
         lic.status = status
         lic.archived = archived
@@ -232,6 +250,12 @@ def license_edit_view(request, license_id):
         lic.last_updated_notes = last_updated_notes
         lic.save()
         lic.functionalities.set(LicenseFunctionality.objects.filter(id__in=func_ids))
+
+        AssetHistory.record_scalar_changes(
+            lic, before_values, last_updated_by, ASSET_HISTORY_SHARED_FIELDS + ASSET_HISTORY_LICENSE_FIELDS
+        )
+        AssetHistory.record_note(lic, last_updated_by, before_note, last_updated_notes)
+        AssetHistory.record_functionality_changes(lic, before_func_ids, last_updated_by)
 
         return redirect("/licenses/")
 
@@ -254,6 +278,8 @@ def license_edit_view(request, license_id):
         "last_updated_by_id": str(current_staff.id) if current_staff else "",
         "last_updated_date": datetime.date.today().isoformat(),
         "last_updated_notes": lic.last_updated_notes,
+        "history_mode": history_mode,
+        "history_page": AssetHistory.filtered_for(lic, mode=history_mode, page=history_page),
     })
     return render(request, "inventory/license_form.html", form_ctx)
 

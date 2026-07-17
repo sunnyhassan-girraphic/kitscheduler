@@ -12,6 +12,48 @@
     margin: 0 auto;
     padding: 24px;
   }
+  .form-page-wide { max-width: 1220px; margin: 0 auto; padding: 24px; }
+  .detail-columns {
+    display: grid; grid-template-columns: 1fr minmax(320px, 400px); gap: 16px; align-items: start;
+  }
+  @media (max-width: 960px) { .detail-columns { grid-template-columns: 1fr; } }
+  .detail-columns .form-page { max-width: none; margin: 0; padding: 0; }
+
+  /* History feed - matches ticket_detail.html's styling */
+  .history-feed { max-height: 640px; overflow-y: auto; }
+  .history-item {
+    display: flex; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border);
+  }
+  .history-item:first-child { border-top: none; }
+  .history-dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--accent);
+    flex-shrink: 0; margin-top: 4px;
+  }
+  .history-item.is-created .history-dot { background: var(--green); }
+  .history-item.is-note .history-dot { background: var(--blue); }
+  .history-body { flex: 1; min-width: 0; }
+  .history-change { color: var(--text); font-size: 13px; font-weight: 600; }
+  .history-change .from-to { font-weight: 400; color: var(--text-dim); }
+  .history-change .val { font-weight: 600; }
+  .history-comment {
+    color: var(--text); margin-top: 4px; white-space: pre-wrap; font-size: 13px;
+    background: var(--surface-2); border-radius: 6px; padding: 8px 10px;
+  }
+  .history-meta { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .history-who { font-size: 12px; font-weight: 600; color: var(--accent); }
+  .history-when { font-size: 11px; color: var(--text-faint); }
+  .history-filters { display: flex; gap: 4px; }
+  .history-filter-btn {
+    font-size: 11px; padding: 4px 8px; border-radius: 5px; text-decoration: none;
+    color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border);
+  }
+  .history-filter-btn.active { color: var(--accent); border-color: var(--accent-deep); background: var(--accent-glow); }
+  .history-empty { color: var(--text-faint); font-size: 13px; padding: 16px; }
+  .history-pagination {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-faint);
+  }
+  .history-pagination a { color: var(--accent); text-decoration: none; }
   .back-link {
     display: inline-flex; align-items: center; gap: 6px;
     color: var(--text-dim); text-decoration: none; font-size: 13px;
@@ -117,6 +159,7 @@
 {% endblock %}
 
 {% block content %}
+{% if license %}<div class="form-page-wide"><div class="detail-columns"><div>{% endif %}
 <div class="form-page">
 
   <a class="back-link" href="/licenses/">&larr; All licenses</a>
@@ -252,6 +295,58 @@
   {% endif %}
 
 </div>
+{% if license %}</div>
+<div>
+  <div class="form-section" style="margin-bottom:0;">
+    <div class="form-section-head" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>History</span>
+      <div class="history-filters">
+        <a class="history-filter-btn {% if history_mode == 'week' %}active{% endif %}" href="?history=week">This week</a>
+        <a class="history-filter-btn {% if history_mode == 'month' %}active{% endif %}" href="?history=month">This month</a>
+        <a class="history-filter-btn {% if history_mode == 'all' %}active{% endif %}" href="?history=all">All time</a>
+      </div>
+    </div>
+    <div class="history-feed">
+      {% for entry in history_page %}
+      <div class="history-item {% if entry.field_changed == 'created' %}is-created{% elif entry.field_changed == 'note' %}is-note{% endif %}">
+        <div class="history-dot"></div>
+        <div class="history-body">
+          {% if entry.field_changed == "created" %}
+            <div class="history-change">License created</div>
+          {% elif entry.field_changed == "note" %}
+            <div class="history-change">Note added</div>
+            <div class="history-comment">{{ entry.note }}</div>
+          {% elif entry.field_changed == "functionality_added" %}
+            <div class="history-change">Added functionality <span class="val">{{ entry.new_value }}</span></div>
+          {% elif entry.field_changed == "functionality_removed" %}
+            <div class="history-change">Removed functionality <span class="val">{{ entry.old_value }}</span></div>
+          {% else %}
+            <div class="history-change">{{ entry.field_label }} changed <span class="from-to">from <span class="val">{{ entry.old_value }}</span> to <span class="val">{{ entry.new_value }}</span></span></div>
+          {% endif %}
+          <div class="history-meta">
+            <span class="history-who">{% if entry.changed_by %}{{ entry.changed_by.name }}{% else %}Unknown{% endif %}</span>
+            <span class="history-when">&middot; {{ entry.created_at|date:"j M Y, g:ia" }}</span>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="history-empty">No changes logged {% if history_mode == 'week' %}this week{% elif history_mode == 'month' %}this month{% endif %}.</div>
+      {% endfor %}
+    </div>
+    {% if history_page.has_other_pages %}
+    <div class="history-pagination">
+      {% if history_page.has_previous %}
+        <a href="?history={{ history_mode }}&history_page={{ history_page.previous_page_number }}">&larr; Newer</a>
+      {% else %}<span></span>{% endif %}
+      <span>Page {{ history_page.number }} of {{ history_page.paginator.num_pages }}</span>
+      {% if history_page.has_next %}
+        <a href="?history={{ history_mode }}&history_page={{ history_page.next_page_number }}">Older &rarr;</a>
+      {% else %}<span></span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+</div></div>{% endif %}
 
 <script>
 (function() {

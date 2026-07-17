@@ -6,7 +6,8 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from ..models import Asset, StaffMember, Tag
+from ..models import Asset, StaffMember, Tag, AssetHistory
+from ..models.assets import ASSET_HISTORY_SHARED_FIELDS
 
 CONTAINER_KIND_META = {
     Asset.AssetType.ENGINE: {
@@ -262,9 +263,15 @@ def _container_create_view(request, kind):
             archived=archived, notes=notes,
             last_updated_by=last_updated_by, last_updated_date=parsed_date, last_updated_notes=last_updated_notes,
         )
+        AssetHistory.objects.create(
+            asset=container, changed_by=last_updated_by, field_changed="created",
+        )
+        AssetHistory.record_note(container, last_updated_by, "", last_updated_notes)
         _apply_component_selection(container, selected_ids)
         if kind == Asset.AssetType.ENGINE:
             _apply_container_children(selected_ids, request.POST.getlist("container_child"))
+        actual_nested_ids = list(container.nested_assets.values_list("id", flat=True))
+        AssetHistory.record_component_changes(container, [], actual_nested_ids, last_updated_by)
 
         return redirect(meta["list_url"])
 
@@ -282,6 +289,13 @@ def _container_create_view(request, kind):
 def _container_edit_view(request, kind, container_id):
     meta = CONTAINER_KIND_META[kind]
     container = get_object_or_404(Asset, pk=container_id, asset_type=kind)
+    history_mode = request.GET.get("history", "month")
+    if history_mode not in ("week", "month", "all"):
+        history_mode = "month"
+    try:
+        history_page = int(request.GET.get("history_page", "1"))
+    except ValueError:
+        history_page = 1
 
     if request.method == "POST":
         asset_id = request.POST.get("asset_id", "").strip()
@@ -338,6 +352,10 @@ def _container_edit_view(request, kind, container_id):
             form_ctx["error"] = "Last updated date is invalid."
             return render(request, "inventory/engine_form.html", form_ctx)
 
+        before_values = {field: getattr(container, field) for field in ASSET_HISTORY_SHARED_FIELDS}
+        before_note = container.last_updated_notes
+        before_component_ids = list(container.nested_assets.values_list("id", flat=True))
+
         container.asset_id = asset_id
         container.make_model = make_model
         container.serial = serial
@@ -350,9 +368,15 @@ def _container_edit_view(request, kind, container_id):
         container.last_updated_notes = last_updated_notes
         container.save()
 
+        AssetHistory.record_scalar_changes(container, before_values, last_updated_by, ASSET_HISTORY_SHARED_FIELDS)
+        AssetHistory.record_note(container, last_updated_by, before_note, last_updated_notes)
+
         _apply_component_selection(container, selected_ids)
         if kind == Asset.AssetType.ENGINE:
             _apply_container_children(selected_ids, request.POST.getlist("container_child"))
+
+        after_component_ids = list(container.nested_assets.values_list("id", flat=True))
+        AssetHistory.record_component_changes(container, before_component_ids, after_component_ids, last_updated_by)
 
         kit_membership = container.kit_asset_tags.first()
         if kit_membership:
@@ -384,6 +408,8 @@ def _container_edit_view(request, kind, container_id):
         "container_child_pairs": [],
         "tags": list(Tag.objects.all()),
         "kit_membership": container.kit_asset_tags.select_related("kit", "tag").first(),
+        "history_mode": history_mode,
+        "history_page": AssetHistory.filtered_for(container, mode=history_mode, page=history_page),
     })
     return render(request, "inventory/engine_form.html", form_ctx)
 

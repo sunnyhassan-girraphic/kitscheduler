@@ -143,6 +143,163 @@ class Asset(models.Model):
         return self.asset_type in self.CONTAINER_TYPES
 
 
+# Scalar fields that get an automatic history entry when they change, split
+# by whether they apply to every Asset type or only to Licenses. Fields not
+# listed here (make_model, serial, free-text notes, etc.) were deliberately
+# left out - flagged early as things that would just generate noise, not
+# useful history (agreed with Sunny when designing this).
+ASSET_HISTORY_SHARED_FIELDS = ["status", "archived", "qty", "asset_id"]
+ASSET_HISTORY_LICENSE_FIELDS = [
+    "license_type", "viz_ticket", "license_duration_start", "license_duration_end",
+]
+
+ASSET_HISTORY_FIELD_LABELS = {
+    "status": "Status",
+    "archived": "Archived",
+    "qty": "Quantity",
+    "asset_id": "Asset ID",
+    "license_type": "License type",
+    "viz_ticket": "Viz ticket",
+    "license_duration_start": "Duration start",
+    "license_duration_end": "Duration end",
+}
+
+
+def _history_display_value(field, raw_value):
+    """Renders a raw field value (old OR new - this takes plain values, not
+    an Asset instance, so it works equally for 'before' snapshots) into the
+    same human label the UI would show, e.g. 'AVAILABLE' -> 'Available'."""
+    if field == "status":
+        return dict(Asset.Status.choices).get(raw_value, raw_value or "(none)")
+    if field == "license_type":
+        return dict(Asset.LicenseType.choices).get(raw_value, raw_value) if raw_value else "(none)"
+    if field == "archived":
+        return "Archived" if raw_value else "Active"
+    if raw_value in (None, ""):
+        return "(none)"
+    return str(raw_value)
+
+
+class AssetHistory(models.Model):
+    """Change log for License and Engine/I-O Device pages, shown on the
+    right-hand side of their edit forms - mirrors TicketHistory's shape,
+    with one deliberate difference: changed_by is a StaffMember (matching
+    the existing 'Last updated by' picker, which allows logging an update
+    on someone else's behalf) rather than the Django login, since that's
+    already how this app's 'Last updated by' concept works everywhere else."""
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name="history")
+    changed_by = models.ForeignKey(
+        "StaffMember", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+    )
+    field_changed = models.CharField(
+        max_length=40,
+        help_text="e.g. 'status', 'qty', 'component_added', 'note', 'created'.",
+    )
+    old_value = models.CharField(max_length=200, blank=True)
+    new_value = models.CharField(max_length=200, blank=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name_plural = "Asset history"
+
+    def __str__(self):
+        return f"{self.asset.asset_id} - {self.field_changed}"
+
+    @property
+    def field_label(self):
+        return ASSET_HISTORY_FIELD_LABELS.get(self.field_changed, self.field_changed.replace("_", " ").title())
+
+    @staticmethod
+    def filtered_for(asset, mode="month", page=1, page_size=25):
+        """mode is 'week', 'month', or 'all'. Always paginated regardless of
+        mode - even 'this week' could theoretically be large on a very
+        actively-changed asset, and there's no upside to skipping the safety
+        net just because the window is usually small."""
+        import datetime as _dt
+        from django.core.paginator import Paginator
+
+        qs = asset.history.select_related("changed_by").order_by("-created_at")
+        if mode == "week":
+            qs = qs.filter(created_at__date__gte=_dt.date.today() - _dt.timedelta(days=7))
+        elif mode == "month":
+            qs = qs.filter(created_at__date__gte=_dt.date.today() - _dt.timedelta(days=30))
+        return Paginator(qs, page_size).get_page(page)
+
+    @staticmethod
+    def record_scalar_changes(asset, before_values, changed_by, fields):
+        """before_values is a dict of field -> raw value captured BEFORE the
+        save was applied. Compares each against asset's current (post-save)
+        value and logs one entry per field that actually changed."""
+        for field in fields:
+            old_raw = before_values.get(field)
+            new_raw = getattr(asset, field)
+            if old_raw == new_raw:
+                continue
+            AssetHistory.objects.create(
+                asset=asset, changed_by=changed_by, field_changed=field,
+                old_value=_history_display_value(field, old_raw)[:200],
+                new_value=_history_display_value(field, new_raw)[:200],
+            )
+
+    @staticmethod
+    def record_note(asset, changed_by, before_note, after_note):
+        """Only logs when the note text actually changed - NOT every time
+        it's non-blank, since the edit form pre-fills the previous note for
+        context and would otherwise re-log the same text on every unrelated
+        save (e.g. fixing a typo in make_model would also silently re-log
+        an old 'Replaced fan, retested OK' note every time)."""
+        after_note = (after_note or "").strip()
+        if after_note and after_note != (before_note or ""):
+            AssetHistory.objects.create(
+                asset=asset, changed_by=changed_by, field_changed="note", note=after_note,
+            )
+
+    @staticmethod
+    def record_component_changes(container, before_ids, after_ids, changed_by):
+        """Logs direct components added/removed from this Engine/I-O Device.
+        Deliberately not recursive - a change to what's nested inside a
+        sub-container (e.g. an I/O Device nested in this Engine) gets logged
+        against that sub-container when IT is edited, not duplicated here."""
+        before_ids, after_ids = set(before_ids), set(after_ids)
+        added, removed = after_ids - before_ids, before_ids - after_ids
+        if not (added or removed):
+            return
+        labels = dict(Asset.objects.filter(id__in=added | removed).values_list("id", "asset_id"))
+        for aid in added:
+            AssetHistory.objects.create(
+                asset=container, changed_by=changed_by, field_changed="component_added",
+                new_value=labels.get(aid, str(aid)),
+            )
+        for aid in removed:
+            AssetHistory.objects.create(
+                asset=container, changed_by=changed_by, field_changed="component_removed",
+                old_value=labels.get(aid, str(aid)),
+            )
+
+    @staticmethod
+    def record_functionality_changes(license_asset, before_ids, changed_by):
+        after_ids = set(license_asset.functionalities.values_list("id", flat=True))
+        before_ids = set(before_ids)
+        added, removed = after_ids - before_ids, before_ids - after_ids
+        if not (added or removed):
+            return
+        names = dict(
+            LicenseFunctionality.objects.filter(id__in=added | removed).values_list("id", "name")
+        )
+        for fid in added:
+            AssetHistory.objects.create(
+                asset=license_asset, changed_by=changed_by, field_changed="functionality_added",
+                new_value=names.get(fid, str(fid)),
+            )
+        for fid in removed:
+            AssetHistory.objects.create(
+                asset=license_asset, changed_by=changed_by, field_changed="functionality_removed",
+                old_value=names.get(fid, str(fid)),
+            )
+
+
 class Tag(models.Model):
     """Bank of tags that can be attached to an asset within a specific kit,
     e.g. 'MAIN', 'BACKUP', 'SPARE' - editable from Settings."""

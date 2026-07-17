@@ -6,7 +6,7 @@ re-exported here so existing code (`from inventory.models import Asset`,
 `from . import models` + `models.Asset`, etc.) keeps working unchanged.
 
     staff.py     -> StaffMember
-    assets.py    -> Asset, Tag, LicenseFunctionality
+    assets.py    -> Asset, Tag, LicenseFunctionality, AssetHistory
     kits.py      -> Kit, KitAssetTag
     jobs.py      -> Job, CategoryColour, KitBooking, AssetBooking, StaffBooking
     tickets.py   -> Ticket, TicketHistory
@@ -14,7 +14,7 @@ re-exported here so existing code (`from inventory.models import Asset`,
 """
 
 from .staff import StaffMember
-from .assets import Asset, Tag, LicenseFunctionality
+from .assets import Asset, Tag, LicenseFunctionality, AssetHistory
 from .kits import Kit, KitAssetTag
 from .jobs import Job, CategoryColour, KitBooking, AssetBooking, StaffBooking
 from .tickets import Ticket, TicketHistory
@@ -25,6 +25,7 @@ __all__ = [
     "Asset",
     "Tag",
     "LicenseFunctionality",
+    "AssetHistory",
     "Kit",
     "KitAssetTag",
     "Job",
