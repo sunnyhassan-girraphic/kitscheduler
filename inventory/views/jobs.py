@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
 from ..models import Asset, AssetBooking, Job, Kit, KitBooking, StaffBooking, StaffMember
+from .timeline import _kit_member_rows
 
 
 def _job_edit_context(job):
@@ -17,9 +18,11 @@ def _job_edit_context(job):
     license_bookings = list(
         AssetBooking.objects.filter(job=job).select_related("asset").order_by("start_date")
     )
+    for b in kit_bookings:
+        b.kit_members = _kit_member_rows(b.kit)
 
     all_kits = [
-        {"id": k.id, "name": k.name, "memberCount": k.assets.count()}
+        {"id": k.id, "name": k.name, "memberCount": k.assets.count(), "members": _kit_member_rows(k)}
         for k in Kit.objects.order_by("name")
     ]
     all_staff = [
