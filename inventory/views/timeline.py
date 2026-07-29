@@ -359,6 +359,7 @@ def create_staff_booking(request):
     new_job_color = request.POST.get("new_job_color", "").strip()
     start_date = request.POST.get("start_date")
     end_date = request.POST.get("end_date")
+    notes = request.POST.get("notes", "").strip()
 
     if not all([staff_id, start_date, end_date]):
         return JsonResponse({"error": "Missing required fields."}, status=400)
@@ -391,9 +392,12 @@ def create_staff_booking(request):
         staff_member=staff_member, job=job, start_date=start, end_date=end
     ).first()
     if existing:
+        if existing.notes != notes:
+            existing.notes = notes
+            existing.save(update_fields=["notes"])
         return JsonResponse({"ok": True, "booking_id": existing.id, "job_id": job.id})
 
-    booking = StaffBooking.objects.create(staff_member=staff_member, job=job, start_date=start, end_date=end)
+    booking = StaffBooking.objects.create(staff_member=staff_member, job=job, start_date=start, end_date=end, notes=notes)
     return JsonResponse({"ok": True, "booking_id": booking.id, "job_id": job.id})
 
 

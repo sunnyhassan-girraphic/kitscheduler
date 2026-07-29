@@ -1,0 +1,426 @@
+{% extends "inventory/base.html" %}
+{% block title %}Edit {{ job.name }} - Kit scheduler{% endblock %}
+{% block brand_sub %}Editing job{% endblock %}
+
+{% block header_actions %}
+  <a class="btn" href="/timeline/">&larr; Back to Timeline</a>
+{% endblock %}
+
+{% block extra_style %}
+  .form-page { max-width: 900px; margin: 0 auto; padding: 24px; }
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--text-dim); text-decoration: none; font-size: 13px; margin-bottom: 16px;
+  }
+  .back-link:hover { color: var(--text); }
+  .job-color-bar { height: 5px; border-radius: 3px; margin-bottom: 16px; }
+  .form-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 18px; }
+  .form-section-head {
+    padding: 14px 16px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px;
+  }
+  .form-section-body { padding: 16px; }
+  .form-field { margin-bottom: 14px; }
+  .form-field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
+  .form-field input[type="text"], .form-field input[type="date"], .form-field select, .form-field textarea {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px;
+    font-family: inherit; box-sizing: border-box;
+  }
+  .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .color-override-row { display: flex; align-items: center; gap: 10px; }
+  .color-override-row input[type="color"] { width: 44px; height: 32px; padding: 2px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface-2); cursor: pointer; }
+  .color-override-row label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); margin: 0; }
+  .error-msg { background: var(--red-dim); color: var(--red); border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; }
+  .booking-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .booking-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 8px; font-size: 13px; flex-wrap: wrap;
+  }
+  .booking-row .bname { font-weight: 600; flex: 1; min-width: 120px; }
+  .booking-row .bname a { color: var(--text); text-decoration: none; }
+  .booking-row .bname a:hover { color: var(--accent); }
+  .booking-row .bdates { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+  .booking-row .bfunc { color: var(--text-faint); font-size: 11px; width: 100%; }
+  .booking-remove-btn {
+    background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 16px;
+    line-height: 1; padding: 2px 6px;
+  }
+  .booking-remove-btn:hover { color: var(--red); }
+  .empty-hint { color: var(--text-faint); font-size: 12px; font-style: italic; padding: 4px 0 12px; }
+  .add-panel { border-top: 1px dashed var(--border-strong); padding-top: 14px; }
+  .add-panel-dates { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 10px; flex-wrap: wrap; }
+  .add-panel-dates .form-field { margin-bottom: 0; flex: 1; min-width: 130px; }
+  .add-search-input {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px; font-family: inherit;
+    box-sizing: border-box; margin-bottom: 8px;
+  }
+  .add-results { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .add-result-row {
+    display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 13px; flex-wrap: wrap;
+  }
+  .add-result-row .rname { flex: 1; min-width: 100px; }
+  .add-result-row .rmeta { color: var(--text-faint); font-size: 11px; }
+  .add-result-btn {
+    background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text);
+    border-radius: 5px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+  }
+  .add-result-btn:hover { border-color: var(--accent-deep); }
+  .func-checklist { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; margin-top: 6px; }
+  .func-checklist label { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-dim); font-weight: 400; }
+  .add-error { color: var(--red); font-size: 12px; margin-top: 6px; width: 100%; }
+  .staff-notes-input { width: 140px; }
+{% endblock %}
+
+{% block content %}
+<div class="form-page">
+  <a class="back-link" href="/timeline/">&larr; Back to Timeline</a>
+
+  <div class="job-color-bar" style="background: {{ job.resolve_color }};"></div>
+
+  {% if error %}<div class="error-msg">{{ error }}</div>{% endif %}
+
+  <div class="form-section">
+    <div class="form-section-head">Job details</div>
+    <div class="form-section-body">
+      <form method="post" id="job-details-form">
+        {% csrf_token %}
+        <div class="form-field">
+          <label for="f-name">Job name</label>
+          <input type="text" id="f-name" name="name" value="{{ form_values.name|default:job.name }}" required>
+        </div>
+        <div class="form-row-2">
+          <div class="form-field">
+            <label for="f-category">Category</label>
+            <select id="f-category" name="category">
+              {% for value, label in job_categories %}
+                <option value="{{ value }}" {% if form_values.category|default:job.category == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <div class="color-override-row" style="margin-top:22px;">
+              <input type="color" id="f-color" name="custom_color" value="{{ form_values.custom_color|default:job.custom_color|default:'#EAB308' }}" {% if not job.custom_color and not form_values.custom_color %}disabled{% endif %}>
+              <label for="f-color-override">
+                <input type="checkbox" id="f-color-override" {% if job.custom_color or form_values.custom_color %}checked{% endif %}
+                       onchange="document.getElementById('f-color').disabled = !this.checked;">
+                Custom color (else uses category color)
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div class="form-field">
+            <label for="f-start">Start date</label>
+            <input type="date" id="f-start" name="start_date" value="{{ form_values.start_date|default:job.start_date|date:'Y-m-d' }}" required>
+          </div>
+          <div class="form-field">
+            <label for="f-end">End date</label>
+            <input type="date" id="f-end" name="end_date" value="{{ form_values.end_date|default:job.end_date|date:'Y-m-d' }}" required>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="f-notes">Notes</label>
+          <textarea id="f-notes" name="notes" rows="3">{{ form_values.notes|default:job.notes }}</textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Save details</button>
+          <button class="btn" type="button" style="color:var(--red);" onclick="deleteJobFromPage({{ job.id }})">Delete job</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-head">Kits</div>
+    <div class="form-section-body">
+      <div class="booking-list" id="kit-booking-list">
+        {% for b in kit_bookings %}
+        <div class="booking-row" data-booking-id="{{ b.id }}">
+          <span class="bname"><a href="/kits/{{ b.kit_id }}/edit/">{{ b.kit.name }}</a></span>
+          <span class="bdates">{{ b.start_date|date:"j M Y" }} &ndash; {{ b.end_date|date:"j M Y" }}</span>
+          <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('kit', {{ b.id }}, this)">&times;</button>
+        </div>
+        {% empty %}
+        <div class="empty-hint" id="kit-empty-hint">No kits booked on this job yet.</div>
+        {% endfor %}
+      </div>
+      <div class="add-panel">
+        <div class="add-panel-dates">
+          <div class="form-field">
+            <label>From</label>
+            <input type="date" id="kit-add-start" value="{{ job.start_date|date:'Y-m-d' }}">
+          </div>
+          <div class="form-field">
+            <label>To</label>
+            <input type="date" id="kit-add-end" value="{{ job.end_date|date:'Y-m-d' }}">
+          </div>
+        </div>
+        <input type="text" class="add-search-input" id="kit-search" placeholder="Search kits to add&hellip;" oninput="renderKitResults()">
+        <div class="add-results" id="kit-results"></div>
+        <div class="add-error" id="kit-add-error"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-head">Staff</div>
+    <div class="form-section-body">
+      <div class="booking-list" id="staff-booking-list">
+        {% for b in staff_bookings %}
+        <div class="booking-row" data-booking-id="{{ b.id }}">
+          <span class="bname">{{ b.staff_member.name }}</span>
+          <span class="bdates">{{ b.start_date|date:"j M Y" }} &ndash; {{ b.end_date|date:"j M Y" }}</span>
+          {% if b.notes %}<span class="bfunc">{{ b.notes }}</span>{% endif %}
+          <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('staff', {{ b.id }}, this)">&times;</button>
+        </div>
+        {% empty %}
+        <div class="empty-hint" id="staff-empty-hint">No staff booked on this job yet.</div>
+        {% endfor %}
+      </div>
+      <div class="add-panel">
+        <div class="add-panel-dates">
+          <div class="form-field">
+            <label>From</label>
+            <input type="date" id="staff-add-start" value="{{ job.start_date|date:'Y-m-d' }}">
+          </div>
+          <div class="form-field">
+            <label>To</label>
+            <input type="date" id="staff-add-end" value="{{ job.end_date|date:'Y-m-d' }}">
+          </div>
+          <div class="form-field">
+            <label>Notes (optional)</label>
+            <input type="text" class="staff-notes-input" id="staff-add-notes">
+          </div>
+        </div>
+        <input type="text" class="add-search-input" id="staff-search" placeholder="Search staff to add&hellip;" oninput="renderStaffResults()">
+        <div class="add-results" id="staff-results"></div>
+        <div class="add-error" id="staff-add-error"></div>
+        <div class="dialog-hint" style="font-size:11px; color:var(--text-faint); margin-top:6px;">Staff bookings don't block on overlap - if someone's already booked elsewhere in this window, both will simply show.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-head">Licenses</div>
+    <div class="form-section-body">
+      <div class="booking-list" id="license-booking-list">
+        {% for b in license_bookings %}
+        <div class="booking-row" data-booking-id="{{ b.id }}">
+          <span class="bname"><a href="/licenses/{{ b.asset_id }}/edit/">{{ b.asset.asset_id }}</a></span>
+          <span class="bdates">{{ b.start_date|date:"j M Y" }} &ndash; {{ b.end_date|date:"j M Y" }}</span>
+          {% if b.functionalities %}<span class="bfunc">Using: {{ b.functionalities }}</span>{% endif %}
+          <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('license', {{ b.id }}, this)">&times;</button>
+        </div>
+        {% empty %}
+        <div class="empty-hint" id="license-empty-hint">No licenses booked on this job yet.</div>
+        {% endfor %}
+      </div>
+      <div class="add-panel">
+        <div class="add-panel-dates">
+          <div class="form-field">
+            <label>From</label>
+            <input type="date" id="license-add-start" value="{{ job.start_date|date:'Y-m-d' }}">
+          </div>
+          <div class="form-field">
+            <label>To</label>
+            <input type="date" id="license-add-end" value="{{ job.end_date|date:'Y-m-d' }}">
+          </div>
+        </div>
+        <input type="text" class="add-search-input" id="license-search" placeholder="Search licenses to add&hellip;" oninput="renderLicenseResults()">
+        <div class="add-results" id="license-results"></div>
+        <div class="add-error" id="license-add-error"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ all_kits_json|json_script:"all-kits-data" }}
+{{ all_staff_json|json_script:"all-staff-data" }}
+{{ all_licenses_json|json_script:"all-licenses-data" }}
+<script>
+const JOB_ID = {{ job.id }};
+const CSRF = document.querySelector("[name=csrfmiddlewaretoken]").value;
+const ALL_KITS = JSON.parse(document.getElementById("all-kits-data").textContent);
+const ALL_STAFF = JSON.parse(document.getElementById("all-staff-data").textContent);
+const ALL_LICENSES = JSON.parse(document.getElementById("all-licenses-data").textContent);
+
+function removeEmptyHint(sectionPrefix) {
+  const hint = document.getElementById(`${sectionPrefix}-empty-hint`);
+  if (hint) hint.remove();
+}
+
+function addBookingRowToDom(listId, sectionPrefix, html) {
+  removeEmptyHint(sectionPrefix);
+  document.getElementById(listId).insertAdjacentHTML("beforeend", html);
+}
+
+async function removeBooking(kind, bookingId, btn) {
+  const endpoints = { kit: "bookings", staff: "staff-bookings", license: "license-bookings" };
+  const resp = await fetch(`/api/${endpoints[kind]}/${bookingId}/delete/`, {
+    method: "POST", headers: { "X-CSRFToken": CSRF },
+  });
+  if (resp.ok) {
+    btn.closest(".booking-row").remove();
+    const listId = `${kind}-booking-list`;
+    if (!document.querySelector(`#${listId} .booking-row`)) {
+      document.getElementById(listId).innerHTML = `<div class="empty-hint" id="${kind}-empty-hint">Nothing booked on this job yet.</div>`;
+    }
+  }
+}
+
+async function deleteJobFromPage(jobId) {
+  if (!confirm("Delete this job? This removes all its kit/staff/license bookings too. This cannot be undone.")) return;
+  const resp = await fetch(`/api/jobs/${jobId}/delete/`, { method: "POST", headers: { "X-CSRFToken": CSRF } });
+  if (resp.ok) window.location.href = "/timeline/";
+}
+
+function renderKitResults() {
+  const q = document.getElementById("kit-search").value.toLowerCase().trim();
+  const container = document.getElementById("kit-results");
+  container.innerHTML = "";
+  if (!q) return;
+  const alreadyBookedNames = new Set(
+    Array.from(document.querySelectorAll("#kit-booking-list .booking-row .bname")).map(el => el.textContent.trim())
+  );
+  const matches = ALL_KITS.filter(k => k.name.toLowerCase().includes(q) && !alreadyBookedNames.has(k.name)).slice(0, 30);
+  if (!matches.length) {
+    container.innerHTML = `<div class="empty-hint">No matching kits.</div>`;
+    return;
+  }
+  matches.forEach(k => {
+    const row = document.createElement("div");
+    row.className = "add-result-row";
+    row.innerHTML = `
+      <span class="rname">${k.name}</span>
+      <span class="rmeta">${k.memberCount} member${k.memberCount === 1 ? "" : "s"}</span>
+      <button type="button" class="add-result-btn" data-id="${k.id}">Add</button>
+    `;
+    row.querySelector(".add-result-btn").addEventListener("click", () => addKit(k.id, k.name));
+    container.appendChild(row);
+  });
+}
+
+async function addKit(kitId, kitName) {
+  const start = document.getElementById("kit-add-start").value;
+  const end = document.getElementById("kit-add-end").value;
+  const errEl = document.getElementById("kit-add-error");
+  errEl.textContent = "";
+  if (!start || !end) { errEl.textContent = "Pick a start and end date first."; return; }
+  const params = new URLSearchParams({ kit_id: kitId, job_id: JOB_ID, start_date: start, end_date: end });
+  const resp = await fetch("/api/bookings/create/", {
+    method: "POST", headers: { "X-CSRFToken": CSRF, "Content-Type": "application/x-www-form-urlencoded" }, body: params,
+  });
+  const data = await resp.json();
+  if (!resp.ok) { errEl.textContent = data.error || "Could not add kit."; return; }
+  addBookingRowToDom("kit-booking-list", "kit", `
+    <div class="booking-row" data-booking-id="${data.booking_id}">
+      <span class="bname"><a href="/kits/${kitId}/edit/">${kitName}</a></span>
+      <span class="bdates">${start} &ndash; ${end}</span>
+      <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('kit', ${data.booking_id}, this)">&times;</button>
+    </div>
+  `);
+  document.getElementById("kit-search").value = "";
+  renderKitResults();
+}
+
+function renderStaffResults() {
+  const q = document.getElementById("staff-search").value.toLowerCase().trim();
+  const container = document.getElementById("staff-results");
+  container.innerHTML = "";
+  if (!q) return;
+  const matches = ALL_STAFF.filter(s => s.name.toLowerCase().includes(q)).slice(0, 30);
+  if (!matches.length) {
+    container.innerHTML = `<div class="empty-hint">No matching staff.</div>`;
+    return;
+  }
+  matches.forEach(s => {
+    const row = document.createElement("div");
+    row.className = "add-result-row";
+    row.innerHTML = `<span class="rname">${s.name}</span><button type="button" class="add-result-btn" data-id="${s.id}">Add</button>`;
+    row.querySelector(".add-result-btn").addEventListener("click", () => addStaff(s.id, s.name));
+    container.appendChild(row);
+  });
+}
+
+async function addStaff(staffId, staffName) {
+  const start = document.getElementById("staff-add-start").value;
+  const end = document.getElementById("staff-add-end").value;
+  const notes = document.getElementById("staff-add-notes").value.trim();
+  const errEl = document.getElementById("staff-add-error");
+  errEl.textContent = "";
+  if (!start || !end) { errEl.textContent = "Pick a start and end date first."; return; }
+  const params = new URLSearchParams({ staff_id: staffId, job_id: JOB_ID, start_date: start, end_date: end });
+  if (notes) params.set("notes", notes);
+  const resp = await fetch("/api/staff-bookings/create/", {
+    method: "POST", headers: { "X-CSRFToken": CSRF, "Content-Type": "application/x-www-form-urlencoded" }, body: params,
+  });
+  const data = await resp.json();
+  if (!resp.ok) { errEl.textContent = data.error || "Could not add staff."; return; }
+  addBookingRowToDom("staff-booking-list", "staff", `
+    <div class="booking-row" data-booking-id="${data.booking_id}">
+      <span class="bname">${staffName}</span>
+      <span class="bdates">${start} &ndash; ${end}</span>
+      ${notes ? `<span class="bfunc">${notes}</span>` : ""}
+      <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('staff', ${data.booking_id}, this)">&times;</button>
+    </div>
+  `);
+  document.getElementById("staff-search").value = "";
+  document.getElementById("staff-add-notes").value = "";
+  renderStaffResults();
+}
+
+function renderLicenseResults() {
+  const q = document.getElementById("license-search").value.toLowerCase().trim();
+  const container = document.getElementById("license-results");
+  container.innerHTML = "";
+  if (!q) return;
+  const matches = ALL_LICENSES.filter(l => l.assetId.toLowerCase().includes(q)).slice(0, 30);
+  if (!matches.length) {
+    container.innerHTML = `<div class="empty-hint">No matching licenses.</div>`;
+    return;
+  }
+  matches.forEach(l => {
+    const row = document.createElement("div");
+    row.className = "add-result-row";
+    const funcHtml = l.functionalities.length
+      ? `<div class="func-checklist">${l.functionalities.map(f => `<label><input type="checkbox" value="${f}"> ${f}</label>`).join("")}</div>`
+      : "";
+    row.innerHTML = `
+      <span class="rname">${l.assetId}</span>
+      <button type="button" class="add-result-btn" data-id="${l.id}">Add</button>
+      ${funcHtml}
+    `;
+    row.querySelector(".add-result-btn").addEventListener("click", () => addLicense(l.id, l.assetId, row));
+    container.appendChild(row);
+  });
+}
+
+async function addLicense(assetId, assetLabel, row) {
+  const start = document.getElementById("license-add-start").value;
+  const end = document.getElementById("license-add-end").value;
+  const errEl = document.getElementById("license-add-error");
+  errEl.textContent = "";
+  if (!start || !end) { errEl.textContent = "Pick a start and end date first."; return; }
+  const checked = Array.from(row.querySelectorAll(".func-checklist input:checked")).map(cb => cb.value);
+  const params = new URLSearchParams({ asset_id: assetId, job_id: JOB_ID, start_date: start, end_date: end });
+  if (checked.length) params.set("functionalities", checked.join(", "));
+  const resp = await fetch("/api/license-bookings/create/", {
+    method: "POST", headers: { "X-CSRFToken": CSRF, "Content-Type": "application/x-www-form-urlencoded" }, body: params,
+  });
+  const data = await resp.json();
+  if (!resp.ok) { errEl.textContent = data.error || "Could not add license."; return; }
+  addBookingRowToDom("license-booking-list", "license", `
+    <div class="booking-row" data-booking-id="${data.booking_id}">
+      <span class="bname"><a href="/licenses/${assetId}/edit/">${assetLabel}</a></span>
+      <span class="bdates">${start} &ndash; ${end}</span>
+      ${checked.length ? `<span class="bfunc">Using: ${checked.join(", ")}</span>` : ""}
+      <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('license', ${data.booking_id}, this)">&times;</button>
+    </div>
+  `);
+  document.getElementById("license-search").value = "";
+  renderLicenseResults();
+}
+</script>
+{% endblock %}

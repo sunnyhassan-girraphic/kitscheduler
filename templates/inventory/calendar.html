@@ -551,7 +551,7 @@ async function openJobDetail(jobId) {
   document.getElementById("jdEnd").textContent = formatDateLong(job.end_date);
   document.getElementById("jdCategory").textContent = job.category_display;
   document.getElementById("jdNotes").textContent = job.notes && job.notes.trim() ? job.notes : "No notes added.";
-  document.getElementById("jdEditLink").href = `/admin/inventory/job/${job.id}/change/`;
+  document.getElementById("jdEditLink").href = `/jobs/${job.id}/edit/`;
 
   const kitsEl = document.getElementById("jdKits");
   kitsEl.innerHTML = job.kits.length
@@ -597,7 +597,7 @@ async function cloneJob() {
   });
   const data = await resp.json();
   if (resp.ok && data.job_id) {
-    window.location.href = `/admin/inventory/job/${data.job_id}/change/`;
+    window.location.href = `/jobs/${data.job_id}/edit/`;
   } else {
     alert("Couldn't clone this job. Try again, or duplicate it from the admin instead.");
   }

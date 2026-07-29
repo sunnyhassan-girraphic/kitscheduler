@@ -702,7 +702,7 @@ async function openJobDetail(jobId, bookingKind, bookingId) {
     else document.getElementById("jdStaffRow").style.display = "none";
     if (job.notes) { document.getElementById("jdNotes").textContent = job.notes; document.getElementById("jdNotesRow").style.display = "flex"; }
     else document.getElementById("jdNotesRow").style.display = "none";
-    document.getElementById("jdEditLink").href = `/admin/inventory/job/${jobId}/change/`;
+    document.getElementById("jdEditLink").href = `/jobs/${jobId}/edit/`;
 
     const unassignBtn = document.getElementById("jdUnassignBtn");
     unassignBtn.style.display = (activeBookingKind && activeBookingId) ? "inline-flex" : "none";

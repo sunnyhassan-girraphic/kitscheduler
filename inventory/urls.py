@@ -17,6 +17,7 @@ urlpatterns = [
     path("kits/<int:kit_id>/edit/", views.kit_edit_view, name="kit_edit"),
     path("kits/<int:kit_id>/pdf/", views.kit_pdf_view, name="kit_pdf"),
     path("kits/<int:kit_id>/delete/", views.kit_delete_view, name="kit_delete"),
+    path("jobs/<int:job_id>/edit/", views.job_edit_view, name="job_edit"),
     path("licenses/", views.license_list_view, name="license_list"),
     path("licenses/new/", views.license_create_view, name="license_create"),
     path("licenses/<int:license_id>/edit/", views.license_edit_view, name="license_edit"),

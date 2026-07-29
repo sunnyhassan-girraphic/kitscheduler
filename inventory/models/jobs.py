@@ -14,6 +14,8 @@ class Job(models.Model):
         TX = "TX", "TX"
         WAREHOUSE = "WAREHOUSE", "Warehouse"
         TECH_DEVELOPMENT = "TECH_DEVELOPMENT", "Tech development"
+        PERMANENT_INSTALL = "PERMANENT_INSTALL", "Permanent Install"
+        LONG_TERM_LOAN = "LONG_TERM_LOAN", "Long Term Loan"
 
     name = models.CharField(max_length=200)
     category = models.CharField(max_length=20, choices=Category.choices, default=Category.TX)

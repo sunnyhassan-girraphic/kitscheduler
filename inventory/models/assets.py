@@ -39,9 +39,18 @@ class Asset(models.Model):
     class Status(models.TextChoices):
         AVAILABLE = "AVAILABLE", "Available"
         IN_USE = "IN_USE", "In use"
+        BOOKED = "BOOKED", "Booked"
         NEEDS_REPAIR = "NEEDS_REPAIR", "Needs repair"
         MAINTENANCE = "MAINTENANCE", "Maintenance"
         MISSING = "MISSING", "Missing"
+
+    # Available / In use / Booked are managed automatically by
+    # inventory.status_sync based on kit membership, nesting, and job
+    # bookings - Needs repair / Maintenance / Missing are manual and
+    # "sticky": the auto-recompute never touches an asset while it's set to
+    # one of those, so someone has to deliberately set it back to Available
+    # for automatic management to resume.
+    AUTO_MANAGED_STATUSES = (Status.AVAILABLE, Status.IN_USE, Status.BOOKED)
 
     class LicenseType(models.TextChoices):
         PERMANENT = "PERMANENT", "Permanent"

@@ -533,7 +533,7 @@ function downloadKitPdf(kitId) {
     if (!TAGS.length || a.type !== "Engine") return "";
     const current = assetTags[id] || "";
     const options = [`<option value="">No tag</option>`].concat(
-      TAGS.map(t => `<option value="${t.id}" ${String(t.id) === String(current) ? "selected" : ""}>${t.name}</option>`)
+      TAGS.map(t => `<option value="${t.id}" style="color: ${t.color || '#EAB308'};" ${String(t.id) === String(current) ? "selected" : ""}>${t.name}</option>`)
     ).join("");
     return `<select class="tag-select" data-id="${id}" title="What is this used for in this kit?">${options}</select>`;
   }

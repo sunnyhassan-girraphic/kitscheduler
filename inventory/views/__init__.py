@@ -9,6 +9,7 @@ had to change.
     timeline.py   -> timeline/calendar views + booking & job APIs
     assets.py     -> asset list + engine/I-O device CRUD
     kits.py       -> kit list/create/edit/delete/PDF
+    jobs.py       -> job edit page (details + kit/staff/license bookings)
     licenses.py   -> license list/create/edit/delete
     settings.py   -> settings page, tags, functionalities, CSV export
     tickets.py    -> public fault reporting + staff ticket views
@@ -49,6 +50,10 @@ from .kits import (
     kit_edit_view,
     kit_delete_view,
     kit_pdf_view,
+)
+
+from .jobs import (
+    job_edit_view,
 )
 
 from .licenses import (

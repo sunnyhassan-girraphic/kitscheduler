@@ -254,7 +254,7 @@
               <select name="kit_tag" style="max-width:200px;">
                 <option value="">No tag</option>
                 {% for t in tags %}
-                  <option value="{{ t.id }}" {% if kit_membership.tag_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+                  <option value="{{ t.id }}" style="color: {{ t.color|default:'#EAB308' }};" {% if kit_membership.tag_id == t.id %}selected{% endif %}>{{ t.name }}</option>
                 {% endfor %}
               </select>
             </div>

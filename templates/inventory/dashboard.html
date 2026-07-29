@@ -118,7 +118,7 @@
       </div>
       <div class="dash-card-body">
         {% for job in upcoming_jobs %}
-          <a class="dash-row" style="text-decoration:none; color:inherit; cursor:pointer;" onclick="openDashJobDetail({{ job.id }}); return false;" href="/admin/inventory/job/{{ job.id }}/change/">
+          <a class="dash-row" style="text-decoration:none; color:inherit; cursor:pointer;" onclick="openDashJobDetail({{ job.id }}); return false;" href="/jobs/{{ job.id }}/edit/">
             <span class="primary-text">{{ job.name }}</span>
             <span class="badge badge-type">{{ job.get_category_display }}</span>
             <span class="secondary-text">
@@ -281,7 +281,7 @@ async function openDashJobDetail(jobId) {
     else document.getElementById("jdStaffRow").style.display = "none";
     if (job.notes) { document.getElementById("jdNotes").textContent = job.notes; document.getElementById("jdNotesRow").style.display = "flex"; }
     else document.getElementById("jdNotesRow").style.display = "none";
-    document.getElementById("jdEditLink").href = `/admin/inventory/job/${jobId}/change/`;
+    document.getElementById("jdEditLink").href = `/jobs/${jobId}/edit/`;
     dashJobDialog.showModal();
   } catch (e) { console.error(e); }
 }

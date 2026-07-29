@@ -34,6 +34,10 @@
     font-size: 14px; line-height: 1; padding: 0 2px;
   }
   .bank-chip .chip-del:hover { color: var(--red); }
+  .tag-swatch {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.25); flex-shrink: 0;
+  }
   .bank-add-row { display: flex; gap: 8px; padding: 10px 16px 14px; }
   .bank-add-row input[type="text"] {
     flex: 1; background: var(--surface-2); border: 1px solid var(--border-strong);
@@ -74,6 +78,7 @@
       <div class="bank-list">
         {% for tag in tags %}
         <span class="bank-chip">
+          <span class="tag-swatch" style="background-color: {{ tag.color|default:'#EAB308' }};"></span>
           {{ tag.name }}
           <form method="post" action="/settings/tags/{{ tag.id }}/delete/" onsubmit="return confirm('Remove tag &quot;{{ tag.name }}&quot;? Any kit assets using it will lose the tag.');">
             {% csrf_token %}
