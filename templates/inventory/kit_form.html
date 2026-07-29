@@ -15,6 +15,48 @@
     margin: 0 auto;
     padding: 24px;
   }
+  .form-page-wide { max-width: 1220px; margin: 0 auto; padding: 24px; }
+  .detail-columns {
+    display: grid; grid-template-columns: 1fr minmax(320px, 400px); gap: 16px; align-items: start;
+  }
+  @media (max-width: 960px) { .detail-columns { grid-template-columns: 1fr; } }
+  .detail-columns .form-page { max-width: none; margin: 0; padding: 0; }
+
+  /* History feed - matches engine_form.html / ticket_detail.html styling */
+  .history-feed { max-height: 640px; overflow-y: auto; }
+  .history-item {
+    display: flex; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border);
+  }
+  .history-item:first-child { border-top: none; }
+  .history-dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--accent);
+    flex-shrink: 0; margin-top: 4px;
+  }
+  .history-item.is-created .history-dot { background: var(--green); }
+  .history-item.is-note .history-dot { background: var(--blue); }
+  .history-body { flex: 1; min-width: 0; }
+  .history-change { color: var(--text); font-size: 13px; font-weight: 600; }
+  .history-change .from-to { font-weight: 400; color: var(--text-dim); }
+  .history-change .val { font-weight: 600; }
+  .history-comment {
+    color: var(--text); margin-top: 4px; white-space: pre-wrap; font-size: 13px;
+    background: var(--surface-2); border-radius: 6px; padding: 8px 10px;
+  }
+  .history-meta { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .history-who { font-size: 12px; font-weight: 600; color: var(--accent); }
+  .history-when { font-size: 11px; color: var(--text-faint); }
+  .history-filters { display: flex; gap: 4px; }
+  .history-filter-btn {
+    font-size: 11px; padding: 4px 8px; border-radius: 5px; text-decoration: none;
+    color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border);
+  }
+  .history-filter-btn.active { color: var(--accent); border-color: var(--accent-deep); background: var(--accent-glow); }
+  .history-empty { color: var(--text-faint); font-size: 13px; padding: 16px; }
+  .history-pagination {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-faint);
+  }
+  .history-pagination a { color: var(--accent); text-decoration: none; }
   .back-link {
     display: inline-flex; align-items: center; gap: 6px;
     color: var(--text-dim); text-decoration: none; font-size: 13px;
@@ -108,6 +150,16 @@
     border-radius: 5px; padding: 3px 6px; font-size: 11px; font-family: inherit; max-width: 120px;
   }
   .picker-row .tag-select:focus { outline: none; border-color: var(--accent); }
+  .picker-row .qty-input {
+    background: var(--surface); border: 1px solid var(--border-strong); color: var(--text);
+    border-radius: 5px; padding: 3px 4px; font-size: 11px; font-family: inherit; width: 46px;
+    text-align: center; flex-shrink: 0;
+  }
+  .picker-row .qty-input:focus { outline: none; border-color: var(--accent); }
+  .picker-row .qty-available {
+    font-size: 10px; color: var(--text-faint); flex-shrink: 0; white-space: nowrap;
+  }
+  .picker-row .qty-available.qty-none { color: var(--red); }
   .picker-remove-btn {
     background: none; border: none; color: var(--text-faint); cursor: pointer;
     font-size: 16px; line-height: 1; padding: 2px 4px; flex-shrink: 0;
@@ -143,6 +195,12 @@
     color: var(--text); border-radius: 4px; padding: 4px 6px; font-size: 12px; box-sizing: border-box;
   }
   .pdf-items-table .pdf-case-input:focus { outline: none; border-color: var(--accent); }
+  .pdf-items-table .pdf-qty-input {
+    width: 56px; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 4px; padding: 4px 6px; font-size: 12px; box-sizing: border-box;
+    text-align: center;
+  }
+  .pdf-items-table .pdf-qty-input:focus { outline: none; border-color: var(--accent); }
   .pdf-items-table .pdf-checked-input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
   .picker-search-wrap input {
     width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
@@ -182,9 +240,14 @@
 {% endblock %}
 
 {% block content %}
+{% if kit %}
+<div class="form-page-wide">
+  <a class="back-link" href="/kits/">&larr; All kits</a>
+  <div class="detail-columns"><div>
+{% endif %}
 <div class="form-page">
 
-  <a class="back-link" href="/kits/">&larr; All kits</a>
+  {% if not kit %}<a class="back-link" href="/kits/">&larr; All kits</a>{% endif %}
 
   {% if error %}
   <div class="error-msg">{{ error }}</div>
@@ -213,8 +276,7 @@
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
           Search below to add Engines and standalone gear. Components inside an Engine (or an
           I/O Device nested in one) travel with it automatically and show up underneath it here.
-          Optionally tag an asset (e.g. "MAIN") so people know what to use it for &mdash;
-          manage the tag bank in <a href="/settings/" style="color:var(--accent);">Settings</a>.
+          Optionally tag an asset. Tag bank managed in <a href="/settings/" style="color:var(--accent);">Settings</a>.
         </p>
         <div class="selected-count">
           <span id="selected-count">0</span> asset<span id="selected-plural">s</span> selected
@@ -260,18 +322,18 @@
     <p style="margin:0 0 14px; font-size:12px; color:var(--text-dim);">Fill in what you know now - anything left blank prints as a hand-fill line, same as leaving it blank on paper.</p>
     <div class="form-field">
       <label for="pdf-packed-by">Packed by</label>
-      <input type="text" id="pdf-packed-by">
+      <input type="text" id="pdf-packed-by" value="{{ pdf_packed_by_default|default:'' }}">
     </div>
     <div class="form-field">
       <label for="pdf-event-date">Event date</label>
       <div class="date-input-wrap">
-        <input type="text" id="pdf-event-date" placeholder="DD/MM/YYYY" autocomplete="off">
+        <input type="text" id="pdf-event-date" placeholder="DD/MM/YYYY" autocomplete="off" value="{{ pdf_event_date_default|default:'' }}">
         <button type="button" class="date-icon-btn" id="pdf-event-date-icon" aria-label="Pick a date">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
           </svg>
         </button>
-        <input type="date" id="pdf-event-date-native" class="date-native-hidden" tabindex="-1" aria-hidden="true">
+        <input type="date" id="pdf-event-date-native" class="date-native-hidden" tabindex="-1" aria-hidden="true" value="{{ pdf_event_date_iso|default:'' }}">
       </div>
     </div>
     <div class="pdf-meta-row">
@@ -291,15 +353,16 @@
 
     {% if pdf_items %}
     <div class="form-field">
-      <label style="margin-bottom:8px;">Items <span style="color:var(--text-faint); font-weight:400;">(set a case number and tick off as packed - both are optional, blank prints as a hand-fill line)</span></label>
+      <label style="margin-bottom:8px;">Items <span style="color:var(--text-faint); font-weight:400;">(quantity defaults to what's committed to this kit, but you can override it just for this print &mdash; set a case number and tick off as packed too, all optional, blank prints as a hand-fill line)</span></label>
       <table class="pdf-items-table">
         <thead>
-          <tr><th>Item</th><th>Case No.</th><th>Checked</th></tr>
+          <tr><th>Item</th><th>Quantity</th><th>Case No.</th><th>Checked</th></tr>
         </thead>
         <tbody>
           {% for row in pdf_items %}
           <tr>
             <td class="{% if row.nested %}nested{% endif %}">{% if row.nested %}&mdash; {% endif %}{{ row.item }}{% if row.details %} <span class="dim">{{ row.details }}</span>{% endif %}</td>
+            <td><input type="text" inputmode="numeric" pattern="[0-9]*" class="pdf-qty-input" data-asset-id="{{ row.id }}" value="{{ row.qty }}"></td>
             <td><input type="text" class="pdf-case-input" data-asset-id="{{ row.id }}" placeholder="-"></td>
             <td style="text-align:center;"><input type="checkbox" class="pdf-checked-input" data-asset-id="{{ row.id }}"></td>
           </tr>
@@ -316,6 +379,60 @@
   {% endif %}
 
 </div>
+{% if kit %}</div>
+<div>
+  <div class="form-section" style="margin-bottom:0;">
+    <div class="form-section-head" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>History</span>
+      <div class="history-filters">
+        <a class="history-filter-btn {% if history_mode == 'week' %}active{% endif %}" href="?history=week">This week</a>
+        <a class="history-filter-btn {% if history_mode == 'month' %}active{% endif %}" href="?history=month">This month</a>
+        <a class="history-filter-btn {% if history_mode == 'all' %}active{% endif %}" href="?history=all">All time</a>
+      </div>
+    </div>
+    <div class="history-feed">
+      {% for entry in history_page %}
+      <div class="history-item {% if entry.field_changed == 'created' %}is-created{% elif entry.field_changed == 'note' %}is-note{% endif %}">
+        <div class="history-dot"></div>
+        <div class="history-body">
+          {% if entry.field_changed == "created" %}
+            <div class="history-change">Kit created</div>
+          {% elif entry.field_changed == "note" %}
+            <div class="history-change">Note added</div>
+            <div class="history-comment">{{ entry.note }}</div>
+          {% elif entry.field_changed == "asset_added" %}
+            <div class="history-change">Added asset <span class="val">{{ entry.new_value }}</span></div>
+          {% elif entry.field_changed == "asset_removed" %}
+            <div class="history-change">Removed asset <span class="val">{{ entry.old_value }}</span></div>
+          {% elif entry.field_changed == "quantity_changed" %}
+            <div class="history-change">Quantity changed <span class="from-to">from <span class="val">{{ entry.old_value }}</span> to <span class="val">{{ entry.new_value }}</span></span></div>
+          {% else %}
+            <div class="history-change">{{ entry.field_label }} changed <span class="from-to">from <span class="val">{{ entry.old_value }}</span> to <span class="val">{{ entry.new_value }}</span></span></div>
+          {% endif %}
+          <div class="history-meta">
+            <span class="history-who">{% if entry.changed_by %}{{ entry.changed_by.name }}{% else %}Unknown{% endif %}</span>
+            <span class="history-when">&middot; {{ entry.created_at|date:"j M Y, g:ia" }}</span>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="history-empty">No changes logged {% if history_mode == 'week' %}this week{% elif history_mode == 'month' %}this month{% endif %}.</div>
+      {% endfor %}
+    </div>
+    {% if history_page.has_other_pages %}
+    <div class="history-pagination">
+      {% if history_page.has_previous %}
+        <a href="?history={{ history_mode }}&history_page={{ history_page.previous_page_number }}">&larr; Newer</a>
+      {% else %}<span></span>{% endif %}
+      <span>Page {{ history_page.number }} of {{ history_page.paginator.num_pages }}</span>
+      {% if history_page.has_next %}
+        <a href="?history={{ history_mode }}&history_page={{ history_page.next_page_number }}">Older &rarr;</a>
+      {% else %}<span></span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+</div></div>{% endif %}
 
 <script>
 (function() {
@@ -337,6 +454,13 @@
   });
 })();
 
+document.querySelectorAll(".pdf-qty-input").forEach(input => {
+  input.addEventListener("input", () => {
+    const digitsOnly = input.value.replace(/[^0-9]/g, "");
+    if (digitsOnly !== input.value) input.value = digitsOnly;
+  });
+});
+
 function downloadKitPdf(kitId) {
   const params = new URLSearchParams({
     packed_by: document.getElementById("pdf-packed-by").value.trim(),
@@ -344,6 +468,10 @@ function downloadKitPdf(kitId) {
     gps_tag: document.getElementById("pdf-gps-tag").value.trim(),
     carnet: document.getElementById("pdf-carnet").value.trim(),
     cases: document.getElementById("pdf-cases").value.trim(),
+  });
+  document.querySelectorAll(".pdf-qty-input").forEach(input => {
+    const val = input.value.trim();
+    if (val) params.set(`qty_${input.dataset.assetId}`, val);
   });
   document.querySelectorAll(".pdf-case-input").forEach(input => {
     const val = input.value.trim();
@@ -377,8 +505,11 @@ function downloadKitPdf(kitId) {
 
   let selected = new Set([{{ selected_ids|join:"," }}]);
   const initialTags = {{ selected_tags_json|default:"{}"|safe }};
+  const initialQty = {{ selected_qty_json|default:"{}"|safe }};
   const assetTags = {};
+  const assetQty = {};
   Object.keys(initialTags).forEach(k => { assetTags[k] = initialTags[k]; });
+  Object.keys(initialQty).forEach(k => { assetQty[k] = initialQty[k]; });
 
   // Populate the type filter from whatever types actually exist in the pool
   Array.from(new Set(ALL.map(a => a.type))).sort().forEach(t => {
@@ -398,8 +529,8 @@ function downloadKitPdf(kitId) {
     return `<div class="picker-nested">${rows}</div>`;
   }
 
-  function tagSelectHtml(id) {
-    if (!TAGS.length) return "";
+  function tagSelectHtml(id, a) {
+    if (!TAGS.length || a.type !== "Engine") return "";
     const current = assetTags[id] || "";
     const options = [`<option value="">No tag</option>`].concat(
       TAGS.map(t => `<option value="${t.id}" ${String(t.id) === String(current) ? "selected" : ""}>${t.name}</option>`)
@@ -407,11 +538,22 @@ function downloadKitPdf(kitId) {
     return `<select class="tag-select" data-id="${id}" title="What is this used for in this kit?">${options}</select>`;
   }
 
+  function qtyInputHtml(id, a) {
+    if (!a.isBulk) return "";
+    const committedElsewhere = Math.max(a.totalQty - a.available, 0);
+    const current = assetQty[id] || 1;
+    return `
+      <input type="text" inputmode="numeric" pattern="[0-9]*" class="qty-input" data-id="${id}" data-max="${a.available}" value="${current}" title="How many go in this kit">
+      <span class="qty-available">of ${a.totalQty}${committedElsewhere ? ` (${committedElsewhere} in other kits)` : ""}</span>
+    `;
+  }
+
   function renderSelected() {
     selectedContainer.innerHTML = "";
     const ids = Array.from(selected).filter(id => byId[id]);
     ids.forEach(id => {
       const a = byId[id];
+      if (a.isBulk && !assetQty[id]) assetQty[id] = 1;
       const item = document.createElement("div");
       item.className = "picker-item";
       item.innerHTML = `
@@ -420,10 +562,12 @@ function downloadKitPdf(kitId) {
           <span class="amodel">${a.makeModel || ""}</span>
           <span class="atype">${a.type}</span>
           ${statusBadge(a)}
-          ${tagSelectHtml(id)}
+          ${qtyInputHtml(id, a)}
+          ${tagSelectHtml(id, a)}
           <button type="button" class="picker-remove-btn" title="Remove" data-id="${id}">&times;</button>
           <input type="hidden" name="assets" value="${id}">
           <input type="hidden" name="tag_${id}" value="${assetTags[id] || ""}">
+          <input type="hidden" name="qty_${id}" value="${assetQty[id] || 1}">
         </div>
         ${nestedHtml(a)}
       `;
@@ -452,12 +596,17 @@ function downloadKitPdf(kitId) {
       const row = document.createElement("div");
       row.className = "picker-row";
       row.style.marginBottom = "6px";
+      const outOfStock = a.isBulk && a.available <= 0;
+      const availableHtml = a.isBulk
+        ? `<span class="qty-available${outOfStock ? " qty-none" : ""}">${a.available} of ${a.totalQty} available</span>`
+        : "";
       row.innerHTML = `
         <span class="aid">${a.assetId}</span>
         <span class="amodel">${a.makeModel || ""}</span>
         <span class="atype">${a.type}</span>
+        ${availableHtml}
         ${statusBadge(a)}
-        <button type="button" class="picker-add-btn" data-id="${a.id}">Add</button>
+        <button type="button" class="picker-add-btn" data-id="${a.id}" ${outOfStock ? "disabled" : ""}>Add</button>
       `;
       resultsContainer.appendChild(row);
     });
@@ -466,24 +615,47 @@ function downloadKitPdf(kitId) {
   selectedContainer.addEventListener("click", (e) => {
     const btn = e.target.closest(".picker-remove-btn");
     if (!btn) return;
-    selected.delete(parseInt(btn.dataset.id, 10));
+    const id = parseInt(btn.dataset.id, 10);
+    selected.delete(id);
+    delete assetQty[id];
     renderSelected();
     renderResults();
   });
 
+  selectedContainer.addEventListener("input", (e) => {
+    const qtyInput = e.target.closest(".qty-input");
+    if (!qtyInput) return;
+    const digitsOnly = qtyInput.value.replace(/[^0-9]/g, "");
+    if (digitsOnly !== qtyInput.value) qtyInput.value = digitsOnly;
+  });
+
   selectedContainer.addEventListener("change", (e) => {
     const select = e.target.closest(".tag-select");
-    if (!select) return;
-    const id = select.dataset.id;
-    assetTags[id] = select.value;
-    const hidden = select.closest(".picker-row").querySelector(`input[name="tag_${id}"]`);
-    if (hidden) hidden.value = select.value;
+    if (select) {
+      const id = select.dataset.id;
+      assetTags[id] = select.value;
+      const hidden = select.closest(".picker-row").querySelector(`input[name="tag_${id}"]`);
+      if (hidden) hidden.value = select.value;
+      return;
+    }
+    const qtyInput = e.target.closest(".qty-input");
+    if (qtyInput) {
+      const id = qtyInput.dataset.id;
+      const max = parseInt(qtyInput.dataset.max, 10) || 1;
+      let val = parseInt(qtyInput.value, 10) || 1;
+      val = Math.max(1, Math.min(val, max));
+      qtyInput.value = val;
+      assetQty[id] = val;
+      const hidden = qtyInput.closest(".picker-row").querySelector(`input[name="qty_${id}"]`);
+      if (hidden) hidden.value = val;
+    }
   });
 
   resultsContainer.addEventListener("click", (e) => {
     const btn = e.target.closest(".picker-add-btn");
-    if (!btn) return;
+    if (!btn || btn.disabled) return;
     selected.add(parseInt(btn.dataset.id, 10));
+    searchInput.value = "";
     renderSelected();
     renderResults();
   });

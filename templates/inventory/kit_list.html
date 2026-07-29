@@ -71,7 +71,7 @@
     <div class="kit-head">
       <span class="name">{{ row.kit.name }}</span>
       {% if row.current_booking %}
-        <span class="badge badge-in_use">Booked - {{ row.current_booking.job.name }}</span>
+        <span class="badge badge-in_use">Booked: {{ row.current_booking.job.name }}</span>
       {% else %}
         <span class="badge badge-available">Free today</span>
       {% endif %}
@@ -84,6 +84,7 @@
       <div class="member-row">
         <span class="mname">{{ member.asset_id }}</span>
         <span class="mmodel">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
+        {% if member.kit_qty > 1 %}<span class="kit-tag" title="Quantity in this kit">&times;{{ member.kit_qty }}</span>{% endif %}
         {% if member.kit_tag %}<span class="kit-tag">{{ member.kit_tag.name }}</span>{% endif %}
         {% if member.asset_type == "ENGINE" or member.asset_type == "IO_DEVICE" %}
           <span class="mnested">{{ member.nested_assets.count }} component{{ member.nested_assets.count|pluralize }}</span>

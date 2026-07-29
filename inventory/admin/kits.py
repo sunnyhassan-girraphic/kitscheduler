@@ -8,7 +8,7 @@ class KitAssetTagInline(admin.TabularInline):
     model = KitAssetTag
     extra = 1
     autocomplete_fields = ("asset",)
-    fields = ("asset", "tag")
+    fields = ("asset", "tag", "quantity")
 
 
 @admin.register(Kit)

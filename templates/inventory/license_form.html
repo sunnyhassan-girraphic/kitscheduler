@@ -206,7 +206,7 @@
         </div>
 
         <div class="form-field">
-          <label>Functionality <span style="color:var(--text-faint); font-weight:400;">(tick all that apply &mdash; manage the list in <a href="/settings/" style="color:var(--accent);">Settings</a>)</span></label>
+          <label>Functionality <span style="color:var(--text-faint); font-weight:400;">(tick all that apply. Manage the list in <a href="/settings/" style="color:var(--accent);">Settings</a>)</span></label>
           {% if functionality_options %}
           <div class="tick-grid">
             {% for f in functionality_options %}
@@ -217,12 +217,12 @@
             {% endfor %}
           </div>
           {% else %}
-          <p style="font-size:12px; color:var(--text-faint);">No functionalities defined yet &mdash; add some in <a href="/settings/" style="color:var(--accent);">Settings</a>.</p>
+          <p style="font-size:12px; color:var(--text-faint);">No functionalities defined yet; create in <a href="/settings/" style="color:var(--accent);">Settings</a>.</p>
           {% endif %}
         </div>
 
         <div class="form-field">
-          <label>Duration <span style="color:var(--text-faint); font-weight:400;">(overall active/usable window &mdash; shown on the timeline; it can still be assigned to individual jobs for shorter stretches within it)</span></label>
+          <label>Duration <span style="color:var(--text-faint); font-weight:400;">(overall active/usable window shown on the timeline; it can still be assigned to individual jobs for shorter stretches within it)</span></label>
           <div class="form-row">
             <div>
               <label for="f-duration-start" style="font-size:11px;">Start</label>
@@ -235,7 +235,7 @@
           </div>
           <div style="margin-top:10px;">
             <label for="f-viz-ticket" style="font-size:11px;">Viz Ticket <span style="color:var(--text-faint); font-weight:400;">(the ticket Viz gave us to authorize this Duration)</span></label>
-            <input type="text" id="f-viz-ticket" name="viz_ticket" value="{{ viz_ticket|default:'' }}" placeholder="e.g. VIZ-4821">
+            <input type="text" id="f-viz-ticket" name="viz_ticket" value="{{ viz_ticket|default:'' }}">
           </div>
         </div>
 

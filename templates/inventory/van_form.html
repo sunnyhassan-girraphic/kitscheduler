@@ -26,8 +26,10 @@
   .error-msg { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); border-radius: 6px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
   .form-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; }
   {% if vehicle %}
-  .delete-zone { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-top: 24px; }
+  .delete-zone { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-top: 24px; }
   .delete-zone p { margin: 0; font-size: 13px; color: var(--text-dim); }
+  .delete-zone form { flex-shrink: 0; }
+  .delete-zone .btn { white-space: nowrap; }
   {% endif %}
 {% endblock %}
 {% block content %}

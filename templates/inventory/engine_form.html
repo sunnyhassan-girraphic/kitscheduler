@@ -299,9 +299,9 @@
       <div class="form-section-head">Components</div>
       <div class="form-section-body">
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
-          Search for assets below to nest them in this {{ kind_label|lower }} &mdash; this includes
-          I/O Devices. When you add one of those, a second search box appears
-          under it so you can nest its own components (e.g. a GPU) straight into it in one go.
+          Search for assets below to nest them in this {{ kind_label|lower }} (including
+          I/O Devices). When you add one of those, a second search box appears
+          under it so you can nest its own components straight into it in one go.
           To add a component that doesn't exist as an asset yet, create it first in Inventory, then come back here.
         </p>
         <div class="selected-count">
@@ -641,6 +641,7 @@
     const btn = e.target.closest(".picker-add-btn");
     if (!btn) return;
     selected.add(parseInt(btn.dataset.id, 10));
+    searchInput.value = "";
     renderSelected();
     renderResults();
   });

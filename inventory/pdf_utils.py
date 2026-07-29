@@ -9,6 +9,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
+from reportlab.graphics.shapes import Drawing, Line
 from reportlab.platypus import (
     SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer,
 )
@@ -48,15 +49,23 @@ detail_style = ParagraphStyle("DetailCell", fontName="Helvetica", fontSize=9, le
 qty_style = ParagraphStyle("QtyCell", fontName="Helvetica", fontSize=9, leading=11, alignment=1)
 
 
+def _checkmark_drawing(size=8):
+    """A checkmark drawn as two line segments, not a font glyph - Helvetica
+    has no checkmark character, and ZapfDingbats' checkmark code turned out
+    to render as a missing-glyph box in practice rather than an actual
+    checkmark, so this sidesteps font/encoding guesswork entirely."""
+    d = Drawing(size, size)
+    d.add(Line(size * 0.08, size * 0.45, size * 0.38, size * 0.12,
+                strokeColor=colors.black, strokeWidth=1.3, strokeLineCap=1))
+    d.add(Line(size * 0.38, size * 0.12, size * 0.92, size * 0.85,
+                strokeColor=colors.black, strokeWidth=1.3, strokeLineCap=1))
+    return d
+
+
 def _checkbox_flowable(checked=False):
-    """A small square drawn as a 1x1 table, since Helvetica's base WinAnsi
-    encoding has no checkbox/checkmark glyph to rely on. When checked, a
-    bold X is drawn inside using the same table-cell text (Helvetica-Bold
-    has a plain 'X' glyph, unlike checkmark/box unicode chars)."""
-    content = Paragraph("<b>X</b>", ParagraphStyle(
-        "CheckX", fontName="Helvetica-Bold", fontSize=8, leading=9,
-        alignment=1, textColor=colors.black,
-    )) if checked else ""
+    """A small square drawn as a 1x1 table. When checked, a vector
+    checkmark (see _checkmark_drawing) is placed inside."""
+    content = _checkmark_drawing(size=8) if checked else ""
     box = Table([[content]], colWidths=[10], rowHeights=[10])
     box.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1, BORDER_BLACK),
@@ -132,6 +141,7 @@ def get_kit_checklist_rows(kit):
     Asset id so the edit-before-export UI (and the override lookup below)
     can key off something stable."""
     rows = []
+    kit_quantities = {kat.asset_id: kat.quantity for kat in kit.kit_asset_tags.all()}
 
     def add_nested(container, depth=1):
         for comp in container.nested_assets.all().order_by("asset_id"):
@@ -150,7 +160,7 @@ def get_kit_checklist_rows(kit):
             "id": asset.id,
             "item": asset.asset_id,
             "details": asset.make_model,
-            "qty": asset.qty,
+            "qty": kit_quantities.get(asset.id, asset.qty),
             "nested": False,
         })
         if asset.asset_type in ("ENGINE", "IO_DEVICE"):
@@ -167,7 +177,7 @@ def _items_table(kit, item_overrides=None):
         Paragraph("DETAILS", header_cell_style),
         Paragraph("QUANTITY", header_cell_style),
         Paragraph("CASE NO.", header_cell_style),
-        Paragraph("CHECK", header_cell_style),
+        Paragraph("CHECKED", header_cell_style),
     ]
     data = [header]
     rows = get_kit_checklist_rows(kit)
@@ -178,14 +188,14 @@ def _items_table(kit, item_overrides=None):
             nested_item_style if row["nested"] else item_style,
         )
         details_para = Paragraph(row["details"] or "", detail_style)
-        qty_para = Paragraph(str(row["qty"]), qty_style)
+        qty_para = Paragraph(str(override.get("qty", row["qty"])), qty_style)
         case_para = Paragraph(override.get("case", "") or "", detail_style)
         checkbox = _checkbox_flowable(checked=bool(override.get("checked")))
         data.append([item_para, details_para, qty_para, case_para, checkbox])
 
     col_widths = [
-        CONTENT_WIDTH * 0.28, CONTENT_WIDTH * 0.36,
-        CONTENT_WIDTH * 0.14, CONTENT_WIDTH * 0.12, CONTENT_WIDTH * 0.10,
+        CONTENT_WIDTH * 0.26, CONTENT_WIDTH * 0.32,
+        CONTENT_WIDTH * 0.14, CONTENT_WIDTH * 0.12, CONTENT_WIDTH * 0.16,
     ]
     tbl = Table(data, colWidths=col_widths, repeatRows=1)
     style = [

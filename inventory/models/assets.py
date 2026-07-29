@@ -27,6 +27,7 @@ class Asset(models.Model):
         CABLE = "CABLE", "Cable"
         IO_DEVICE = "IO_DEVICE", "I/O Device"
         LICENSE = "LICENSE", "License"
+        LAPTOP = "LAPTOP", "Laptop"
 
     # Types that other assets can be physically nested inside of. ENGINE is
     # the top-level container; IO_DEVICE is a container that can itself nest
