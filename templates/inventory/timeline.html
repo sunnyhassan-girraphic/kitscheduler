@@ -433,7 +433,7 @@
       <select id="f_job" name="job_id">
         <option value="">Select a job...</option>
         {% for job in jobs %}
-          <option value="{{ job.id }}">{{ job.name }}</option>
+          <option value="{{ job.id }}" data-start="{{ job.start_date|date:'Y-m-d' }}" data-end="{{ job.end_date|date:'Y-m-d' }}">{{ job.name }}</option>
         {% endfor %}
       </select>
     </div>
@@ -545,6 +545,16 @@ function switchJobTab(tab) {
   document.getElementById("tab-existing").classList.toggle("active", tab === "existing");
   document.getElementById("tab-new").classList.toggle("active", tab === "new");
 }
+
+document.getElementById("f_job").addEventListener("change", function() {
+  const opt = this.options[this.selectedIndex];
+  if (!opt || !opt.value) return;
+  // Autofill from the selected job's own dates - still fully editable
+  // afterward, this just saves re-typing the common case of booking
+  // something for the job's whole span.
+  if (opt.dataset.start) document.getElementById("f_start").value = opt.dataset.start;
+  if (opt.dataset.end) document.getElementById("f_end").value = opt.dataset.end;
+});
 
 function openDialogForRange(kind, itemId, itemName, startDate, endDate, functionalities) {
   activeKind = kind;
