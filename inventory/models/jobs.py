@@ -23,6 +23,12 @@ class Job(models.Model):
     end_date = models.DateField()
     notes = models.TextField(blank=True)
     custom_color = models.CharField(max_length=7, blank=True)
+    last_updated_by = models.ForeignKey(
+        StaffMember, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+", help_text="Who made the last recorded update."
+    )
+    last_updated_date = models.DateField(null=True, blank=True)
+    last_updated_notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -145,3 +151,76 @@ class StaffBooking(models.Model):
 
     def overlaps(self, on_date):
         return self.start_date <= on_date <= self.end_date
+
+
+JOB_HISTORY_FIELD_LABELS = {
+    "name": "Job name",
+    "category": "Category",
+    "start_date": "Start date",
+    "end_date": "End date",
+    "notes": "Notes",
+    "custom_color": "Custom colour",
+    "last_updated_by": "Updated by",
+    "last_updated_date": "Last updated date",
+    "last_updated_notes": "What changed",
+}
+
+JOB_HISTORY_SCALAR_FIELDS = [
+    "name", "category", "start_date", "end_date", "notes", "custom_color",
+]
+
+
+class JobHistory(models.Model):
+    """Change log for the Job edit form - mirrors KitHistory/AssetHistory shape."""
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="history")
+    changed_by = models.ForeignKey(
+        StaffMember, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+    )
+    field_changed = models.CharField(max_length=40)
+    old_value = models.CharField(max_length=200, blank=True)
+    new_value = models.CharField(max_length=200, blank=True)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name_plural = "Job history"
+
+    def __str__(self):
+        return f"{self.job.name} - {self.field_changed}"
+
+    @property
+    def field_label(self):
+        return JOB_HISTORY_FIELD_LABELS.get(self.field_changed, self.field_changed.replace("_", " ").title())
+
+    @staticmethod
+    def filtered_for(job, mode="month", page=1, page_size=25):
+        import datetime as _dt
+        from django.core.paginator import Paginator
+        qs = job.history.select_related("changed_by").order_by("-created_at")
+        if mode == "week":
+            qs = qs.filter(created_at__date__gte=_dt.date.today() - _dt.timedelta(days=7))
+        elif mode == "month":
+            qs = qs.filter(created_at__date__gte=_dt.date.today() - _dt.timedelta(days=30))
+        return Paginator(qs, page_size).get_page(page)
+
+    @staticmethod
+    def record_scalar_changes(job, before_values, changed_by):
+        for field in JOB_HISTORY_SCALAR_FIELDS:
+            old_raw = before_values.get(field)
+            new_raw = getattr(job, field)
+            if str(old_raw) == str(new_raw):
+                continue
+            JobHistory.objects.create(
+                job=job, changed_by=changed_by, field_changed=field,
+                old_value=str(old_raw)[:200] if old_raw not in (None, "") else "(none)",
+                new_value=str(new_raw)[:200] if new_raw not in (None, "") else "(none)",
+            )
+
+    @staticmethod
+    def record_note(job, changed_by, before_note, after_note):
+        after_note = (after_note or "").strip()
+        if after_note and after_note != (before_note or ""):
+            JobHistory.objects.create(
+                job=job, changed_by=changed_by, field_changed="note", note=after_note,
+            )

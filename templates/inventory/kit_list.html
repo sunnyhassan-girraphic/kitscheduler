@@ -1,4 +1,5 @@
 {% extends "inventory/base.html" %}
+{% load inventory_extras %}
 {% block title %}Kits - Kit scheduler{% endblock %}
 {% block brand_sub %}{{ total_kits }} kit{{ total_kits|pluralize }}{% endblock %}
 {% block header_actions %}
@@ -27,28 +28,59 @@
     display: flex; align-items: center; gap: 10px;
     padding: 8px 16px; font-size: 13px; border-top: 1px solid var(--border); flex-wrap: wrap;
   }
-  .member-row .mname { color: var(--text); min-width: 130px; }
+  .member-row.is-container { cursor: pointer; }
+  .member-row.is-container:hover { background: rgba(255,255,255,0.02); }
+  .member-row .mname { color: var(--text); min-width: 130px; font-family: var(--mono); }
   .member-row .mmodel { color: var(--text-dim); flex: 1; }
-  .member-row .mnested { font-size: 11px; color: var(--text-faint); font-family: var(--mono); }
+  .member-row .mcomp-count {
+    font-size: 11px; color: var(--text-faint); font-family: var(--mono); white-space: nowrap;
+  }
+  .member-row .mcollapse-icon {
+    width: 16px; height: 16px; flex-shrink: 0; color: var(--text-faint);
+    transition: transform 0.15s;
+  }
+  .member-row.collapsed .mcollapse-icon { transform: rotate(-90deg); }
+  .member-qty {
+    font-size: 11px; color: var(--text-dim); font-family: var(--mono);
+    background: var(--surface-2); border: 1px solid var(--border-strong);
+    border-radius: 4px; padding: 1px 6px; white-space: nowrap;
+  }
+  .nested-rows-wrap.hidden { display: none; }
   .nested-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 6px 16px 6px 40px; font-size: 12px; border-top: 1px solid var(--border);
+    padding: 6px 16px 6px 16px; font-size: 12px; border-top: 1px solid var(--border);
     color: var(--text-dim); background: var(--bg); flex-wrap: wrap;
   }
-  .nested-row .nname { font-family: var(--mono); min-width: 120px; color: var(--text-dim); }
-  .nested-row .nmodel { flex: 1; }
-  .nested-row .subnested-row {
-    padding: 6px 16px 6px 24px; margin-left: -40px; width: calc(100% + 40px);
+  .nested-row .nindent {
+    display: flex; align-items: center; width: 10px; flex-shrink: 0; color: var(--text-faint);
   }
-  .subnested-row { padding-left: 60px; }
+  .nested-row .nindent svg { width: 14px; height: 14px; }
+  .nested-row .nname { font-family: var(--mono); min-width: 110px; color: var(--text-dim); }
+  .nested-row .nmodel { flex: 1; }
+  .subnested-row { padding-left: 40px; }
+  .subnested-row .nindent { color: var(--border-strong); }
   .empty-members { padding: 10px 16px; color: var(--text-faint); font-size: 12px; font-style: italic; }
   .kit-tag {
     font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.03em; background: var(--accent-glow); color: var(--accent);
     border: 1px solid var(--accent-deep);
   }
+  .kit-card-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+  .kit-card-btn {
+    width: 28px; height: 28px; border-radius: 6px; background: transparent; border: none;
+    color: var(--text-dim); cursor: pointer; text-decoration: none;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .kit-card-btn:hover { background: var(--surface); color: var(--accent); }
+  .kit-card-btn.pin-btn.pinned { color: var(--accent); }
+  .kit-card-btn svg { width: 15px; height: 15px; }
+  .kit-card-btn.close-btn:hover { color: var(--red); }
+  .kit-card.pinned { order: -1; border-color: var(--accent-deep); }
+  .kit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .kit-grid { grid-template-columns: 1fr; } }
 {% endblock %}
 {% block content %}
+<form id="csrf-holder" style="display:none;">{% csrf_token %}</form>
 <div class="filter-bar">
   <div class="filter-bar-left">
     <a href="?tab=all{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'all' %}btn-active{% endif %}">All kits</a>
@@ -67,7 +99,7 @@
 {% if rows %}
 <div class="kit-grid">
   {% for row in rows %}
-  <div class="kit-card">
+  <div class="kit-card" data-kit-id="{{ row.kit.id }}">
     <div class="kit-head">
       <span class="name">{{ row.kit.name }}</span>
       {% if row.current_booking %}
@@ -75,39 +107,59 @@
       {% else %}
         <span class="badge badge-available">Free today</span>
       {% endif %}
-      <span class="meta">
-        {{ row.members|length }} member{{ row.members|length|pluralize }}{% if row.nested_count %} &middot; {{ row.nested_count }} nested{% endif %}
-      </span>
-      <a class="btn" href="/kits/{{ row.kit.id }}/edit/" style="font-size:12px; padding:4px 10px;">Edit</a>
+      <span class="meta">{% kit_member_summary row.members %}</span>
+      <div class="kit-card-actions">
+        <a class="kit-card-btn" href="/kits/{{ row.kit.id }}/edit/" title="Edit" aria-label="Edit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </a>
+        <button type="button" class="kit-card-btn pin-btn" title="Pin" aria-label="Pin" onclick="togglePin(this, {{ row.kit.id }})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+        </button>
+        <button type="button" class="kit-card-btn close-btn" title="Delete kit" aria-label="Delete kit" onclick="dismissCard(this, {{ row.kit.id }}, '{{ row.kit.name|escapejs }}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
     </div>
     {% for member in row.members %}
-      <div class="member-row">
-        <span class="mname">{{ member.asset_id }}</span>
-        <span class="mmodel">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
-        {% if member.kit_qty > 1 %}<span class="kit-tag" title="Quantity in this kit">&times;{{ member.kit_qty }}</span>{% endif %}
-        {% if member.kit_tag %}<span class="kit-tag" style="background: {{ member.kit_tag.color|default:'#EAB308' }}1A; color: {{ member.kit_tag.color|default:'#EAB308' }}; border-color: {{ member.kit_tag.color|default:'#EAB308' }};">{{ member.kit_tag.name }}</span>{% endif %}
-        {% if member.asset_type == "ENGINE" or member.asset_type == "IO_DEVICE" %}
-          <span class="mnested">{{ member.nested_assets.count }} component{{ member.nested_assets.count|pluralize }}</span>
-        {% endif %}
-        <span class="badge badge-{{ member.status|lower }}">{{ member.get_status_display }}</span>
-      </div>
       {% if member.asset_type == "ENGINE" or member.asset_type == "IO_DEVICE" %}
-        {% for comp in member.nested_assets.all %}
-          <div class="nested-row">
-            <span class="nname">{{ comp.asset_id }}</span>
-            <span class="nmodel">{{ comp.get_asset_type_display }}{% if comp.make_model %} &middot; {{ comp.make_model }}{% endif %}</span>
-            <span class="badge badge-{{ comp.status|lower }}">{{ comp.get_status_display }}</span>
-          </div>
-          {% if comp.asset_type == "IO_DEVICE" %}
-            {% for subcomp in comp.nested_assets.all %}
-              <div class="nested-row subnested-row">
-                <span class="nname">{{ subcomp.asset_id }}</span>
-                <span class="nmodel">{{ subcomp.get_asset_type_display }}{% if subcomp.make_model %} &middot; {{ subcomp.make_model }}{% endif %}</span>
-                <span class="badge badge-{{ subcomp.status|lower }}">{{ subcomp.get_status_display }}</span>
-              </div>
-            {% endfor %}
-          {% endif %}
-        {% endfor %}
+        {% with comp_count=member.nested_assets.count wrap_id=row.kit.id|stringformat:"s"|add:"-"|add:member.asset_id %}
+        <div class="member-row is-container" onclick="toggleNested('{{ wrap_id }}', this)">
+          <svg class="mcollapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          <span class="mname">{{ member.asset_id }}</span>
+          <span class="mmodel">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
+          {% if member.kit_tag %}<span class="kit-tag" style="background: {{ member.kit_tag.color|default:'#EAB308' }}1A; color: {{ member.kit_tag.color|default:'#EAB308' }}; border-color: {{ member.kit_tag.color|default:'#EAB308' }};">{{ member.kit_tag.name }}</span>{% endif %}
+          {% if comp_count %}<span class="mcomp-count">{{ comp_count }} component{{ comp_count|pluralize }}</span>{% endif %}
+          <span class="badge badge-{{ member.status|lower }}">{{ member.get_status_display }}</span>
+        </div>
+        <div class="nested-rows-wrap" id="nested-{{ wrap_id }}">
+          {% for comp in member.nested_assets.all %}
+            <div class="nested-row">
+<span class="nindent"></span>
+              <span class="nname">{{ comp.asset_id }}</span>
+              <span class="nmodel">{{ comp.get_asset_type_display }}{% if comp.make_model %} &middot; {{ comp.make_model }}{% endif %}</span>
+              <span class="badge badge-{{ comp.status|lower }}">{{ comp.get_status_display }}</span>
+            </div>
+            {% if comp.asset_type == "IO_DEVICE" %}
+              {% for subcomp in comp.nested_assets.all %}
+                <div class="nested-row subnested-row">
+    <span class="nindent"></span>
+                  <span class="nname">{{ subcomp.asset_id }}</span>
+                  <span class="nmodel">{{ subcomp.get_asset_type_display }}{% if subcomp.make_model %} &middot; {{ subcomp.make_model }}{% endif %}</span>
+                  <span class="badge badge-{{ subcomp.status|lower }}">{{ subcomp.get_status_display }}</span>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% endwith %}
+      {% else %}
+        <div class="member-row">
+          <span class="mname">{{ member.asset_id }}</span>
+          <span class="mmodel">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
+          {% if member.kit_tag %}<span class="kit-tag" style="background: {{ member.kit_tag.color|default:'#EAB308' }}1A; color: {{ member.kit_tag.color|default:'#EAB308' }}; border-color: {{ member.kit_tag.color|default:'#EAB308' }};">{{ member.kit_tag.name }}</span>{% endif %}
+          {% if member.kit_qty > 1 %}<span class="member-qty">&times;{{ member.kit_qty }}</span>{% endif %}
+          <span class="badge badge-{{ member.status|lower }}">{{ member.get_status_display }}</span>
+        </div>
       {% endif %}
     {% empty %}
       <div class="empty-members">No members added yet.</div>
@@ -121,4 +173,74 @@
   <a href="/kits/new/">Create your first kit</a>.
 </div>
 {% endif %}
+<script>
+function toggleNested(wrapId, headerEl) {
+  const wrap = document.getElementById("nested-" + wrapId);
+  if (!wrap) return;
+  wrap.classList.toggle("hidden");
+  headerEl.classList.toggle("collapsed");
+}
+</script>
+<script>
+(function() {
+  const PINNED_KEY = "ks_pinned_kits";
+  const DISMISSED_KEY = "ks_dismissed_kits";
+
+  function getPinned() { try { return new Set(JSON.parse(localStorage.getItem(PINNED_KEY) || "[]")); } catch { return new Set(); } }
+  function getDismissed() { return new Set(); } // no longer used — X now deletes
+  function savePinned(s) { localStorage.setItem(PINNED_KEY, JSON.stringify([...s])); }
+  function saveDismissed(s) { localStorage.setItem(DISMISSED_KEY, JSON.stringify([...s])); }
+
+  const pinned = getPinned();
+  const dismissed = getDismissed();
+
+  // Apply initial state
+  document.querySelectorAll(".kit-card").forEach(card => {
+    const id = parseInt(card.dataset.kitId, 10);
+    if (dismissed.has(id)) { card.style.display = "none"; return; }
+    if (pinned.has(id)) {
+      card.classList.add("pinned");
+      card.querySelector(".pin-btn").classList.add("pinned");
+    }
+  });
+
+  window.togglePin = function(btn, kitId) {
+    if (pinned.has(kitId)) {
+      pinned.delete(kitId);
+      btn.closest(".kit-card").classList.remove("pinned");
+      btn.classList.remove("pinned");
+    } else {
+      pinned.add(kitId);
+      btn.closest(".kit-card").classList.add("pinned");
+      btn.classList.add("pinned");
+    }
+    savePinned(pinned);
+    // Re-sort: pinned cards first
+    const grid = document.querySelector(".kit-grid");
+    if (!grid) return;
+    const cards = Array.from(grid.querySelectorAll(".kit-card"));
+    cards.sort((a, b) => {
+      const ap = a.classList.contains("pinned") ? 0 : 1;
+      const bp = b.classList.contains("pinned") ? 0 : 1;
+      return ap - bp;
+    });
+    cards.forEach(c => grid.appendChild(c));
+  };
+
+  window.dismissCard = async function(btn, kitId, kitName) {
+    if (!confirm(`Delete "${kitName}"? This removes the kit and every booking on it. This cannot be undone.`)) return;
+    const csrf = document.querySelector("[name=csrfmiddlewaretoken]");
+    const csrfToken = csrf ? csrf.value : "";
+    const resp = await fetch(`/kits/${kitId}/delete/`, {
+      method: "POST",
+      headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
+    });
+    if (resp.ok || resp.redirected) {
+      btn.closest(".kit-card").remove();
+    } else {
+      alert("Could not delete kit. Please try again.");
+    }
+  };
+})();
+</script>
 {% endblock %}

@@ -80,6 +80,17 @@
     letter-spacing: 0.04em;
     color: var(--text-dim);
   }
+  .form-section.collapsed .form-section-body { display: none; }
+  .form-section.collapsed .form-section-head { border-bottom: none; }
+  .form-section-head { cursor: pointer; user-select: none; }
+  .form-section-head:hover { color: var(--text); }
+  .collapse-btn {
+    background: none; border: none; color: var(--text-faint); cursor: pointer;
+    padding: 0; display: flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; flex-shrink: 0; transition: transform 0.15s;
+  }
+  .form-section.collapsed .collapse-btn { transform: rotate(-90deg); }
+  .collapse-btn svg { width: 14px; height: 14px; }
   .form-section-body { padding: 16px; }
   .form-field { margin-bottom: 14px; }
   .form-field:last-child { margin-bottom: 0; }
@@ -259,8 +270,8 @@
   <form method="post" id="kit-form">
     {% csrf_token %}
 
-    <div class="form-section">
-      <div class="form-section-head">Kit details</div>
+    <div class="form-section" id="section-details">
+      <div class="form-section-head" onclick="toggleSection('section-details')" style="display:flex;align-items:center;justify-content:space-between;">Kit details <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>
       <div class="form-section-body">
         <div class="form-field">
           <label for="f-name">Kit name <span style="color:var(--red);">*</span></label>
@@ -273,8 +284,8 @@
       </div>
     </div>
 
-    <div class="form-section">
-      <div class="form-section-head">Assets in this kit</div>
+    <div class="form-section" id="section-assets">
+      <div class="form-section-head" onclick="toggleSection('section-assets')" style="display:flex;align-items:center;justify-content:space-between;">Assets in this kit <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>
       <div class="form-section-body">
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
           Search below to add Engines and standalone gear. Components inside an Engine (or an
@@ -356,7 +367,7 @@
 
     {% if pdf_items %}
     <div class="form-field">
-      <label style="margin-bottom:8px;">Items <span style="color:var(--text-faint); font-weight:400;">(quantity defaults to what's committed to this kit, but you can override it just for this print &mdash; set a case number and tick off as packed too, all optional, blank prints as a hand-fill line)</span></label>
+      <label style="margin-bottom:8px;">Items <span style="color:var(--text-faint); font-weight:400;">(quantity defaults to what's committed to this kit, but you can override it just for this print.</span></label>
       <table class="pdf-items-table">
         <thead>
           <tr><th>Item</th><th>Quantity</th><th>Case No.</th><th>Checked</th></tr>
@@ -364,7 +375,7 @@
         <tbody>
           {% for row in pdf_items %}
           <tr>
-            <td class="{% if row.nested %}nested{% endif %}">{% if row.nested %}&mdash; {% endif %}{{ row.item }}{% if row.details %} <span class="dim">{{ row.details }}</span>{% endif %}</td>
+            <td class="{% if row.nested %}nested{% endif %}">{% if row.nested %}- {% endif %}{{ row.item }}{% if row.details %} <span class="dim">{{ row.details }}</span>{% endif %}</td>
             <td><input type="text" inputmode="numeric" pattern="[0-9]*" class="pdf-qty-input" data-asset-id="{{ row.id }}" value="{{ row.qty }}"></td>
             <td><input type="text" class="pdf-case-input" data-asset-id="{{ row.id }}" placeholder="-"></td>
             <td style="text-align:center;"><input type="checkbox" class="pdf-checked-input" data-asset-id="{{ row.id }}"></td>
@@ -437,6 +448,11 @@
 </div>
 </div></div>{% endif %}
 
+<script>
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle("collapsed");
+}
+</script>
 <script>
 (function() {
   const textInput = document.getElementById("pdf-event-date");
@@ -675,6 +691,7 @@ function downloadKitPdf(kitId) {
   renderSelected();
 
   // --- Unsaved changes warning ---
+
   let dirty = false;
   let submitting = false;
   const markDirty = () => { dirty = true; };

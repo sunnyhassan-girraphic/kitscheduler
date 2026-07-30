@@ -16,7 +16,7 @@ re-exported here so existing code (`from inventory.models import Asset`,
 from .staff import StaffMember
 from .assets import Asset, Tag, LicenseFunctionality, AssetHistory
 from .kits import Kit, KitAssetTag, KitHistory
-from .jobs import Job, CategoryColour, KitBooking, AssetBooking, StaffBooking
+from .jobs import Job, CategoryColour, KitBooking, AssetBooking, StaffBooking, JobHistory, JOB_HISTORY_SCALAR_FIELDS
 from .tickets import Ticket, TicketHistory
 from .vans import Vehicle, VanLog, VAN_CHECKLIST_ITEMS
 
@@ -29,6 +29,7 @@ __all__ = [
     "Kit",
     "KitAssetTag",
     "KitHistory",
+    "JobHistory",
     "Job",
     "CategoryColour",
     "KitBooking",

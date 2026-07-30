@@ -7,30 +7,62 @@
 {% endblock %}
 
 {% block extra_style %}
-  .form-page { max-width: 900px; margin: 0 auto; padding: 24px; }
+  .form-page-wide { max-width: 1220px; margin: 0 auto; padding: 24px; }
+  .detail-columns {
+    display: grid; grid-template-columns: 1fr minmax(320px, 400px); gap: 16px; align-items: start;
+  }
+  @media (max-width: 960px) { .detail-columns { grid-template-columns: 1fr; } }
   .back-link {
     display: inline-flex; align-items: center; gap: 6px;
     color: var(--text-dim); text-decoration: none; font-size: 13px; margin-bottom: 16px;
   }
-  .back-link:hover { color: var(--text); }
+  .back-link:hover { color: var(--accent); }
   .job-color-bar { height: 5px; border-radius: 3px; margin-bottom: 16px; }
-  .form-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 18px; }
-  .form-section-head {
-    padding: 14px 16px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px;
+  .form-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 16px; overflow: hidden;
   }
+  .form-section.collapsed .form-section-body { display: none; }
+  .form-section-head {
+    padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border);
+    font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-dim); display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; user-select: none;
+  }
+  .form-section-head:hover { color: var(--text); }
+  .form-section.collapsed .form-section-head { border-bottom: none; }
+  .collapse-btn {
+    background: none; border: none; color: var(--text-faint); cursor: pointer;
+    padding: 0; display: flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; flex-shrink: 0; transition: transform 0.15s;
+  }
+  .form-section.collapsed .collapse-btn { transform: rotate(-90deg); }
+  .collapse-btn svg { width: 14px; height: 14px; }
   .form-section-body { padding: 16px; }
   .form-field { margin-bottom: 14px; }
+  .form-field:last-child { margin-bottom: 0; }
   .form-field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
   .form-field input[type="text"], .form-field input[type="date"], .form-field select, .form-field textarea {
     width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
     color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px;
     font-family: inherit; box-sizing: border-box;
   }
-  .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-field input:focus, .form-field select:focus, .form-field textarea:focus { outline: none; border-color: var(--accent); }
+  .form-field textarea { resize: vertical; min-height: 80px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .color-override-row { display: flex; align-items: center; gap: 10px; }
   .color-override-row input[type="color"] { width: 44px; height: 32px; padding: 2px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface-2); cursor: pointer; }
   .color-override-row label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); margin: 0; }
   .error-msg { background: var(--red-dim); color: var(--red); border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; }
+  .form-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; }
+  .delete-zone {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin-top: 8px;
+  }
+  .delete-zone p { margin: 0; font-size: 13px; color: var(--text-dim); }
+
+  /* Booking sections */
   .booking-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
   .booking-row {
     display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--surface-2);
@@ -41,11 +73,6 @@
   .booking-row .bname a:hover { color: var(--accent); }
   .booking-row .bdates { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
   .booking-row .bfunc { color: var(--text-faint); font-size: 11px; width: 100%; }
-  .bmembers { width: 100%; margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--border-strong); display: flex; flex-direction: column; gap: 3px; }
-  .bmember-row { font-size: 11px; color: var(--text-dim); }
-  .bmember-row.nested { padding-left: 16px; }
-  .bmember-row.nested.subnested { padding-left: 32px; }
-  .bmember-row .dim { color: var(--text-faint); }
   .booking-remove-btn {
     background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 16px;
     line-height: 1; padding: 2px 6px;
@@ -60,6 +87,7 @@
     color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px; font-family: inherit;
     box-sizing: border-box; margin-bottom: 8px;
   }
+  .add-search-input:focus { outline: none; border-color: var(--accent); }
   .add-results { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
   .add-result-row {
     display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--border);
@@ -76,239 +104,332 @@
   .func-checklist label { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-dim); font-weight: 400; }
   .add-error { color: var(--red); font-size: 12px; margin-top: 6px; width: 100%; }
   .staff-notes-input { width: 140px; }
+  .picker-in-hint { font-size: 12px; color: var(--text-dim); flex-shrink: 0; white-space: nowrap; }
 
-  /* Kit booking card — mirrors kit_list.html card style */
-  .kit-booking-card {
-    border: 1px solid var(--border); border-radius: 8px;
-    margin-bottom: 10px; overflow: hidden; background: var(--surface);
-  }
-  .kit-booking-card .kit-head {
-    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
-    background: var(--surface-2); border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
-  }
-  .kit-booking-card .kit-head .kname {
-    font-weight: 600; font-size: 13px;
-  }
+  /* Kit booking cards */
+  .kit-booking-card { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; background: var(--surface); }
+  .kit-booking-card .kit-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--surface-2); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .kit-booking-card .kit-head .kname { font-weight: 600; font-size: 13px; }
   .kit-booking-card .kit-head .kname a { color: var(--text); text-decoration: none; }
   .kit-booking-card .kit-head .kname a:hover { color: var(--accent); }
-  .kit-booking-card .kit-head .kmeta {
-    font-size: 12px; color: var(--text-dim); margin-left: auto; font-family: var(--mono);
-  }
+  .kit-booking-card .kit-head .kmeta { font-size: 12px; color: var(--text-dim); margin-left: auto; font-family: var(--mono); }
   .kit-booking-card .kit-head .kdates { font-size: 12px; color: var(--text-dim); }
-  .kit-member-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 7px 14px; font-size: 12px; border-top: 1px solid var(--border); flex-wrap: wrap;
-  }
+  .kit-member-row { display: flex; align-items: center; gap: 10px; padding: 7px 14px; font-size: 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
   .kit-member-row .mname { color: var(--text); min-width: 120px; font-family: var(--mono); font-size: 12px; }
   .kit-member-row .mmodel { color: var(--text-dim); flex: 1; }
-  .kit-nested-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 5px 14px 5px 38px; font-size: 11px; border-top: 1px solid var(--border);
-    color: var(--text-dim); background: var(--bg); flex-wrap: wrap;
-  }
+  .kit-nested-row { display: flex; align-items: center; gap: 10px; padding: 5px 14px 5px 38px; font-size: 11px; border-top: 1px solid var(--border); color: var(--text-dim); background: var(--bg); flex-wrap: wrap; }
   .kit-nested-row.subnested { padding-left: 62px; }
   .kit-nested-row .nname { font-family: var(--mono); min-width: 110px; color: var(--text-dim); }
   .kit-nested-row .nmodel { flex: 1; }
-  .kit-qty-badge {
-    font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.03em;
-    background: var(--accent-glow); color: var(--accent); border: 1px solid var(--accent-deep);
-  }
-  .kit-tag-badge {
-    font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.03em;
-  }
+  .kit-qty-badge { font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; background: var(--accent-glow); color: var(--accent); border: 1px solid var(--accent-deep); }
+  .kit-tag-badge { font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
   .kit-empty-members { padding: 8px 14px; color: var(--text-faint); font-size: 12px; font-style: italic; }
 
-  /* Kit search result rows with status */
-  .add-result-row .rstatus .badge { font-size: 10px; padding: 2px 6px; }
-  .add-result-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  /* History panel */
+  .history-feed { max-height: 640px; overflow-y: auto; }
+  .history-item { display: flex; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border); }
+  .history-item:first-child { border-top: none; }
+  .history-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 4px; }
+  .history-item.is-created .history-dot { background: var(--green); }
+  .history-item.is-note .history-dot { background: var(--blue); }
+  .history-body { flex: 1; min-width: 0; }
+  .history-change { color: var(--text); font-size: 13px; font-weight: 600; }
+  .history-change .from-to { font-weight: 400; color: var(--text-dim); }
+  .history-change .val { font-weight: 600; }
+  .history-comment { color: var(--text); margin-top: 4px; white-space: pre-wrap; font-size: 13px; background: var(--surface-2); border-radius: 6px; padding: 8px 10px; }
+  .history-meta { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .history-who { font-size: 12px; font-weight: 600; color: var(--accent); }
+  .history-when { font-size: 11px; color: var(--text-faint); }
+  .history-filters { display: flex; gap: 4px; }
+  .history-filter-btn { font-size: 11px; padding: 4px 8px; border-radius: 5px; text-decoration: none; color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border); }
+  .history-filter-btn.active { color: var(--accent); border-color: var(--accent-deep); background: var(--accent-glow); }
+  .history-empty { color: var(--text-faint); font-size: 13px; padding: 16px; }
+  .history-pagination { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-faint); }
+  .history-pagination a { color: var(--accent); text-decoration: none; }
 {% endblock %}
 
 {% block content %}
-<div class="form-page">
+<div class="form-page-wide">
   <a class="back-link" href="/timeline/">&larr; Back to Timeline</a>
-
   <div class="job-color-bar" style="background: {{ job.resolve_color }};"></div>
 
-  {% if error %}<div class="error-msg">{{ error }}</div>{% endif %}
+  <div class="detail-columns">
+  <div>
+    {% if error %}<div class="error-msg">{{ error }}</div>{% endif %}
 
-  <div class="form-section">
-    <div class="form-section-head">Job details</div>
-    <div class="form-section-body">
-      <form method="post" id="job-details-form">
-        {% csrf_token %}
-        <div class="form-field">
-          <label for="f-name">Job name</label>
-          <input type="text" id="f-name" name="name" value="{{ form_values.name|default:job.name }}" required>
-        </div>
-        <div class="form-row-2">
-          <div class="form-field">
-            <label for="f-category">Category</label>
-            <select id="f-category" name="category">
-              {% for value, label in job_categories %}
-                <option value="{{ value }}" {% if form_values.category|default:job.category == value %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-field">
-            <div class="color-override-row" style="margin-top:22px;">
-              <input type="color" id="f-color" name="custom_color" value="{{ form_values.custom_color|default:job.custom_color|default:'#EAB308' }}" {% if not job.custom_color and not form_values.custom_color %}disabled{% endif %}>
-              <label for="f-color-override">
-                <input type="checkbox" id="f-color-override" {% if job.custom_color or form_values.custom_color %}checked{% endif %}
-                       onchange="document.getElementById('f-color').disabled = !this.checked;">
-                Custom color (else uses category color)
-              </label>
-            </div>
-          </div>
-        </div>
-        <div class="form-row-2">
-          <div class="form-field">
-            <label for="f-start">Start date</label>
-            <input type="date" id="f-start" name="start_date" value="{{ form_values.start_date|default:job.start_date|date:'Y-m-d' }}" required>
-          </div>
-          <div class="form-field">
-            <label for="f-end">End date</label>
-            <input type="date" id="f-end" name="end_date" value="{{ form_values.end_date|default:job.end_date|date:'Y-m-d' }}" required>
-          </div>
-        </div>
-        <div class="form-field">
-          <label for="f-notes">Notes</label>
-          <textarea id="f-notes" name="notes" rows="3">{{ form_values.notes|default:job.notes }}</textarea>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-primary" type="submit">Save details</button>
-          <button class="btn" type="button" style="color:var(--red);" onclick="deleteJobFromPage({{ job.id }})">Delete job</button>
-        </div>
-      </form>
-    </div>
-  </div>
+    <form method="post" id="job-form">
+      {% csrf_token %}
 
-  <div class="form-section">
-    <div class="form-section-head">Assigned Kits</div>
-    <div class="form-section-body">
-      <div class="booking-list" id="kit-booking-list">
-        {% for b in kit_bookings %}
-        <div class="kit-booking-card" data-booking-id="{{ b.id }}" data-booking-kit-id="{{ b.kit_id }}">
-          <div class="kit-head">
-            <span class="kname"><a href="/kits/{{ b.kit_id }}/edit/">{{ b.kit.name }}</a></span>
-            <span class="kdates">{{ b.start_date|date:"j M Y" }} &ndash; {{ b.end_date|date:"j M Y" }}</span>
-            <span class="kmeta">{{ b.kit_members|length }} member{{ b.kit_members|length|pluralize }}</span>
-            <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('kit', {{ b.id }}, this)">&times;</button>
+      <!-- JOB DETAILS -->
+      <div class="form-section" id="section-details">
+        <div class="form-section-head" onclick="toggleSection('section-details')">
+          <span>Job details</span>
+          <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="form-section-body">
+          <div class="form-field">
+            <label for="f-name">Job name <span style="color:var(--red);">*</span></label>
+            <input type="text" id="f-name" name="name" value="{{ form_values.name|default:job.name }}" required>
           </div>
-          {% for m in b.kit_members %}
-            <div class="kit-member-row">
-              <span class="mname">{{ m.assetId }}</span>
-              <span class="mmodel">{{ m.type }}{% if m.model %} &middot; {{ m.model }}{% endif %}</span>
-              {% if m.qty > 1 %}<span class="kit-qty-badge">&times;{{ m.qty }}</span>{% endif %}
-              {% if m.tag %}<span class="kit-tag-badge" style="background: {{ m.tag.color }}1A; color: {{ m.tag.color }}; border: 1px solid {{ m.tag.color }};">{{ m.tag.name }}</span>{% endif %}
-              <span class="badge badge-{{ m.statusKey }}">{{ m.status }}</span>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="f-category">Category</label>
+              <select id="f-category" name="category">
+                {% for value, label in job_categories %}
+                  <option value="{{ value }}" {% if form_values.category|default:job.category == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
             </div>
-            {% for n in m.nested %}
-              <div class="kit-nested-row{% if n.indent %} subnested{% endif %}">
-                <span class="nname">{{ n.assetId }}</span>
-                <span class="nmodel">{{ n.type }}{% if n.model %} &middot; {{ n.model }}{% endif %}</span>
-                <span class="badge badge-{{ n.statusKey }}">{{ n.status }}</span>
+            <div class="form-field">
+              <div class="color-override-row" style="margin-top:22px;">
+                <input type="color" id="f-color" name="custom_color" value="{{ form_values.custom_color|default:job.custom_color|default:'#EAB308' }}" {% if not job.custom_color and not form_values.custom_color %}disabled{% endif %}>
+                <label for="f-color-override">
+                  <input type="checkbox" id="f-color-override" {% if job.custom_color or form_values.custom_color %}checked{% endif %}
+                         onchange="document.getElementById('f-color').disabled = !this.checked;">
+                  Custom colour
+                </label>
               </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="f-start">Start date</label>
+              <input type="date" id="f-start" name="start_date" value="{{ form_values.start_date|default:job.start_date|date:'Y-m-d' }}" required>
+            </div>
+            <div class="form-field">
+              <label for="f-end">End date</label>
+              <input type="date" id="f-end" name="end_date" value="{{ form_values.end_date|default:job.end_date|date:'Y-m-d' }}" required>
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="f-notes">Notes <span style="color:var(--text-faint); font-weight:400;">(optional)</span></label>
+            <textarea id="f-notes" name="notes">{{ form_values.notes|default:job.notes }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- KITS -->
+      <div class="form-section collapsed" id="section-kits">
+        <div class="form-section-head" onclick="toggleSection('section-kits')">
+          <span>Assigned Kits</span>
+          <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="form-section-body">
+          <div class="booking-list" id="kit-booking-list">
+            {% for b in kit_bookings %}
+            <div class="kit-booking-card" data-booking-id="{{ b.id }}" data-booking-kit-id="{{ b.kit_id }}">
+              <div class="kit-head">
+                <span class="kname"><a href="/kits/{{ b.kit_id }}/edit/">{{ b.kit.name }}</a></span>
+                <span class="kdates">{{ b.start_date|date:"j M Y" }} &ndash; {{ b.end_date|date:"j M Y" }}</span>
+                <span class="kmeta">{{ b.kit_members|length }} member{{ b.kit_members|length|pluralize }}</span>
+                <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('kit', {{ b.id }}, this)">&times;</button>
+              </div>
+              {% for m in b.kit_members %}
+                <div class="kit-member-row">
+                  <span class="mname">{{ m.assetId }}</span>
+                  <span class="mmodel">{{ m.type }}{% if m.model %} &middot; {{ m.model }}{% endif %}</span>
+                  {% if m.qty > 1 %}<span class="kit-qty-badge">&times;{{ m.qty }}</span>{% endif %}
+                  {% if m.tag %}<span class="kit-tag-badge" style="background: {{ m.tag.color }}1A; color: {{ m.tag.color }}; border: 1px solid {{ m.tag.color }};">{{ m.tag.name }}</span>{% endif %}
+                  <span class="badge badge-{{ m.statusKey }}">{{ m.status }}</span>
+                </div>
+                {% for n in m.nested %}
+                  <div class="kit-nested-row{% if n.indent %} subnested{% endif %}">
+                    <span class="nname">{{ n.assetId }}</span>
+                    <span class="nmodel">{{ n.type }}{% if n.model %} &middot; {{ n.model }}{% endif %}</span>
+                    <span class="badge badge-{{ n.statusKey }}">{{ n.status }}</span>
+                  </div>
+                {% endfor %}
+              {% empty %}
+                <div class="kit-empty-members">No members added yet.</div>
+              {% endfor %}
+            </div>
+            {% empty %}
+            <div class="empty-hint" id="kit-empty-hint">No kits booked on this job yet.</div>
             {% endfor %}
-          {% empty %}
-            <div class="kit-empty-members">No members added yet.</div>
-          {% endfor %}
-        </div>
-        {% empty %}
-        <div class="empty-hint" id="kit-empty-hint">No kits booked on this job yet.</div>
-        {% endfor %}
-      </div>
-      <div class="add-panel">
-        <div class="add-panel-dates">
-          <div class="form-field">
-            <label>From</label>
-            <input type="date" id="kit-add-start" value="{{ job.start_date|date:'Y-m-d' }}">
           </div>
-          <div class="form-field">
-            <label>To</label>
-            <input type="date" id="kit-add-end" value="{{ job.end_date|date:'Y-m-d' }}">
+          <div class="add-panel">
+            <div class="add-panel-dates">
+              <div class="form-field">
+                <label>From</label>
+                <input type="date" id="kit-add-start" value="{{ job.start_date|date:'Y-m-d' }}">
+              </div>
+              <div class="form-field">
+                <label>To</label>
+                <input type="date" id="kit-add-end" value="{{ job.end_date|date:'Y-m-d' }}">
+              </div>
+            </div>
+            <input type="text" class="add-search-input" id="kit-search" placeholder="Search kits to add&hellip;" oninput="renderKitResults()">
+            <div class="add-results" id="kit-results"></div>
+            <div class="add-error" id="kit-add-error"></div>
           </div>
         </div>
-        <input type="text" class="add-search-input" id="kit-search" placeholder="Search kits to add&hellip;" oninput="renderKitResults()">
-        <script>document.getElementById("kit-add-start").addEventListener("change", renderKitResults); document.getElementById("kit-add-end").addEventListener("change", renderKitResults);</script>
-        <div class="add-results" id="kit-results"></div>
-        <div class="add-error" id="kit-add-error"></div>
       </div>
+
+      <!-- STAFF -->
+      <div class="form-section collapsed" id="section-staff">
+        <div class="form-section-head" onclick="toggleSection('section-staff')">
+          <span>Assigned Staff</span>
+          <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="form-section-body">
+          <div class="booking-list" id="staff-booking-list">
+            {% for b in staff_bookings %}
+            <div class="booking-row" data-booking-id="{{ b.id }}">
+              <span class="bname">{{ b.staff_member.name }}</span>
+              <span class="bdates">{{ b.start_date|date:"j M Y" }} &ndash; {{ b.end_date|date:"j M Y" }}</span>
+              <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('staff', {{ b.id }}, this)">&times;</button>
+              {% if b.notes %}<span class="bfunc">{{ b.notes }}</span>{% endif %}
+            </div>
+            {% empty %}
+            <div class="empty-hint" id="staff-empty-hint">No staff booked on this job yet.</div>
+            {% endfor %}
+          </div>
+          <div class="add-panel">
+            <div class="add-panel-dates">
+              <div class="form-field"><label>From</label><input type="date" id="staff-add-start" value="{{ job.start_date|date:'Y-m-d' }}"></div>
+              <div class="form-field"><label>To</label><input type="date" id="staff-add-end" value="{{ job.end_date|date:'Y-m-d' }}"></div>
+              <div class="form-field"><label>Notes (optional)</label><input type="text" class="staff-notes-input" id="staff-add-notes"></div>
+            </div>
+            <input type="text" class="add-search-input" id="staff-search" placeholder="Search staff to add&hellip;" oninput="renderStaffResults()">
+            <div class="add-results" id="staff-results"></div>
+            <div class="add-error" id="staff-add-error"></div>
+            <div style="font-size:11px; color:var(--text-faint); margin-top:6px;">Staff bookings don't block on overlap — if someone's already booked elsewhere in this window, both will simply show.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LICENSES -->
+      <div class="form-section collapsed" id="section-licenses">
+        <div class="form-section-head" onclick="toggleSection('section-licenses')">
+          <span>Assigned Licenses</span>
+          <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="form-section-body">
+          <div class="booking-list" id="license-booking-list">
+            {% for b in license_bookings %}
+            <div class="booking-row" data-booking-id="{{ b.id }}">
+              <span class="bname"><a href="/licenses/{{ b.asset_id }}/edit/">{{ b.asset.asset_id }}</a></span>
+              <span class="bdates">{{ b.start_date|date:"j M Y" }} &ndash; {{ b.end_date|date:"j M Y" }}</span>
+              <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('license', {{ b.id }}, this)">&times;</button>
+              {% if b.functionalities %}<span class="bfunc">Using: {{ b.functionalities }}</span>{% endif %}
+            </div>
+            {% empty %}
+            <div class="empty-hint" id="license-empty-hint">No licenses booked on this job yet.</div>
+            {% endfor %}
+          </div>
+          <div class="add-panel">
+            <div class="add-panel-dates">
+              <div class="form-field"><label>From</label><input type="date" id="license-add-start" value="{{ job.start_date|date:'Y-m-d' }}"></div>
+              <div class="form-field"><label>To</label><input type="date" id="license-add-end" value="{{ job.end_date|date:'Y-m-d' }}"></div>
+            </div>
+            <input type="text" class="add-search-input" id="license-search" placeholder="Search licenses to add&hellip;" oninput="renderLicenseResults()">
+            <div class="add-results" id="license-results"></div>
+            <div class="add-error" id="license-add-error"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LAST UPDATED -->
+      <div class="form-section collapsed" id="section-lastupdated">
+        <div class="form-section-head" onclick="toggleSection('section-lastupdated')">
+          <span>Last updated <span style="color:var(--red); text-transform:none; letter-spacing:normal;">* Required</span></span>
+          <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+        <div class="form-section-body">
+          <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">Every save needs a date so the team knows this record is current. You can't save until this is filled in.</p>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="f-last-updated-by">Updated by</label>
+              <select id="f-last-updated-by" name="last_updated_by">
+                <option value="">-</option>
+                {% for staff in staff_members %}
+                  <option value="{{ staff.id }}" {% if form_values.last_updated_by_id|default:last_updated_by_id == staff.id|stringformat:"s" %}selected{% endif %}>{{ staff.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="f-last-updated-date">Date <span style="color:var(--red);">*</span></label>
+              <input type="date" id="f-last-updated-date" name="last_updated_date" value="{{ form_values.last_updated_date|default:last_updated_date }}" required>
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="f-last-updated-notes">What changed? <span style="color:var(--text-faint); font-weight:400;">(optional)</span></label>
+            <textarea id="f-last-updated-notes" name="last_updated_notes" style="min-height:50px;">{{ form_values.last_updated_notes|default:last_updated_notes }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- SAVE / DELETE -->
+      <div class="form-actions">
+        <a class="btn" href="/timeline/">Cancel</a>
+        <button class="btn btn-primary" type="submit">Save changes</button>
+      </div>
+    </form>
+
+    <div class="delete-zone">
+      <p>Permanently delete this job and all its kit, staff and license bookings.</p>
+      <button class="btn" type="button" style="color:var(--red);" onclick="deleteJobFromPage({{ job.id }})">Delete job</button>
     </div>
   </div>
 
-  <div class="form-section">
-    <div class="form-section-head">Assigned Staff</div>
-    <div class="form-section-body">
-      <div class="booking-list" id="staff-booking-list">
-        {% for b in staff_bookings %}
-        <div class="booking-row" data-booking-id="{{ b.id }}">
-          <span class="bname">{{ b.staff_member.name }}</span>
-          <span class="bdates">{{ b.start_date|date:"j M Y" }} &ndash; {{ b.end_date|date:"j M Y" }}</span>
-          <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('staff', {{ b.id }}, this)">&times;</button>
-          {% if b.notes %}<span class="bfunc">{{ b.notes }}</span>{% endif %}
+  <!-- HISTORY PANEL -->
+  <div>
+    <div class="form-section" style="margin-bottom:0;">
+      <div class="form-section-head" style="display:flex; align-items:center; justify-content:space-between; cursor:default;">
+        <span>History</span>
+        <div class="history-filters">
+          <a class="history-filter-btn {% if history_mode == 'week' %}active{% endif %}" href="?history=week">This week</a>
+          <a class="history-filter-btn {% if history_mode == 'month' %}active{% endif %}" href="?history=month">This month</a>
+          <a class="history-filter-btn {% if history_mode == 'all' %}active{% endif %}" href="?history=all">All time</a>
+        </div>
+      </div>
+      <div class="history-feed">
+        {% for entry in history_page %}
+        <div class="history-item {% if entry.field_changed == 'note' %}is-note{% endif %}">
+          <div class="history-dot"></div>
+          <div class="history-body">
+            {% if entry.field_changed == "note" %}
+              <div class="history-change">Note added</div>
+              <div class="history-comment">{{ entry.note }}</div>
+            {% else %}
+              <div class="history-change">{{ entry.field_label }} changed
+                <span class="from-to">from <span class="val">{{ entry.old_value }}</span> to <span class="val">{{ entry.new_value }}</span></span>
+              </div>
+            {% endif %}
+            <div class="history-meta">
+              <span class="history-who">{% if entry.changed_by %}{{ entry.changed_by.name }}{% else %}Unknown{% endif %}</span>
+              <span class="history-when">&middot; {{ entry.created_at|date:"j M Y, g:ia" }}</span>
+            </div>
+          </div>
         </div>
         {% empty %}
-        <div class="empty-hint" id="staff-empty-hint">No staff booked on this job yet.</div>
+        <div class="history-empty">No changes logged {% if history_mode == 'week' %}this week{% elif history_mode == 'month' %}this month{% endif %}.</div>
         {% endfor %}
       </div>
-      <div class="add-panel">
-        <div class="add-panel-dates">
-          <div class="form-field">
-            <label>From</label>
-            <input type="date" id="staff-add-start" value="{{ job.start_date|date:'Y-m-d' }}">
-          </div>
-          <div class="form-field">
-            <label>To</label>
-            <input type="date" id="staff-add-end" value="{{ job.end_date|date:'Y-m-d' }}">
-          </div>
-          <div class="form-field">
-            <label>Notes (optional)</label>
-            <input type="text" class="staff-notes-input" id="staff-add-notes">
-          </div>
-        </div>
-        <input type="text" class="add-search-input" id="staff-search" placeholder="Search staff to add&hellip;" oninput="renderStaffResults()">
-        <div class="add-results" id="staff-results"></div>
-        <div class="add-error" id="staff-add-error"></div>
-        <div class="dialog-hint" style="font-size:11px; color:var(--text-faint); margin-top:6px;">Staff bookings don't block on overlap - if someone's already booked elsewhere in this window, both will simply show.</div>
+      {% if history_page.has_other_pages %}
+      <div class="history-pagination">
+        {% if history_page.has_previous %}
+          <a href="?history={{ history_mode }}&history_page={{ history_page.previous_page_number }}">&larr; Newer</a>
+        {% else %}<span></span>{% endif %}
+        <span>Page {{ history_page.number }} of {{ history_page.paginator.num_pages }}</span>
+        {% if history_page.has_next %}
+          <a href="?history={{ history_mode }}&history_page={{ history_page.next_page_number }}">Older &rarr;</a>
+        {% else %}<span></span>{% endif %}
       </div>
+      {% endif %}
     </div>
   </div>
-
-  <div class="form-section">
-    <div class="form-section-head">Assigned Licenses</div>
-    <div class="form-section-body">
-      <div class="booking-list" id="license-booking-list">
-        {% for b in license_bookings %}
-        <div class="booking-row" data-booking-id="{{ b.id }}">
-          <span class="bname"><a href="/licenses/{{ b.asset_id }}/edit/">{{ b.asset.asset_id }}</a></span>
-          <span class="bdates">{{ b.start_date|date:"j M Y" }} &ndash; {{ b.end_date|date:"j M Y" }}</span>
-          <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('license', {{ b.id }}, this)">&times;</button>
-          {% if b.functionalities %}<span class="bfunc">Using: {{ b.functionalities }}</span>{% endif %}
-        </div>
-        {% empty %}
-        <div class="empty-hint" id="license-empty-hint">No licenses booked on this job yet.</div>
-        {% endfor %}
-      </div>
-      <div class="add-panel">
-        <div class="add-panel-dates">
-          <div class="form-field">
-            <label>From</label>
-            <input type="date" id="license-add-start" value="{{ job.start_date|date:'Y-m-d' }}">
-          </div>
-          <div class="form-field">
-            <label>To</label>
-            <input type="date" id="license-add-end" value="{{ job.end_date|date:'Y-m-d' }}">
-          </div>
-        </div>
-        <input type="text" class="add-search-input" id="license-search" placeholder="Search licenses to add&hellip;" oninput="renderLicenseResults()">
-        <div class="add-results" id="license-results"></div>
-        <div class="add-error" id="license-add-error"></div>
-      </div>
-    </div>
-  </div>
+  </div><!-- /detail-columns -->
 </div>
 
 {{ all_kits_json|json_script:"all-kits-data" }}
@@ -322,11 +443,17 @@ const ALL_STAFF = JSON.parse(document.getElementById("all-staff-data").textConte
 const ALL_LICENSES = JSON.parse(document.getElementById("all-licenses-data").textContent);
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+// ── Collapsible sections ─────────────────────────────────────────────────────
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle("collapsed");
+}
+
+// ── Kit date change listeners ────────────────────────────────────────────────
+document.getElementById("kit-add-start").addEventListener("change", renderKitResults);
+document.getElementById("kit-add-end").addEventListener("change", renderKitResults);
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function formatDateNice(iso) {
-  // iso is "YYYY-MM-DD" from a <input type="date"> - format to match the
-  // server-rendered "j M Y" style (e.g. "24 Jul 2026") instead of leaving
-  // it as raw ISO, which looked like a different/broken date format next
-  // to existing rows.
   const [y, m, d] = iso.split("-").map(Number);
   if (!y || !m || !d) return iso;
   return `${d} ${MONTH_NAMES[m - 1]} ${y}`;
@@ -342,6 +469,7 @@ function addBookingRowToDom(listId, sectionPrefix, html) {
   document.getElementById(listId).insertAdjacentHTML("beforeend", html);
 }
 
+// ── Remove booking ───────────────────────────────────────────────────────────
 async function removeBooking(kind, bookingId, btn) {
   const endpoints = { kit: "bookings", staff: "staff-bookings", license: "license-bookings" };
   const resp = await fetch(`/api/${endpoints[kind]}/${bookingId}/delete/`, {
@@ -358,19 +486,17 @@ async function removeBooking(kind, bookingId, btn) {
   }
 }
 
+// ── Delete job ───────────────────────────────────────────────────────────────
 async function deleteJobFromPage(jobId) {
   if (!confirm("Delete this job? This removes all its kit/staff/license bookings too. This cannot be undone.")) return;
   const resp = await fetch(`/api/jobs/${jobId}/delete/`, { method: "POST", headers: { "X-CSRFToken": CSRF } });
   if (resp.ok) window.location.href = "/timeline/";
 }
 
-function datesOverlap(aStart, aEnd, bStart, bEnd) {
-  return aStart <= bEnd && aEnd >= bStart;
-}
+// ── Kit picker ───────────────────────────────────────────────────────────────
+function datesOverlap(aStart, aEnd, bStart, bEnd) { return aStart <= bEnd && aEnd >= bStart; }
 
 function kitConflict(kit) {
-  // Returns the conflicting booking object if the selected window overlaps
-  // an existing booking on another job, otherwise null.
   const start = document.getElementById("kit-add-start").value;
   const end = document.getElementById("kit-add-end").value;
   if (!start || !end || !kit.bookings || !kit.bookings.length) return null;
@@ -383,21 +509,16 @@ function renderKitResults() {
   container.innerHTML = "";
   if (!q) return;
   const matches = ALL_KITS.filter(k => k.name.toLowerCase().includes(q)).slice(0, 30);
-  if (!matches.length) {
-    container.innerHTML = `<div class="empty-hint">No matching kits.</div>`;
-    return;
-  }
+  if (!matches.length) { container.innerHTML = `<div class="empty-hint">No matching kits.</div>`; return; }
   matches.forEach(k => {
     const conflict = kitConflict(k);
     const row = document.createElement("div");
     row.className = "add-result-row";
     const meta = `${k.memberCount} member${k.memberCount === 1 ? "" : "s"}${k.nestedCount ? ` &middot; ${k.nestedCount} nested` : ""}`;
     row.innerHTML = conflict
-      ? `<span class="rname">${k.name}</span><span class="rmeta">${meta}</span><span class="qty-available" style="color:var(--red);font-size:11px;">Booked: ${conflict.jobName}</span>`
+      ? `<span class="rname">${k.name}</span><span class="rmeta">${meta}</span><span class="picker-in-hint" style="color:var(--red);">Booked: ${conflict.jobName}</span>`
       : `<span class="rname">${k.name}</span><span class="rmeta">${meta}</span><button type="button" class="add-result-btn" data-id="${k.id}">Add</button>`;
-    if (!conflict) {
-      row.querySelector(".add-result-btn").addEventListener("click", () => addKit(k));
-    }
+    if (!conflict) row.querySelector(".add-result-btn").addEventListener("click", () => addKit(k));
     container.appendChild(row);
   });
 }
@@ -411,8 +532,7 @@ function kitMembersHtml(kit) {
     const statusBadge = `<span class="badge badge-${m.statusKey}">${m.status}</span>`;
     lines.push(`<div class="kit-member-row"><span class="mname">${m.assetId}</span><span class="mmodel">${m.type}${m.model ? ` &middot; ${m.model}` : ""}</span>${qtyBadge}${tagBadge}${statusBadge}</div>`);
     (m.nested || []).forEach(n => {
-      const nStatus = `<span class="badge badge-${n.statusKey}">${n.status}</span>`;
-      lines.push(`<div class="kit-nested-row${n.indent ? " subnested" : ""}"><span class="nname">${n.assetId}</span><span class="nmodel">${n.type}${n.model ? ` &middot; ${n.model}` : ""}</span>${nStatus}</div>`);
+      lines.push(`<div class="kit-nested-row${n.indent ? " subnested" : ""}"><span class="nname">${n.assetId}</span><span class="nmodel">${n.type}${n.model ? ` &middot; ${n.model}` : ""}</span><span class="badge badge-${n.statusKey}">${n.status}</span></div>`);
     });
   });
   return lines.join("");
@@ -446,16 +566,14 @@ async function addKit(kit) {
   renderKitResults();
 }
 
+// ── Staff picker ─────────────────────────────────────────────────────────────
 function renderStaffResults() {
   const q = document.getElementById("staff-search").value.toLowerCase().trim();
   const container = document.getElementById("staff-results");
   container.innerHTML = "";
   if (!q) return;
   const matches = ALL_STAFF.filter(s => s.name.toLowerCase().includes(q)).slice(0, 30);
-  if (!matches.length) {
-    container.innerHTML = `<div class="empty-hint">No matching staff.</div>`;
-    return;
-  }
+  if (!matches.length) { container.innerHTML = `<div class="empty-hint">No matching staff.</div>`; return; }
   matches.forEach(s => {
     const row = document.createElement("div");
     row.className = "add-result-row";
@@ -492,27 +610,21 @@ async function addStaff(staffId, staffName) {
   renderStaffResults();
 }
 
+// ── License picker ───────────────────────────────────────────────────────────
 function renderLicenseResults() {
   const q = document.getElementById("license-search").value.toLowerCase().trim();
   const container = document.getElementById("license-results");
   container.innerHTML = "";
   if (!q) return;
   const matches = ALL_LICENSES.filter(l => l.assetId.toLowerCase().includes(q)).slice(0, 30);
-  if (!matches.length) {
-    container.innerHTML = `<div class="empty-hint">No matching licenses.</div>`;
-    return;
-  }
+  if (!matches.length) { container.innerHTML = `<div class="empty-hint">No matching licenses.</div>`; return; }
   matches.forEach(l => {
     const row = document.createElement("div");
     row.className = "add-result-row";
     const funcHtml = l.functionalities.length
       ? `<div class="func-checklist">${l.functionalities.map(f => `<label><input type="checkbox" value="${f}"> ${f}</label>`).join("")}</div>`
       : "";
-    row.innerHTML = `
-      <span class="rname">${l.assetId}</span>
-      <button type="button" class="add-result-btn" data-id="${l.id}">Add</button>
-      ${funcHtml}
-    `;
+    row.innerHTML = `<span class="rname">${l.assetId}</span><button type="button" class="add-result-btn" data-id="${l.id}">Add</button>${funcHtml}`;
     row.querySelector(".add-result-btn").addEventListener("click", () => addLicense(l.id, l.assetId, row));
     container.appendChild(row);
   });
@@ -543,5 +655,30 @@ async function addLicense(assetId, assetLabel, row) {
   document.getElementById("license-search").value = "";
   renderLicenseResults();
 }
+
+// ── Unsaved changes warning ──────────────────────────────────────────────────
+let dirty = false;
+let submitting = false;
+const form = document.getElementById("job-form");
+const markDirty = () => { dirty = true; };
+form.addEventListener("input", markDirty);
+form.addEventListener("change", markDirty);
+form.addEventListener("submit", () => { submitting = true; });
+
+window.addEventListener("beforeunload", (e) => {
+  if (dirty && !submitting) { e.preventDefault(); e.returnValue = ""; }
+});
+
+document.addEventListener("click", (e) => {
+  if (!dirty || submitting) return;
+  const link = e.target.closest("a[href]");
+  if (!link || link.target === "_blank") return;
+  if (link.closest("dialog")) return;
+  if (!confirm("You have unsaved changes. Leave this page without saving?")) {
+    e.preventDefault();
+  } else {
+    submitting = true;
+  }
+});
 </script>
 {% endblock %}

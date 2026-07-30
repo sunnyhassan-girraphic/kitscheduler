@@ -4,7 +4,7 @@ import re
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
-from ..models import Asset, AssetBooking, Job, Kit, KitBooking, StaffBooking, StaffMember
+from ..models import Asset, AssetBooking, Job, JobHistory, Kit, KitBooking, StaffBooking, StaffMember
 from .timeline import _kit_member_rows
 
 
@@ -68,6 +68,7 @@ def _job_edit_context(job):
         "all_kits_json": all_kits,
         "all_staff_json": all_staff,
         "all_licenses_json": all_licenses,
+        "staff_members": list(StaffMember.objects.filter(active=True).order_by("name")),
         "active_nav": "timeline",
     }
 
@@ -83,6 +84,9 @@ def job_edit_view(request, job_id):
         custom_color = request.POST.get("custom_color", "").strip()
         start_date_raw = request.POST.get("start_date", "")
         end_date_raw = request.POST.get("end_date", "")
+        last_updated_by_id = request.POST.get("last_updated_by", "").strip()
+        last_updated_date_raw = request.POST.get("last_updated_date", "").strip()
+        last_updated_notes = request.POST.get("last_updated_notes", "").strip()
 
         error = None
         start = end = None
@@ -90,6 +94,8 @@ def job_edit_view(request, job_id):
             error = "Job name is required."
         elif category not in Job.Category.values:
             error = "Pick a valid category."
+        elif not last_updated_date_raw:
+            error = "Last updated date is required before you can save."
         else:
             try:
                 start = datetime.date.fromisoformat(start_date_raw)
@@ -99,6 +105,11 @@ def job_edit_view(request, job_id):
             else:
                 if start > end:
                     error = "End date cannot be before start date."
+            if not error:
+                try:
+                    datetime.date.fromisoformat(last_updated_date_raw)
+                except ValueError:
+                    error = "Last updated date is invalid."
 
         if custom_color and not re.fullmatch(r"#[0-9A-Fa-f]{6}", custom_color):
             custom_color = ""
@@ -110,8 +121,21 @@ def job_edit_view(request, job_id):
                 "name": name, "category": category, "notes": notes,
                 "custom_color": custom_color,
                 "start_date": start_date_raw, "end_date": end_date_raw,
+                "last_updated_by_id": last_updated_by_id,
+                "last_updated_date": last_updated_date_raw,
+                "last_updated_notes": last_updated_notes,
             }
             return render(request, "inventory/job_form.html", context)
+
+        last_updated_by = None
+        if last_updated_by_id.isdigit():
+            last_updated_by = StaffMember.objects.filter(pk=last_updated_by_id).first()
+
+        before_values = {
+            f: getattr(job, f)
+            for f in ["name", "category", "start_date", "end_date", "notes", "custom_color"]
+        }
+        before_note = job.last_updated_notes
 
         job.name = name
         job.category = category
@@ -119,7 +143,27 @@ def job_edit_view(request, job_id):
         job.custom_color = custom_color
         job.start_date = start
         job.end_date = end
+        job.last_updated_by = last_updated_by
+        job.last_updated_date = datetime.date.fromisoformat(last_updated_date_raw)
+        job.last_updated_notes = last_updated_notes
         job.save()
+
+        JobHistory.record_scalar_changes(job, before_values, last_updated_by)
+        JobHistory.record_note(job, last_updated_by, before_note, last_updated_notes)
+
         return redirect(f"/jobs/{job.id}/edit/")
 
-    return render(request, "inventory/job_form.html", _job_edit_context(job))
+    history_mode = request.GET.get("history", "month")
+    if history_mode not in ("week", "month", "all"):
+        history_mode = "month"
+    history_page_num = request.GET.get("history_page", 1)
+    current_staff = StaffMember.for_user(request.user)
+    context = _job_edit_context(job)
+    context.update({
+        "history_mode": history_mode,
+        "history_page": JobHistory.filtered_for(job, mode=history_mode, page=history_page_num),
+        "last_updated_by_id": str(current_staff.id) if current_staff else "",
+        "last_updated_date": datetime.date.today().isoformat(),
+        "last_updated_notes": job.last_updated_notes,
+    })
+    return render(request, "inventory/job_form.html", context)

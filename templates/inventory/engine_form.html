@@ -77,6 +77,17 @@
     letter-spacing: 0.04em;
     color: var(--text-dim);
   }
+  .form-section.collapsed .form-section-body { display: none; }
+  .form-section.collapsed .form-section-head { border-bottom: none; }
+  .form-section-head { cursor: pointer; user-select: none; }
+  .form-section-head:hover { color: var(--text); }
+  .collapse-btn {
+    background: none; border: none; color: var(--text-faint); cursor: pointer;
+    padding: 0; display: flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; flex-shrink: 0; transition: transform 0.15s;
+  }
+  .form-section.collapsed .collapse-btn { transform: rotate(-90deg); }
+  .collapse-btn svg { width: 14px; height: 14px; }
   .form-section-body { padding: 16px; }
   .form-field { margin-bottom: 14px; }
   .form-field:last-child { margin-bottom: 0; }
@@ -234,8 +245,8 @@
   <form method="post" id="engine-form">
     {% csrf_token %}
 
-    <div class="form-section">
-      <div class="form-section-head">{{ kind_label }} details</div>
+    <div class="form-section collapsed" id="section-details">
+      <div class="form-section-head" onclick="toggleSection('section-details')" style="display:flex;align-items:center;justify-content:space-between;">{{ kind_label }} details <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>
       <div class="form-section-body">
         <div class="form-row">
           <div class="form-field">
@@ -298,8 +309,8 @@
       </div>
     </div>
 
-    <div class="form-section">
-      <div class="form-section-head">Components</div>
+    <div class="form-section" id="section-components">
+      <div class="form-section-head" onclick="toggleSection('section-components')" style="display:flex;align-items:center;justify-content:space-between;">Components <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>
       <div class="form-section-body">
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
           Search for assets below to nest them in this {{ kind_label|lower }} (including
@@ -327,8 +338,8 @@
       </div>
     </div>
 
-    <div class="form-section">
-      <div class="form-section-head">Last updated <span style="color:var(--red); text-transform:none; letter-spacing:normal;">* Required</span></div>
+    <div class="form-section collapsed" id="section-lastupdated">
+      <div class="form-section-head" onclick="toggleSection('section-lastupdated')" style="display:flex;align-items:center;justify-content:space-between;"><span>Last updated <span style="color:var(--red); text-transform:none; letter-spacing:normal;">* Required</span></span><button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>
       <div class="form-section-body">
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
           Every save needs a date so the team knows this record is current. You can't save until this is filled in.
@@ -431,6 +442,11 @@
 {{ components_json|json_script:"components-data" }}
 {{ nestable_json|json_script:"nestable-data" }}
 {{ container_child_pairs|json_script:"container-pairs-data" }}
+<script>
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle("collapsed");
+}
+</script>
 <script>
 (function() {
   const ALL = JSON.parse(document.getElementById("components-data").textContent);
@@ -668,6 +684,7 @@
   renderSelected();
 
   // --- Unsaved changes warning ---
+
   let dirty = false;
   let submitting = false;
   const markDirty = () => { dirty = true; };
