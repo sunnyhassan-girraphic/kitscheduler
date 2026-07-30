@@ -21,10 +21,30 @@ def _job_edit_context(job):
     for b in kit_bookings:
         b.kit_members = _kit_member_rows(b.kit)
 
-    all_kits = [
-        {"id": k.id, "name": k.name, "memberCount": k.assets.count(), "members": _kit_member_rows(k)}
-        for k in Kit.objects.order_by("name")
-    ]
+    # Pre-fetch all kit bookings (excluding this job) so JS can check conflicts
+    other_bookings_qs = KitBooking.objects.exclude(job=job).select_related("job").order_by("start_date")
+    bookings_by_kit = {}
+    for b in other_bookings_qs:
+        bookings_by_kit.setdefault(b.kit_id, []).append({
+            "jobName": b.job.name,
+            "start": b.start_date.isoformat(),
+            "end": b.end_date.isoformat(),
+        })
+
+    all_kits = []
+    for k in Kit.objects.prefetch_related("assets", "kit_asset_tags__tag", "assets__nested_assets").order_by("name"):
+        member_count = k.assets.count()
+        nested_count = sum(
+            m.nested_assets.count() for m in k.assets.all()
+        )
+        all_kits.append({
+            "id": k.id,
+            "name": k.name,
+            "memberCount": member_count,
+            "nestedCount": nested_count,
+            "members": _kit_member_rows(k),
+            "bookings": bookings_by_kit.get(k.id, []),
+        })
     all_staff = [
         {"id": s.id, "name": s.name}
         for s in StaffMember.objects.filter(active=True).order_by("name")

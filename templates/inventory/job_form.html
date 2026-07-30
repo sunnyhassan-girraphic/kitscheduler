@@ -68,14 +68,62 @@
   .add-result-row .rname { flex: 1; min-width: 100px; }
   .add-result-row .rmeta { color: var(--text-faint); font-size: 11px; }
   .add-result-btn {
-    background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text);
-    border-radius: 5px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+    background: var(--accent-glow); border: 1px solid var(--accent-deep); color: var(--accent);
+    border-radius: 5px; padding: 5px 12px; font-size: 12px; cursor: pointer; flex-shrink: 0;
   }
-  .add-result-btn:hover { border-color: var(--accent-deep); }
+  .add-result-btn:hover { opacity: 0.85; }
   .func-checklist { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; margin-top: 6px; }
   .func-checklist label { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-dim); font-weight: 400; }
   .add-error { color: var(--red); font-size: 12px; margin-top: 6px; width: 100%; }
   .staff-notes-input { width: 140px; }
+
+  /* Kit booking card — mirrors kit_list.html card style */
+  .kit-booking-card {
+    border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 10px; overflow: hidden; background: var(--surface);
+  }
+  .kit-booking-card .kit-head {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    background: var(--surface-2); border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .kit-booking-card .kit-head .kname {
+    font-weight: 600; font-size: 13px;
+  }
+  .kit-booking-card .kit-head .kname a { color: var(--text); text-decoration: none; }
+  .kit-booking-card .kit-head .kname a:hover { color: var(--accent); }
+  .kit-booking-card .kit-head .kmeta {
+    font-size: 12px; color: var(--text-dim); margin-left: auto; font-family: var(--mono);
+  }
+  .kit-booking-card .kit-head .kdates { font-size: 12px; color: var(--text-dim); }
+  .kit-member-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 14px; font-size: 12px; border-top: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .kit-member-row .mname { color: var(--text); min-width: 120px; font-family: var(--mono); font-size: 12px; }
+  .kit-member-row .mmodel { color: var(--text-dim); flex: 1; }
+  .kit-nested-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 5px 14px 5px 38px; font-size: 11px; border-top: 1px solid var(--border);
+    color: var(--text-dim); background: var(--bg); flex-wrap: wrap;
+  }
+  .kit-nested-row.subnested { padding-left: 62px; }
+  .kit-nested-row .nname { font-family: var(--mono); min-width: 110px; color: var(--text-dim); }
+  .kit-nested-row .nmodel { flex: 1; }
+  .kit-qty-badge {
+    font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.03em;
+    background: var(--accent-glow); color: var(--accent); border: 1px solid var(--accent-deep);
+  }
+  .kit-tag-badge {
+    font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .kit-empty-members { padding: 8px 14px; color: var(--text-faint); font-size: 12px; font-style: italic; }
+
+  /* Kit search result rows with status */
+  .add-result-row .rstatus .badge { font-size: 10px; padding: 2px 6px; }
+  .add-result-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 {% endblock %}
 
 {% block content %}
@@ -142,20 +190,31 @@
     <div class="form-section-body">
       <div class="booking-list" id="kit-booking-list">
         {% for b in kit_bookings %}
-        <div class="booking-row" data-booking-id="{{ b.id }}">
-          <span class="bname"><a href="/kits/{{ b.kit_id }}/edit/">{{ b.kit.name }}</a></span>
-          <span class="bdates">{{ b.start_date|date:"j M Y" }} &ndash; {{ b.end_date|date:"j M Y" }}</span>
-          <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('kit', {{ b.id }}, this)">&times;</button>
-          {% if b.kit_members %}
-          <div class="bmembers">
-            {% for m in b.kit_members %}
-              <div class="bmember-row">{{ m.assetId }}{% if m.model %} <span class="dim">- {{ m.model }}</span>{% endif %}</div>
-              {% for n in m.nested %}
-                <div class="bmember-row nested{% if n.indent %} subnested{% endif %}">{{ n.assetId }}{% if n.model %} <span class="dim">- {{ n.model }}</span>{% endif %}</div>
-              {% endfor %}
-            {% endfor %}
+        <div class="kit-booking-card" data-booking-id="{{ b.id }}" data-booking-kit-id="{{ b.kit_id }}">
+          <div class="kit-head">
+            <span class="kname"><a href="/kits/{{ b.kit_id }}/edit/">{{ b.kit.name }}</a></span>
+            <span class="kdates">{{ b.start_date|date:"j M Y" }} &ndash; {{ b.end_date|date:"j M Y" }}</span>
+            <span class="kmeta">{{ b.kit_members|length }} member{{ b.kit_members|length|pluralize }}</span>
+            <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('kit', {{ b.id }}, this)">&times;</button>
           </div>
-          {% endif %}
+          {% for m in b.kit_members %}
+            <div class="kit-member-row">
+              <span class="mname">{{ m.assetId }}</span>
+              <span class="mmodel">{{ m.type }}{% if m.model %} &middot; {{ m.model }}{% endif %}</span>
+              {% if m.qty > 1 %}<span class="kit-qty-badge">&times;{{ m.qty }}</span>{% endif %}
+              {% if m.tag %}<span class="kit-tag-badge" style="background: {{ m.tag.color }}1A; color: {{ m.tag.color }}; border: 1px solid {{ m.tag.color }};">{{ m.tag.name }}</span>{% endif %}
+              <span class="badge badge-{{ m.statusKey }}">{{ m.status }}</span>
+            </div>
+            {% for n in m.nested %}
+              <div class="kit-nested-row{% if n.indent %} subnested{% endif %}">
+                <span class="nname">{{ n.assetId }}</span>
+                <span class="nmodel">{{ n.type }}{% if n.model %} &middot; {{ n.model }}{% endif %}</span>
+                <span class="badge badge-{{ n.statusKey }}">{{ n.status }}</span>
+              </div>
+            {% endfor %}
+          {% empty %}
+            <div class="kit-empty-members">No members added yet.</div>
+          {% endfor %}
         </div>
         {% empty %}
         <div class="empty-hint" id="kit-empty-hint">No kits booked on this job yet.</div>
@@ -173,6 +232,7 @@
           </div>
         </div>
         <input type="text" class="add-search-input" id="kit-search" placeholder="Search kits to add&hellip;" oninput="renderKitResults()">
+        <script>document.getElementById("kit-add-start").addEventListener("change", renderKitResults); document.getElementById("kit-add-end").addEventListener("change", renderKitResults);</script>
         <div class="add-results" id="kit-results"></div>
         <div class="add-error" id="kit-add-error"></div>
       </div>
@@ -288,9 +348,11 @@ async function removeBooking(kind, bookingId, btn) {
     method: "POST", headers: { "X-CSRFToken": CSRF },
   });
   if (resp.ok) {
-    btn.closest(".booking-row").remove();
+    const card = btn.closest(".kit-booking-card") || btn.closest(".booking-row");
+    card.remove();
     const listId = `${kind}-booking-list`;
-    if (!document.querySelector(`#${listId} .booking-row`)) {
+    const remaining = document.querySelectorAll(`#${listId} .kit-booking-card, #${listId} .booking-row`);
+    if (!remaining.length) {
       document.getElementById(listId).innerHTML = `<div class="empty-hint" id="${kind}-empty-hint">Nothing booked on this job yet.</div>`;
     }
   }
@@ -302,42 +364,58 @@ async function deleteJobFromPage(jobId) {
   if (resp.ok) window.location.href = "/timeline/";
 }
 
+function datesOverlap(aStart, aEnd, bStart, bEnd) {
+  return aStart <= bEnd && aEnd >= bStart;
+}
+
+function kitConflict(kit) {
+  // Returns the conflicting booking object if the selected window overlaps
+  // an existing booking on another job, otherwise null.
+  const start = document.getElementById("kit-add-start").value;
+  const end = document.getElementById("kit-add-end").value;
+  if (!start || !end || !kit.bookings || !kit.bookings.length) return null;
+  return kit.bookings.find(b => datesOverlap(start, end, b.start, b.end)) || null;
+}
+
 function renderKitResults() {
   const q = document.getElementById("kit-search").value.toLowerCase().trim();
   const container = document.getElementById("kit-results");
   container.innerHTML = "";
   if (!q) return;
-  const alreadyBookedNames = new Set(
-    Array.from(document.querySelectorAll("#kit-booking-list .booking-row .bname")).map(el => el.textContent.trim())
-  );
-  const matches = ALL_KITS.filter(k => k.name.toLowerCase().includes(q) && !alreadyBookedNames.has(k.name)).slice(0, 30);
+  const matches = ALL_KITS.filter(k => k.name.toLowerCase().includes(q)).slice(0, 30);
   if (!matches.length) {
     container.innerHTML = `<div class="empty-hint">No matching kits.</div>`;
     return;
   }
   matches.forEach(k => {
+    const conflict = kitConflict(k);
     const row = document.createElement("div");
     row.className = "add-result-row";
-    row.innerHTML = `
-      <span class="rname">${k.name}</span>
-      <span class="rmeta">${k.memberCount} member${k.memberCount === 1 ? "" : "s"}</span>
-      <button type="button" class="add-result-btn" data-id="${k.id}">Add</button>
-    `;
-    row.querySelector(".add-result-btn").addEventListener("click", () => addKit(k));
+    const meta = `${k.memberCount} member${k.memberCount === 1 ? "" : "s"}${k.nestedCount ? ` &middot; ${k.nestedCount} nested` : ""}`;
+    row.innerHTML = conflict
+      ? `<span class="rname">${k.name}</span><span class="rmeta">${meta}</span><span class="qty-available" style="color:var(--red);font-size:11px;">Booked: ${conflict.jobName}</span>`
+      : `<span class="rname">${k.name}</span><span class="rmeta">${meta}</span><button type="button" class="add-result-btn" data-id="${k.id}">Add</button>`;
+    if (!conflict) {
+      row.querySelector(".add-result-btn").addEventListener("click", () => addKit(k));
+    }
     container.appendChild(row);
   });
 }
 
 function kitMembersHtml(kit) {
-  if (!kit.members || !kit.members.length) return "";
+  if (!kit.members || !kit.members.length) return `<div class="kit-empty-members">No members added yet.</div>`;
   const lines = [];
   kit.members.forEach(m => {
-    lines.push(`<div class="bmember-row">${m.assetId}${m.model ? ` <span class="dim">- ${m.model}</span>` : ""}</div>`);
+    const qtyBadge = m.qty > 1 ? `<span class="kit-qty-badge">&times;${m.qty}</span>` : "";
+    const tagBadge = m.tag ? `<span class="kit-tag-badge" style="background:${m.tag.color}1A;color:${m.tag.color};border:1px solid ${m.tag.color};">${m.tag.name}</span>` : "";
+    const statusBadge = `<span class="badge badge-${m.statusKey}">${m.status}</span>`;
+    lines.push(`<div class="kit-member-row"><span class="mname">${m.assetId}</span><span class="mmodel">${m.type}${m.model ? ` &middot; ${m.model}` : ""}</span>${qtyBadge}${tagBadge}${statusBadge}</div>`);
     (m.nested || []).forEach(n => {
-      lines.push(`<div class="bmember-row nested${n.indent ? " subnested" : ""}">${n.assetId}${n.model ? ` <span class="dim">- ${n.model}</span>` : ""}</div>`);
+      const nStatus = `<span class="badge badge-${n.statusKey}">${n.status}</span>`;
+      lines.push(`<div class="kit-nested-row${n.indent ? " subnested" : ""}"><span class="nname">${n.assetId}</span><span class="nmodel">${n.type}${n.model ? ` &middot; ${n.model}` : ""}</span>${nStatus}</div>`);
     });
   });
-  return `<div class="bmembers">${lines.join("")}</div>`;
+  return lines.join("");
 }
 
 async function addKit(kit) {
@@ -352,11 +430,15 @@ async function addKit(kit) {
   });
   const data = await resp.json();
   if (!resp.ok) { errEl.textContent = data.error || "Could not add kit."; return; }
+  const memberCount = (kit.members || []).length;
   addBookingRowToDom("kit-booking-list", "kit", `
-    <div class="booking-row" data-booking-id="${data.booking_id}">
-      <span class="bname"><a href="/kits/${kit.id}/edit/">${kit.name}</a></span>
-      <span class="bdates">${formatDateNice(start)} &ndash; ${formatDateNice(end)}</span>
-      <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('kit', ${data.booking_id}, this)">&times;</button>
+    <div class="kit-booking-card" data-booking-id="${data.booking_id}" data-booking-kit-id="${kit.id}">
+      <div class="kit-head">
+        <span class="kname"><a href="/kits/${kit.id}/edit/">${kit.name}</a></span>
+        <span class="kdates">${formatDateNice(start)} &ndash; ${formatDateNice(end)}</span>
+        <span class="kmeta">${memberCount} member${memberCount === 1 ? "" : "s"}</span>
+        <button type="button" class="booking-remove-btn" title="Remove" onclick="removeBooking('kit', ${data.booking_id}, this)">&times;</button>
+      </div>
       ${kitMembersHtml(kit)}
     </div>
   `);

@@ -11,30 +11,36 @@ from .common import STEP_DAYS, _build_rows, _date_range, _month_range, _parse_an
 
 
 def _kit_member_rows(kit):
-    tags_by_asset_id = {kat.asset_id: kat.tag.name for kat in kit.kit_asset_tags.select_related("tag") if kat.tag_id}
+    tags_by_asset_id = {
+        kat.asset_id: {"name": kat.tag.name, "color": kat.tag.color or "#EAB308"}
+        for kat in kit.kit_asset_tags.select_related("tag") if kat.tag_id
+    }
+    qty_by_asset_id = {kat.asset_id: kat.quantity for kat in kit.kit_asset_tags.all()}
     rows = []
     for m in kit.assets.all().order_by("asset_type", "asset_id"):
         row = {
             "assetId": m.asset_id,
             "type": m.get_asset_type_display(),
             "model": m.make_model or None,
+            "statusKey": m.status.lower(),
             "status": m.get_status_display(),
             "tag": tags_by_asset_id.get(m.id),
+            "qty": qty_by_asset_id.get(m.id, 1),
             "nested": [],
         }
         if m.asset_type in Asset.CONTAINER_TYPES:
             for comp in m.nested_assets.all().order_by("asset_id"):
                 row["nested"].append({
                     "assetId": comp.asset_id, "type": comp.get_asset_type_display(),
-                    "model": comp.make_model or None, "status": comp.get_status_display(),
-                    "indent": False,
+                    "model": comp.make_model or None, "statusKey": comp.status.lower(),
+                    "status": comp.get_status_display(), "indent": False,
                 })
                 if comp.asset_type in Asset.NESTABLE_CONTAINER_TYPES:
                     for sub in comp.nested_assets.all().order_by("asset_id"):
                         row["nested"].append({
                             "assetId": sub.asset_id, "type": sub.get_asset_type_display(),
-                            "model": sub.make_model or None, "status": sub.get_status_display(),
-                            "indent": True,
+                            "model": sub.make_model or None, "statusKey": sub.status.lower(),
+                            "status": sub.get_status_display(), "indent": True,
                         })
         rows.append(row)
     return rows

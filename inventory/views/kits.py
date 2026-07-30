@@ -66,50 +66,35 @@ def kit_list_view(request):
 
 
 def _kit_eligible_assets_qs(current_kit=None):
-    """Assets eligible to be direct kit members: not archived, not a COMPONENT,
-    not an I/O Device already nested inside an Engine (it travels with that
-    Engine automatically). Individually-tracked assets (qty == 1) are
-    exclusive to one kit at a time, same as before. Bulk/stock assets
-    (qty > 1, e.g. a 'Wired Mouse' row representing several identical
-    units) can appear in multiple kits at once as long as some quantity
-    remains uncommitted - see _bulk_asset_availability(). Assets already in
-    the current kit are always included so they remain visible/removable
-    even in edge cases."""
-    other_kit_asset_ids = set(
-        Kit.objects.exclude(pk=current_kit.pk if current_kit else None)
-        .values_list("assets__id", flat=True)
-    )
-    other_kit_asset_ids.discard(None)
-    other_kit_container_ids = set(
-        Asset.objects.filter(
-            id__in=other_kit_asset_ids, asset_type__in=Asset.CONTAINER_TYPES
-        ).values_list("id", flat=True)
-    )
-    # I/O Devices nested inside one of those Engines are containers too -
-    # their own nested components must be excluded from the picker as well.
-    other_kit_container_ids |= set(
-        Asset.objects.filter(
-            parent_engine_id__in=other_kit_container_ids, asset_type__in=Asset.NESTABLE_CONTAINER_TYPES
-        ).values_list("id", flat=True)
-    )
-    current_kit_asset_ids = set(current_kit.assets.values_list("id", flat=True)) if current_kit else set()
-    # Bulk assets (qty > 1) with any quantity still uncommitted elsewhere -
-    # these stay selectable even though they're technically "in" another kit.
-    bulk_available_ids = set(
-        Asset.objects.filter(qty__gt=1).exclude(id__in=current_kit_asset_ids).values_list("id", flat=True)
-    )
-
+    """All non-archived, non-component, non-nested assets — shown in the
+    picker regardless of kit membership or status. Callers use
+    _kit_picker_assets() which annotates each asset with whether it is
+    already in another kit (shown greyed/disabled in the UI) and handles
+    bulk-quantity availability. The server-side save still validates that
+    only genuinely addable assets are committed."""
     return Asset.objects.filter(
         archived=False
     ).exclude(
         asset_type=Asset.AssetType.COMPONENT
     ).exclude(
         Q(asset_type__in=Asset.NESTABLE_CONTAINER_TYPES) & Q(parent_engine__isnull=False)
-    ).filter(
-        Q(id__in=current_kit_asset_ids)
-        | Q(id__in=bulk_available_ids)
-        | (~Q(id__in=other_kit_asset_ids) & ~Q(parent_engine_id__in=other_kit_container_ids))
     )
+
+
+def _other_kit_asset_info(current_kit=None):
+    """Returns two dicts keyed by asset id:
+      - other_kit_ids: set of asset ids that are in another kit (non-bulk exclusive)
+      - asset_kit_name: asset_id -> name of the other kit it belongs to
+    """
+    kat_qs = KitAssetTag.objects.select_related("kit", "asset").filter(asset__qty=1)
+    if current_kit is not None:
+        kat_qs = kat_qs.exclude(kit=current_kit)
+    other_kit_ids = set()
+    asset_kit_name = {}
+    for kat in kat_qs:
+        other_kit_ids.add(kat.asset_id)
+        asset_kit_name[kat.asset_id] = kat.kit.name
+    return other_kit_ids, asset_kit_name
 
 
 def _bulk_committed_elsewhere(current_kit=None):
@@ -125,11 +110,12 @@ def _bulk_committed_elsewhere(current_kit=None):
 
 
 def _kit_picker_assets(current_kit=None):
-    """Assets eligible to be direct kit members, with nested-component info for engines/I-O devices."""
+    """All picker-eligible assets, annotated with kit-membership and availability info."""
     assets = _kit_eligible_assets_qs(current_kit).order_by(
         "asset_type", "asset_id"
     ).prefetch_related("nested_assets")
     committed_elsewhere = _bulk_committed_elsewhere(current_kit)
+    other_kit_ids, asset_kit_name = _other_kit_asset_info(current_kit)
 
     data = []
     for a in assets:
@@ -141,11 +127,14 @@ def _kit_picker_assets(current_kit=None):
             ]
         is_bulk = a.qty > 1
         available = max(a.qty - committed_elsewhere.get(a.id, 0), 0) if is_bulk else 1
+        in_another_kit = not is_bulk and a.id in other_kit_ids
         data.append({
             "id": a.id, "assetId": a.asset_id, "makeModel": a.make_model,
             "type": a.get_asset_type_display(), "status": a.status.lower(),
             "statusDisplay": a.get_status_display(), "nested": nested,
             "isBulk": is_bulk, "totalQty": a.qty, "available": available,
+            "inAnotherKit": in_another_kit,
+            "otherKitName": asset_kit_name.get(a.id, ""),
         })
     return list(assets), data
 

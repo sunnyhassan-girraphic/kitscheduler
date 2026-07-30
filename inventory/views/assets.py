@@ -89,11 +89,17 @@ def _container_form_context(kind, container=None):
         archived=False
     ).exclude(
         asset_type__in=excluded_types
-    ).filter(
-        Q(parent_engine__isnull=True) | Q(parent_engine=container)
-    ).order_by("asset_type", "asset_id")
+    ).order_by("asset_type", "asset_id").select_related("parent_engine")
 
     components = list(components_qs)
+
+    # Which assets are already nested inside a *different* engine?
+    current_nested_ids = set(container.nested_assets.values_list("id", flat=True)) if container else set()
+    in_another_engine = {}  # asset.id -> engine asset_id string
+    for a in components:
+        if a.parent_engine_id and (container is None or a.parent_engine_id != container.pk):
+            in_another_engine[a.id] = a.parent_engine.asset_id
+
     components_json = [
         {
             "id": a.id,
@@ -104,6 +110,8 @@ def _container_form_context(kind, container=None):
             "status": a.status.lower(),
             "statusDisplay": a.get_status_display(),
             "isContainer": a.asset_type in Asset.NESTABLE_CONTAINER_TYPES,
+            "inAnotherEngine": a.id in in_another_engine,
+            "otherEngineName": in_another_engine.get(a.id, ""),
         }
         for a in components
     ]
@@ -117,13 +125,12 @@ def _container_form_context(kind, container=None):
     nestable_json = []
     if kind == Asset.AssetType.ENGINE:
         container_pool_ids = [a.id for a in components if a.asset_type in Asset.NESTABLE_CONTAINER_TYPES]
+        container_pool_id_set = set(container_pool_ids)
         nestable_qs = Asset.objects.filter(
             archived=False
         ).exclude(
             asset_type__in=Asset.CONTAINER_TYPES
-        ).filter(
-            Q(parent_engine__isnull=True) | Q(parent_engine_id__in=container_pool_ids)
-        ).order_by("asset_type", "asset_id")
+        ).order_by("asset_type", "asset_id").select_related("parent_engine")
         nestable_json = [
             {
                 "id": a.id,
@@ -133,7 +140,9 @@ def _container_form_context(kind, container=None):
                 "type": a.get_asset_type_display(),
                 "status": a.status.lower(),
                 "statusDisplay": a.get_status_display(),
-                "parentContainerId": a.parent_engine_id if a.parent_engine_id in container_pool_ids else None,
+                "parentContainerId": a.parent_engine_id if a.parent_engine_id in container_pool_id_set else None,
+                "inAnotherEngine": bool(a.parent_engine_id and a.parent_engine_id not in container_pool_id_set),
+                "otherEngineName": a.parent_engine.asset_id if (a.parent_engine_id and a.parent_engine_id not in container_pool_id_set) else "",
             }
             for a in nestable_qs
         ]
@@ -159,8 +168,10 @@ def _apply_component_selection(container, selected_ids, kind=None):
     kind = kind or container.asset_type
     excluded_types = [Asset.AssetType.ENGINE] if kind == Asset.AssetType.ENGINE else list(Asset.CONTAINER_TYPES)
     valid_components = Asset.objects.filter(
-        id__in=selected_ids, archived=False
-    ).exclude(asset_type__in=excluded_types)
+        id__in=selected_ids, archived=False, status=Asset.Status.AVAILABLE
+    ).exclude(asset_type__in=excluded_types).filter(
+        Q(parent_engine__isnull=True) | Q(parent_engine=container)
+    )
     selected = set(valid_components)
     currently_nested = set(container.nested_assets.all())
     for asset in selected - currently_nested:

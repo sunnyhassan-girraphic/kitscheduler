@@ -157,9 +157,12 @@
   }
   .picker-row .qty-input:focus { outline: none; border-color: var(--accent); }
   .picker-row .qty-available {
-    font-size: 10px; color: var(--text-faint); flex-shrink: 0; white-space: nowrap;
+    font-size: 12px; color: var(--text-dim); flex-shrink: 0; white-space: nowrap;
   }
   .picker-row .qty-available.qty-none { color: var(--red); }
+  .picker-row .picker-in-hint {
+    font-size: 12px; color: var(--text-dim); flex-shrink: 0; white-space: nowrap;
+  }
   .picker-remove-btn {
     background: none; border: none; color: var(--text-faint); cursor: pointer;
     font-size: 16px; line-height: 1; padding: 2px 4px; flex-shrink: 0;
@@ -294,7 +297,7 @@
           </select>
         </div>
         <div class="picker-results" id="picker-results"></div>
-        <div class="picker-hint">Individually-tracked components aren't listed here directly - add the Engine they're nested in instead. Assets already assigned to another kit won't appear here until removed from it.</div>
+        <div class="picker-hint">Individually-tracked components aren't listed here directly - add the Engine they're nested in instead. Non-available assets are shown but cannot be added until their status changes.</div>
       </div>
     </div>
 
@@ -597,16 +600,22 @@ function downloadKitPdf(kitId) {
       row.className = "picker-row";
       row.style.marginBottom = "6px";
       const outOfStock = a.isBulk && a.available <= 0;
+      const notAvailable = a.status !== "available";
+      const inAnotherKit = a.inAnotherKit;
+      const cantAdd = outOfStock || notAvailable || inAnotherKit;
       const availableHtml = a.isBulk
         ? `<span class="qty-available${outOfStock ? " qty-none" : ""}">${a.available} of ${a.totalQty} available</span>`
         : "";
+      let hint = "";
+      if (inAnotherKit) hint = `<span class="picker-in-hint">in ${a.otherKitName}</span>`;
+      const modelType = [a.type, a.makeModel].filter(Boolean).join(" · ");
       row.innerHTML = `
         <span class="aid">${a.assetId}</span>
-        <span class="amodel">${a.makeModel || ""}</span>
-        <span class="atype">${a.type}</span>
+        <span class="amodel">${modelType}</span>
         ${availableHtml}
+        ${hint}
         ${statusBadge(a)}
-        <button type="button" class="picker-add-btn" data-id="${a.id}" ${outOfStock ? "disabled" : ""}>Add</button>
+        ${cantAdd ? "" : `<button type="button" class="picker-add-btn" data-id="${a.id}">Add</button>`}
       `;
       resultsContainer.appendChild(row);
     });

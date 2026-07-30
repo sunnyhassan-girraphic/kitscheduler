@@ -150,6 +150,9 @@
   .picker-row .amodel { font-size: 12px; color: var(--text-dim); flex: 1; }
   .picker-row .atype { font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; }
   .picker-row .astatus .badge { font-size: 10px; padding: 2px 6px; }
+  .picker-row .picker-in-hint {
+    font-size: 12px; color: var(--text-dim); flex-shrink: 0; white-space: nowrap;
+  }
   .picker-item { margin-bottom: 6px; }
   .container-nest {
     margin: 2px 0 8px 24px; padding: 10px; border-left: 2px solid var(--accent-deep);
@@ -535,12 +538,18 @@
       matches.forEach(a => {
         const row = document.createElement("div");
         row.className = "picker-row";
+        const notAvailable = a.status !== "available";
+        const inAnother = a.inAnotherEngine;
+        const cantAdd = notAvailable || inAnother;
+        let hint = "";
+        if (inAnother) hint = `<span class="picker-in-hint">in ${a.otherEngineName}</span>`;
+        const modelTypeC = [a.type, a.makeModel].filter(Boolean).join(" · ");
         row.innerHTML = `
           <span class="aid">${a.assetId}</span>
-          <span class="amodel">${a.makeModel || ""}</span>
-          <span class="atype">${a.type}</span>
+          <span class="amodel">${modelTypeC}</span>
+          ${hint}
           ${statusBadge(a)}
-          <button type="button" class="picker-add-btn container-child-add" data-container="${containerId}" data-id="${a.id}">Add</button>
+          ${cantAdd ? "" : `<button type="button" class="picker-add-btn container-child-add" data-container="${containerId}" data-id="${a.id}">Add</button>`}
         `;
         resultsEl.appendChild(row);
       });
@@ -597,12 +606,19 @@
     matches.forEach(a => {
       const row = document.createElement("div");
       row.className = "picker-row";
+      row.style.marginBottom = "6px";
+      const notAvailable = a.status !== "available";
+      const inAnother = a.inAnotherEngine;
+      const cantAdd = notAvailable || inAnother;
+      let hint = "";
+      if (inAnother) hint = `<span class="picker-in-hint">in ${a.otherEngineName}</span>`;
+      const modelType = [a.type, a.makeModel].filter(Boolean).join(" · ");
       row.innerHTML = `
         <span class="aid">${a.assetId}</span>
-        <span class="amodel">${a.makeModel || ""}</span>
-        <span class="atype">${a.type}</span>
+        <span class="amodel">${modelType}</span>
+        ${hint}
         ${statusBadge(a)}
-        <button type="button" class="picker-add-btn" data-id="${a.id}">Add</button>
+        ${cantAdd ? "" : `<button type="button" class="picker-add-btn" data-id="${a.id}">Add</button>`}
       `;
       resultsContainer.appendChild(row);
     });
