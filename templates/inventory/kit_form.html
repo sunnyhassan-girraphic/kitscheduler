@@ -367,7 +367,7 @@
 
     {% if pdf_items %}
     <div class="form-field">
-      <label style="margin-bottom:8px;">Items <span style="color:var(--text-faint); font-weight:400;">(quantity defaults to what's committed to this kit, but you can override it just for this print &mdash; set a case number and tick off as packed too, all optional, blank prints as a hand-fill line)</span></label>
+      <label style="margin-bottom:8px;">Items <span style="color:var(--text-faint); font-weight:400;">(quantity defaults to what's committed to this kit, override for PDF export)</span></label>
       <table class="pdf-items-table">
         <thead>
           <tr><th>Item</th><th>Quantity</th><th>Case No.</th><th>Checked</th></tr>
@@ -375,7 +375,7 @@
         <tbody>
           {% for row in pdf_items %}
           <tr>
-            <td class="{% if row.nested %}nested{% endif %}">{% if row.nested %}&mdash; {% endif %}{{ row.item }}{% if row.details %} <span class="dim">{{ row.details }}</span>{% endif %}</td>
+            <td class="{% if row.nested %}nested{% endif %}">{% if row.nested %}- {% endif %}{{ row.item }}{% if row.details %} <span class="dim">{{ row.details }}</span>{% endif %}</td>
             <td><input type="text" inputmode="numeric" pattern="[0-9]*" class="pdf-qty-input" data-asset-id="{{ row.id }}" value="{{ row.qty }}"></td>
             <td><input type="text" class="pdf-case-input" data-asset-id="{{ row.id }}" placeholder="-"></td>
             <td style="text-align:center;"><input type="checkbox" class="pdf-checked-input" data-asset-id="{{ row.id }}"></td>
