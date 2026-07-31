@@ -70,7 +70,22 @@
     margin-bottom: 16px;
     overflow: hidden;
   }
-  .form-section-head {
+
+  .form-section.collapsed .form-section-head { border-bottom: none; }
+    .form-section-body {
+    padding: 16px;
+    overflow: hidden;
+    max-height: 1200px;
+    transition: max-height 0.6s ease;
+  }
+  .form-section.collapsed .form-section-body {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    transition: max-height 0.6s ease, padding-top 0.6s ease, padding-bottom 0.6s ease;
+  }
+  .form-section.collapsed .form-section-head { border-bottom: none; }
+    .form-section-head {
     padding: 12px 16px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
@@ -80,7 +95,14 @@
     letter-spacing: 0.04em;
     color: var(--text-dim);
   }
-  .form-section.collapsed .form-section-body { display: none; }
+  .history-collapsible {
+    max-height: 800px;
+    overflow: hidden;
+    transition: max-height 0.6s ease;
+  }
+  .form-section.collapsed .history-collapsible {
+    max-height: 0;
+  }
   .form-section.collapsed .form-section-head { border-bottom: none; }
   .form-section-head { cursor: pointer; user-select: none; }
   .form-section-head:hover { color: var(--text); }
@@ -91,7 +113,6 @@
   }
   .form-section.collapsed .collapse-btn { transform: rotate(-90deg); }
   .collapse-btn svg { width: 14px; height: 14px; }
-  .form-section-body { padding: 16px; }
   .form-field { margin-bottom: 14px; }
   .form-field:last-child { margin-bottom: 0; }
   .form-field label {
@@ -315,16 +336,16 @@
     <div class="form-section {% if not current_booking %}collapsed{% endif %}" id="section-job">
       <div class="form-section-head" onclick="toggleSection('section-job')" style="display:flex;align-items:center;justify-content:space-between;">
         Assigned job
-        {% if current_booking %}
-          <a href="/jobs/{{ current_booking.job.id }}/edit/" onclick="event.stopPropagation();" style="font-size:11px;font-weight:400;color:var(--accent);text-transform:none;letter-spacing:0;text-decoration:none;">{{ current_booking.job.name }} - {{ current_booking.start_date|date:"j M Y" }} to {{ current_booking.end_date|date:"j M Y" }} ↗</a>
-        {% endif %}
         <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
       </div>
       <div class="form-section-body">
+		{% if current_booking %}
+          <a href="/jobs/{{ current_booking.job.id }}/edit/" onclick="event.stopPropagation();" style="font-size:11px;font-weight:400;color:var(--accent);text-transform:none;letter-spacing:0;text-decoration:none;">{{ current_booking.job.name }} - {{ current_booking.start_date|date:"j M Y" }} to {{ current_booking.end_date|date:"j M Y" }} ↗</a>
+        {% endif %}
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
           Assign this kit to a job. Dates auto-fill from the job but can be adjusted if the kit is only needed for part of the window.
           {% if picker_date_from and picker_date_to %}
-          Checking asset availability for <strong style="color:var(--text-dim);">{{ picker_date_from|date:"j M Y" }} &rarr; {{ picker_date_to|date:"j M Y" }}</strong> — assets in another kit with non-overlapping bookings can still be added.
+          Checking asset availability for <strong style="color:var(--text-dim);">{{ picker_date_from|date:"j M Y" }} &rarr; {{ picker_date_to|date:"j M Y" }}</strong>.ssets in another kit with non-overlapping bookings can still be added.
           {% endif %}
         </p>
 
@@ -482,17 +503,17 @@ async function confirmDeleteKit() {
 </div>
 {% if kit %}</div>
 <div>
-  <div class="form-section" style="margin-bottom:0;">
-    <div class="form-section-head" style="display:flex; align-items:center; justify-content:space-between;">
+  <div class="form-section" id="section-history" style="margin-bottom:0;">
+    <div class="form-section-head" onclick="toggleSection('section-history')" style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
       <span>History</span>
       <div style="display:flex;align-items:center;gap:8px;"><div class="history-filters">
-        <a class="history-filter-btn {% if history_mode == 'week' %}active{% endif %}" href="?history=week">This week</a>
-        <a class="history-filter-btn {% if history_mode == 'month' %}active{% endif %}" href="?history=month">This month</a>
-        <a class="history-filter-btn {% if history_mode == 'all' %}active{% endif %}" href="?history=all">All time</a>
+        <a class="history-filter-btn {% if history_mode == 'week' %}active{% endif %}" href="?history=week" onclick="event.stopPropagation()">This week</a>
+        <a class="history-filter-btn {% if history_mode == 'month' %}active{% endif %}" href="?history=month" onclick="event.stopPropagation()">This month</a>
+        <a class="history-filter-btn {% if history_mode == 'all' %}active{% endif %}" href="?history=all" onclick="event.stopPropagation()">All time</a>
       </div></div>
       <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
     </div>
-    <div class="history-feed">
+    <div class="history-collapsible"><div class="history-feed">
       {% for entry in history_page %}
       <div class="history-item {% if entry.field_changed == 'created' %}is-created{% elif entry.field_changed == 'note' %}is-note{% endif %}">
         <div class="history-dot"></div>
@@ -538,9 +559,10 @@ async function confirmDeleteKit() {
       {% else %}<span></span>{% endif %}
     </div>
     {% endif %}
+  </div><!-- /history-collapsible -->
   </div>
 </div>
-</div></div>{% endif %}
+{% endif %}
 
 <script>
 function toggleSection(id) {

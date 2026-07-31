@@ -547,9 +547,9 @@ def kit_edit_view(request, kit_id):
     selected_tags_json = {kat.asset_id: kat.tag_id for kat in kit_asset_tags if kat.tag_id}
     selected_tags2_json = {kat.asset_id: kat.tag_2_id for kat in kit_asset_tags if kat.tag_2_id}
     selected_qty_json = {kat.asset_id: kat.quantity for kat in kit_asset_tags}
-    history_mode = request.GET.get("history", "month")
+    history_mode = request.GET.get("history", "week")
     if history_mode not in ("week", "month", "all"):
-        history_mode = "month"
+        history_mode = "week"
     history_page_num = request.GET.get("history_page", 1)
     return render(request, "inventory/kit_form.html", {
         "kit": kit,

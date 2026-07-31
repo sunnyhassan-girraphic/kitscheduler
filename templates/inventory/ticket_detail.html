@@ -23,11 +23,37 @@
     background: var(--surface-2); border: 1px solid var(--border);
     border-radius: 8px; margin-bottom: 12px; overflow: hidden;
   }
-  .form-section-head {
+
+  .form-section.collapsed .form-section-head { border-bottom: none; }
+    .form-section-body {
+    padding: 16px;
+    overflow: hidden;
+    max-height: 1200px;
+    transition: max-height 0.6s ease;
+  }
+  .form-section.collapsed .form-section-body {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    transition: max-height 0.6s ease, padding-top 0.6s ease, padding-bottom 0.6s ease;
+  }
+  .form-section.collapsed .form-section-head { border-bottom: none; }
+    .form-section-head {
     padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
     font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim);
   }
-  .form-section-body { padding: 16px; }
+  .history-collapsible {
+    max-height: 800px;
+    overflow: hidden;
+    transition: max-height 0.6s ease;
+  }
+  .form-section.collapsed .history-collapsible { max-height: 0; }
+  .collapse-btn {
+    background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 0;
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+  }
+  .collapse-btn svg { width: 14px; height: 14px; transition: transform 0.2s; }
+  .form-section.collapsed .collapse-btn svg { transform: rotate(-90deg); }
 
   .detail-row { display: flex; gap: 8px; padding: 5px 0; font-size: 13px; }
   .detail-row .k { color: var(--text-dim); min-width: 110px; flex-shrink: 0; }
@@ -147,11 +173,16 @@ async function confirmDeleteTicket() {
   if (ok) document.getElementById("delete-ticket-form").submit();
 }
 </script>
+<script>
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle("collapsed");
+}
+</script>
       </div>
     </div>
-    <div class="form-section collapsed" id="section-history" style="margin-bottom:0;">
+    <div class="form-section" id="section-history" style="margin-bottom:0;">
       <div class="form-section-head" onclick="toggleSection('section-history')" style="display:flex;align-items:center;justify-content:space-between;">History <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>
-      <div class="history-feed">
+      <div class="history-collapsible"><div class="history-feed">
         {% for item in history %}
         {% with entry=item.entry %}
         <div class="history-item {% if entry.field_changed == 'created' %}is-created{% elif entry.field_changed == 'comment' %}is-comment{% endif %}">
@@ -189,7 +220,7 @@ async function confirmDeleteTicket() {
         <div class="history-empty">No history yet.</div>
         {% endfor %}
       </div>
-    </div>
+    </div></div><!-- /history-collapsible -->
   </div>
 
 </div>

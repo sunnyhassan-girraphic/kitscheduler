@@ -17,6 +17,7 @@
     border: 1px solid var(--border); border-radius: 8px;
     margin: 0; background: var(--surface);
     display: flex; flex-direction: column;
+    min-height: 52px; overflow: hidden;
   }
   .kit-head {
     display: flex; align-items: center; gap: 12px; padding: 12px 16px;
@@ -271,6 +272,7 @@ function toggleNested(wrapId, headerEl) {
 </script>
 <script>
 (function() {
+
   // ── Kit status custom menu ──────────────────────────────────────────────────
   const DISMISSED_KEY = "ks_dismissed_kits";
 

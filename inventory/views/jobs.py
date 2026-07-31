@@ -153,9 +153,9 @@ def job_edit_view(request, job_id):
 
         return redirect(f"/jobs/{job.id}/edit/")
 
-    history_mode = request.GET.get("history", "month")
+    history_mode = request.GET.get("history", "week")
     if history_mode not in ("week", "month", "all"):
-        history_mode = "month"
+        history_mode = "week"
     history_page_num = request.GET.get("history_page", 1)
     current_staff = StaffMember.for_user(request.user)
     context = _job_edit_context(job)

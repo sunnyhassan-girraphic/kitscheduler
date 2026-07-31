@@ -155,9 +155,9 @@ def license_create_view(request):
 @login_required
 def license_edit_view(request, license_id):
     lic = get_object_or_404(Asset, pk=license_id, asset_type=Asset.AssetType.LICENSE)
-    history_mode = request.GET.get("history", "month")
+    history_mode = request.GET.get("history", "week")
     if history_mode not in ("week", "month", "all"):
-        history_mode = "month"
+        history_mode = "week"
     try:
         history_page = int(request.GET.get("history_page", "1"))
     except ValueError:

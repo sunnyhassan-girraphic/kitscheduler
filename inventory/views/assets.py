@@ -300,9 +300,9 @@ def _container_create_view(request, kind):
 def _container_edit_view(request, kind, container_id):
     meta = CONTAINER_KIND_META[kind]
     container = get_object_or_404(Asset, pk=container_id, asset_type=kind)
-    history_mode = request.GET.get("history", "month")
+    history_mode = request.GET.get("history", "week")
     if history_mode not in ("week", "month", "all"):
-        history_mode = "month"
+        history_mode = "week"
     try:
         history_page = int(request.GET.get("history_page", "1"))
     except ValueError:
@@ -641,9 +641,9 @@ def asset_edit_view(request, asset_id):
 
     staff_members = list(StaffMember.objects.filter(active=True).order_by("name"))
     current_staff = StaffMember.for_user(request.user)
-    history_mode = request.GET.get("history", "month")
+    history_mode = request.GET.get("history", "week")
     if history_mode not in ("week", "month", "all"):
-        history_mode = "month"
+        history_mode = "week"
     try:
         history_page_num = int(request.GET.get("history_page", "1"))
     except ValueError:
