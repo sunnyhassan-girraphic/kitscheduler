@@ -38,10 +38,18 @@ def kit_list_view(request):
         tags2_by_asset_id = {kat.asset_id: kat.tag_2 for kat in kit.kit_asset_tags.all() if kat.tag_2_id}
         qty_by_asset_id = {kat.asset_id: kat.quantity for kat in kit.kit_asset_tags.all()}
         members = list(kit.assets.all().order_by("asset_type", "asset_id"))
+        member_ids = [m.id for m in members]
+        # For each member, find other kits it also belongs to (excluding this kit)
+        other_kits_by_asset = {}
+        for kat in KitAssetTag.objects.filter(
+            asset_id__in=member_ids
+        ).exclude(kit=kit).select_related("kit"):
+            other_kits_by_asset.setdefault(kat.asset_id, []).append(kat.kit.name)
         for m in members:
             m.kit_tag = tags_by_asset_id.get(m.id)
             m.kit_tag_2 = tags2_by_asset_id.get(m.id)
             m.kit_qty = qty_by_asset_id.get(m.id, 1)
+            m.also_in_kits = other_kits_by_asset.get(m.id, [])
         nested_count = sum(
             m.nested_assets.count()
             + sum(c.nested_assets.count() for c in m.nested_assets.all() if c.asset_type in Asset.NESTABLE_CONTAINER_TYPES)
@@ -50,6 +58,7 @@ def kit_list_view(request):
         current_booking = next(
             (b for b in kit.bookings.all() if b.start_date <= today <= b.end_date), None
         )
+        job_color = current_booking.job.resolve_color() if current_booking else None
         # Keep DB status in sync with booking reality for display.
         # The signal does this on every booking save/delete, but existing kits
         # may have stale status — override in memory so the card always shows
@@ -63,6 +72,7 @@ def kit_list_view(request):
             "members": members,
             "nested_count": nested_count,
             "current_booking": current_booking,
+            "job_color": job_color,
         })
 
     context = {
@@ -608,10 +618,18 @@ def kit_set_status_view(request, kit_id):
             existing.delete()
             booking_removed = True
 
+    # If status was set to READY but an active booking exists today,
+    # immediately recompute to BOOKED so the response reflects truth.
+    if new_status == Kit.Status.READY and not booking_removed:
+        from inventory.signals import _recompute_kit_status
+        _recompute_kit_status(kit.pk)
+        kit.refresh_from_db(fields=["status"])
+
     return JsonResponse({
         "status": kit.status,
         "statusDisplay": kit.get_status_display(),
         "bookingRemoved": booking_removed,
+        "isBooked": kit.status == Kit.Status.BOOKED,
     })
 
 

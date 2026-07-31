@@ -17,33 +17,37 @@
     border: 1px solid var(--border); border-radius: 8px;
     margin: 0; background: var(--surface);
     display: flex; flex-direction: column;
-    min-height: 56px; overflow: hidden;
-    position: relative;
   }
-  .kit-card-inner { flex: 1; overflow-y: auto; min-height: 0; }
-  .kit-card-resize-handle {
-    height: 6px; cursor: ns-resize; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: transparent;
-  }
-  .kit-card-resize-handle::after {
-    content: ''; display: block;
-    width: 32px; height: 2px; border-radius: 2px;
-    background: var(--border-strong); opacity: 0;
-    transition: opacity 0.15s;
-  }
-  .kit-card:hover .kit-card-resize-handle::after { opacity: 1; }
-  .kit-card-resize-handle:hover::after,
-  .kit-card-resize-handle.dragging::after { opacity: 1; background: var(--accent); }
   .kit-head {
     display: flex; align-items: center; gap: 12px; padding: 12px 16px;
     background: var(--surface-2); border-bottom: 1px solid var(--border);
+    border-radius: 8px 8px 0 0; position: relative; overflow: visible;
   }
   .kit-head .name { font-weight: 600; font-size: 14px; }
   .kit-head .name a { color: var(--text); text-decoration: none; }
   .kit-head .name a:hover { color: var(--accent); }
   .kit-head .meta { font-size: 12px; color: var(--text-dim); font-family: var(--mono); }
-  .kit-head .meta-spacer { flex: 1; }
+  .kit-head .meta-spacer { flex: 1; min-width: 4px; }
+
+  /* Job badge — name only, expands on hover to show dates */
+  .kit-job-badge {
+    display: inline-flex; align-items: center; gap: 0;
+    padding: 2px 7px; border-radius: 5px; text-decoration: none;
+    font-size: 11px; font-weight: 600; flex-shrink: 0;
+    background: color-mix(in srgb, var(--job-color, #EAB308) 15%, transparent);
+    color: var(--job-color, #EAB308);
+    border: 1px solid color-mix(in srgb, var(--job-color, #EAB308) 35%, transparent);
+    overflow: hidden; max-width: 120px; transition: max-width 0.22s ease;
+    white-space: nowrap;
+  }
+  .kit-job-badge:hover { max-width: 400px; }
+  .kit-job-badge-dates {
+    font-size: 10px; font-weight: 400; opacity: 0.85; flex-shrink: 0;
+    border-left: 1px solid currentColor; margin-left: 6px; padding-left: 6px;
+    max-width: 0; overflow: hidden; opacity: 0;
+    transition: max-width 0.22s ease, opacity 0.22s ease;
+  }
+  .kit-job-badge:hover .kit-job-badge-dates { max-width: 300px; opacity: 0.85; }
   .member-row, .nested-row {
     display: grid; grid-template-columns: 20px 140px 1fr;
     align-items: center; column-gap: 10px;
@@ -87,33 +91,31 @@
   .kit-card-btn.close-btn:hover { color: var(--red); }
   .kit-card.pinned { order: -1; border-color: var(--accent-deep); }
 
-  /* Status pill on kit card */
+  /* Status pill */
   .kit-status-pill {
     display: inline-flex; align-items: center; gap: 5px;
-    padding: 2px 8px 2px 7px; border-radius: 6px;
+    padding: 4px 8px;; border-radius: 6px;
     border: 1px solid var(--border-strong);
     background: var(--surface-2);
-    font-size: 11px; font-weight: 500; cursor: pointer;
-    color: var(--text-dim);
-    user-select: none; white-space: nowrap; flex-shrink: 0;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    color: var(--text-dim); user-select: none; white-space: nowrap; flex-shrink: 0;
+    position: relative;
   }
-  .kit-status-pill:hover { border-color: var(--accent-deep); color: var(--text); }
+  .kit-status-pill:hover,
+  .kit-status-pill.open { border-color: var(--accent-deep); color: var(--text); }
   .kit-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .kit-status-caret { width: 8px; height: 8px; flex-shrink: 0; opacity: 0.5; margin-left: 1px; }
-
-  /* Dot colours only — pill background/border stays neutral to match the card */
   .kit-status-ready   .kit-status-dot { background: var(--green); }
   .kit-status-prep    .kit-status-dot { background: var(--accent); }
   .kit-status-booked  .kit-status-dot { background: var(--blue); }
   .kit-status-faulty  .kit-status-dot { background: var(--red); }
   .kit-status-archived .kit-status-dot { background: var(--text-faint); }
-
-  /* Dropdown menu — positioned fixed via JS using getBoundingClientRect */
+  /* Custom dropdown menu — absolute inside pill so no positioning calc needed */
   .kit-status-menu {
-    z-index: 9999;
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 9999;
     background: var(--surface-2); border: 1px solid var(--border-strong);
     border-radius: 8px; padding: 4px; min-width: 170px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   }
   .kit-status-menu-item {
     display: flex; align-items: center; gap: 8px;
@@ -121,11 +123,22 @@
     cursor: pointer; color: var(--text-dim);
   }
   .kit-status-menu-item:hover { background: var(--surface); color: var(--text); }
-  .kit-status-menu-item.active { color: var(--text); font-weight: 500; }
+  .kit-status-menu-item.active { color: var(--text); font-weight: 600; }
   .kit-status-menu-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   #kit-status-dialog::backdrop { background: rgba(0,0,0,0.55); }
 {% endblock %}
 {% block content %}
+<!-- Kit status change confirmation dialog — must be in DOM before the IIFE script -->
+<dialog id="kit-status-dialog" style="background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;padding:20px 24px;max-width:400px;color:var(--text);margin:auto;">
+  <h2 style="font-size:15px;margin:0 0 8px;font-weight:600;">Kit is currently booked</h2>
+  <p id="kit-status-dialog-msg" style="font-size:13px;color:var(--text-dim);margin:0 0 14px;line-height:1.5;"></p>
+  <div id="kit-status-remove-line" style="display:flex;flex-direction:column;gap:6px;margin-bottom:18px;"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <button id="kit-status-dialog-cancel" class="btn" type="button">Cancel</button>
+    <button id="kit-status-dialog-confirm" class="btn btn-primary" type="button">Confirm</button>
+  </div>
+</dialog>
+
 <form id="csrf-holder" style="display:none;">{% csrf_token %}</form>
 <div class="filter-bar">
   <div class="filter-bar-left">
@@ -148,11 +161,24 @@
   <div class="kit-card" data-kit-id="{{ row.kit.id }}">
     <div class="kit-head">
       <span class="name">{{ row.kit.name }}</span>
+      {% if row.current_booking %}
+        <a class="kit-job-badge"
+           href="/jobs/{{ row.current_booking.job.id }}/edit/"
+           style="--job-color:{{ row.job_color }};"
+           title="{{ row.current_booking.job.name }} - {{ row.current_booking.start_date|date:'j M Y' }} to {{ row.current_booking.end_date|date:'j M Y' }}">
+          <span class="kit-job-badge-name">{{ row.current_booking.job.name }}</span>
+          <span class="kit-job-badge-dates">{{ row.current_booking.start_date|date:"j M Y" }} to {{ row.current_booking.end_date|date:"j M Y" }} ↗</span>
+        </a>
+      {% endif %}
+      {% if row.kit.status == "FAULTY" and not row.current_booking %}
+        <span class="badge badge-needs_repair">Faulty</span>
+      {% endif %}
+      <span class="meta">{% kit_member_summary row.members %}</span>
+      <div class="meta-spacer"></div>
       <div class="kit-status-pill kit-status-{{ row.kit.status|lower }}"
            data-kit-id="{{ row.kit.id }}"
            data-status="{{ row.kit.status }}"
-           tabindex="0"
-           role="button"
+           tabindex="0" role="button"
            aria-label="Kit status: {{ row.kit.get_status_display }}"
            onclick="openStatusMenu(this)"
            onkeydown="if(event.key==='Enter'||event.key===' ')openStatusMenu(this)">
@@ -160,14 +186,6 @@
         <span class="kit-status-label">{{ row.kit.get_status_display }}</span>
         <svg class="kit-status-caret" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
-      {% if row.current_booking %}
-        <span class="badge badge-in_use">Booked: {{ row.current_booking.job.name }}</span>
-      {% endif %}
-      {% if row.kit.status == "FAULTY" and not row.current_booking %}
-        <span class="badge badge-needs_repair">Faulty</span>
-      {% endif %}
-      <span class="meta">{% kit_member_summary row.members %}</span>
-      <div class="meta-spacer"></div>
       <div class="kit-card-actions">
         <a class="kit-card-btn" href="/kits/{{ row.kit.id }}/edit/" title="Edit" aria-label="Edit">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -188,6 +206,7 @@
           <span class="mname">{{ member.asset_id }}</span>
           <div class="mright">
             <span class="mmodel">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
+            {% if member.also_in_kits %}<span style="font-size:11px;color:var(--text-faint);font-style:italic;">also in {{ member.also_in_kits|join:", " }}</span>{% endif %}
             {% if member.kit_tag %}<span class="kit-tag" style="background: {{ member.kit_tag.color|default:'#EAB308' }}1A; color: {{ member.kit_tag.color|default:'#EAB308' }}; border-color: {{ member.kit_tag.color|default:'#EAB308' }};">{{ member.kit_tag.name }}</span>{% endif %}{% if member.kit_tag_2 %}<span class="kit-tag" style="background: {{ member.kit_tag_2.color|default:'#EAB308' }}1A; color: {{ member.kit_tag_2.color|default:'#EAB308' }}; border-color: {{ member.kit_tag_2.color|default:'#EAB308' }};">{{ member.kit_tag_2.name }}</span>{% endif %}
             <span class="badge badge-{{ member.status|lower }}">{{ member.get_status_display }}</span>
           </div>
@@ -223,6 +242,7 @@
           <span class="mname">{{ member.asset_id }}</span>
           <div class="mright">
             <span class="mmodel">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
+            {% if member.also_in_kits %}<span style="font-size:11px;color:var(--text-faint);font-style:italic;">also in {{ member.also_in_kits|join:", " }}</span>{% endif %}
             {% if member.kit_tag %}<span class="kit-tag" style="background: {{ member.kit_tag.color|default:'#EAB308' }}1A; color: {{ member.kit_tag.color|default:'#EAB308' }}; border-color: {{ member.kit_tag.color|default:'#EAB308' }};">{{ member.kit_tag.name }}</span>{% endif %}{% if member.kit_tag_2 %}<span class="kit-tag" style="background: {{ member.kit_tag_2.color|default:'#EAB308' }}1A; color: {{ member.kit_tag_2.color|default:'#EAB308' }}; border-color: {{ member.kit_tag_2.color|default:'#EAB308' }};">{{ member.kit_tag_2.name }}</span>{% endif %}
             {% if member.kit_qty > 1 %}<span class="member-qty">&times;{{ member.kit_qty }}</span>{% endif %}
             <span class="badge badge-{{ member.status|lower }}">{{ member.get_status_display }}</span>
@@ -234,7 +254,6 @@
     {% endfor %}
   </div>
   {% endfor %}
-  <div class="kit-card-resize-handle" data-kit-id="{{ row.kit.id }}"></div>
 </div>
 {% else %}
 <div class="empty">
@@ -252,56 +271,7 @@ function toggleNested(wrapId, headerEl) {
 </script>
 <script>
 (function() {
-  // ── Kit card drag-to-resize ───────────────────────────────────────────────
-  // Each card has a .kit-card-resize-handle at the bottom. Dragging it sets
-  // an explicit height on the card so grid-auto-rows:min-content is overridden
-  // only for that card. Heights are saved to localStorage per kit ID.
-  const HEIGHTS_KEY = "ks_kit_heights";
-  function getSavedHeights() {
-    try { return JSON.parse(localStorage.getItem(HEIGHTS_KEY) || "{}"); } catch { return {}; }
-  }
-  function saveHeight(kitId, h) {
-    const heights = getSavedHeights();
-    heights[kitId] = h;
-    localStorage.setItem(HEIGHTS_KEY, JSON.stringify(heights));
-  }
-  // Restore saved heights on load
-  const savedHeights = getSavedHeights();
-  document.querySelectorAll(".kit-card[data-kit-id]").forEach(card => {
-    const h = savedHeights[card.dataset.kitId];
-    if (h) card.style.height = h + "px";
-  });
-  // Wire up drag handles
-  document.querySelectorAll(".kit-card-resize-handle").forEach(handle => {
-    handle.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      const card = handle.closest(".kit-card");
-      const startY = e.clientY;
-      const startH = card.getBoundingClientRect().height;
-      handle.classList.add("dragging");
-      function onMove(ev) {
-        const newH = Math.max(56, startH + (ev.clientY - startY));
-        card.style.height = newH + "px";
-      }
-      function onUp() {
-        handle.classList.remove("dragging");
-        const finalH = parseInt(card.style.height, 10);
-        if (finalH) saveHeight(card.dataset.kitId, finalH);
-        document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("mouseup", onUp);
-      }
-      document.addEventListener("mousemove", onMove);
-      document.addEventListener("mouseup", onUp);
-    });
-    // Double-click the handle to reset to natural height
-    handle.addEventListener("dblclick", () => {
-      const card = handle.closest(".kit-card");
-      card.style.height = "";
-      const heights = getSavedHeights();
-      delete heights[card.dataset.kitId];
-      localStorage.setItem(HEIGHTS_KEY, JSON.stringify(heights));
-    });
-  });
+  // ── Kit status custom menu ──────────────────────────────────────────────────
   const DISMISSED_KEY = "ks_dismissed_kits";
 
   function getPinned() { try { return new Set(JSON.parse(localStorage.getItem(PINNED_KEY) || "[]")); } catch { return new Set(); } }
@@ -345,6 +315,7 @@ function toggleNested(wrapId, headerEl) {
     cards.forEach(c => grid.appendChild(c));
   };
 
+  // ── Kit status custom menu ────────────────────────────────────────────────────
   const STATUS_OPTIONS = [
     { value: "READY",    label: "Ready",             dot: "#3fb950" },
     { value: "PREP",     label: "Prep / in progress", dot: "#eab308" },
@@ -356,34 +327,32 @@ function toggleNested(wrapId, headerEl) {
   let activePill = null;
 
   function closeMenu() {
-    if (activeMenu) { activeMenu.remove(); activeMenu = null; activePill = null; }
+    if (activeMenu) { activeMenu.remove(); activeMenu = null; }
+    if (activePill) { activePill.classList.remove("open"); activePill = null; }
   }
 
   document.addEventListener("mousedown", (e) => {
-    if (activeMenu && !activeMenu.contains(e.target) && !e.target.closest(".kit-status-pill")) {
+    if (activeMenu && !activePill.contains(e.target)) {
       closeMenu();
     }
   });
 
   window.openStatusMenu = function(pill) {
-    // Toggle: clicking the open pill's button closes it
     if (activePill === pill) { closeMenu(); return; }
     closeMenu();
 
     const kitId = pill.dataset.kitId;
     const current = pill.dataset.status;
-    const rect = pill.getBoundingClientRect();
 
     const menu = document.createElement("div");
     menu.className = "kit-status-menu";
-    menu.style.cssText = `position:fixed;top:${rect.bottom + 4}px;left:${rect.left}px;`;
 
     STATUS_OPTIONS.forEach(opt => {
       const item = document.createElement("div");
       item.className = "kit-status-menu-item" + (opt.value === current ? " active" : "");
       item.innerHTML = `<span class="kit-status-menu-dot" style="background:${opt.dot}"></span>${opt.label}`;
       item.addEventListener("mousedown", (e) => {
-        e.preventDefault(); // prevent blur before click
+        e.preventDefault();
         e.stopPropagation();
         applyStatus(kitId, opt, pill);
         closeMenu();
@@ -391,67 +360,43 @@ function toggleNested(wrapId, headerEl) {
       menu.appendChild(item);
     });
 
-    document.body.appendChild(menu);
+    pill.appendChild(menu);
     activeMenu = menu;
     activePill = pill;
+    pill.classList.add("open");
   };
 
   async function applyStatus(kitId, opt, pill) {
-    // Check if this kit has a booking — if so, show a confirmation dialog
-    // before setting certain statuses (going away from Booked, or setting Ready).
-    const needsBookingCheck = true; // always check; modal only shows if booking exists
-    let bookingInfo = null;
-    try {
-      const r = await fetch(`/kits/${kitId}/booking-info/`);
-      if (r.ok) bookingInfo = await r.json();
-    } catch {}
-
-    const hasBooking = bookingInfo && bookingInfo.hasBooking;
-
-    if (hasBooking) {
-      // Show confirmation dialog
-      const dialog = document.getElementById("kit-status-dialog");
-      const msg = document.getElementById("kit-status-dialog-msg");
-      const removeLine = document.getElementById("kit-status-remove-line");
-
-      msg.textContent = `This kit is booked on "${bookingInfo.jobName}" (${bookingInfo.startDate} → ${bookingInfo.endDate}).`;
-
-      if (opt.value === "READY") {
-        // Going to Ready: offer to keep or remove the booking
-        removeLine.innerHTML = `
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
-            <input type="radio" name="booking-action" value="keep" checked> Set to Ready - keep the booking
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px;">
-            <input type="radio" name="booking-action" value="remove"> Set to Ready - remove from job
-          </label>`;
-      } else {
-        // Going to Prep/Faulty/Archived from Booked: same choice
-        removeLine.innerHTML = `
+    if (opt.value !== "READY") {
+      let bookingInfo = null;
+      try {
+        const r = await fetch(`/kits/${kitId}/booking-info/`);
+        if (r.ok) bookingInfo = await r.json();
+      } catch {}
+      if (bookingInfo && bookingInfo.hasBooking) {
+        const dialog = document.getElementById("kit-status-dialog");
+        document.getElementById("kit-status-dialog-msg").textContent =
+          `This kit is booked on "${bookingInfo.jobName}" (${bookingInfo.startDate} - ${bookingInfo.endDate}).`;
+        document.getElementById("kit-status-remove-line").innerHTML = `
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
             <input type="radio" name="booking-action" value="keep" checked> Set to ${opt.label} - keep the booking
           </label>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px;">
             <input type="radio" name="booking-action" value="remove"> Set to ${opt.label} - remove from job
           </label>`;
+        dialog.dataset.kitId = kitId;
+        dialog._pill = pill;
+        dialog._opt = opt;
+        dialog.showModal();
+        return;
       }
-
-      dialog.showModal();
-      // Store pending action for when the user confirms
-      dialog.dataset.kitId = kitId;
-      dialog.dataset.pillId = pill.id || "";
-      dialog._pill = pill;
-      dialog._opt = opt;
-    } else {
-      // No booking — apply directly
-      await commitStatus(kitId, opt, pill, false);
     }
+    await commitStatus(kitId, opt, pill, false);
   }
 
   async function commitStatus(kitId, opt, pill, removeBooking) {
     const csrf = document.querySelector("[name=csrfmiddlewaretoken]");
     const csrfToken = csrf ? csrf.value : "";
-    // Optimistic update
     pill.dataset.status = opt.value;
     pill.className = `kit-status-pill kit-status-${opt.value.toLowerCase()}`;
     pill.querySelector(".kit-status-label").textContent = opt.label;
@@ -463,27 +408,23 @@ function toggleNested(wrapId, headerEl) {
         headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
         body,
       });
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        alert(data.error || "Could not update status. Please try again.");
-        location.reload();
-      } else if (removeBooking) {
-        // Booking was removed — reload to update the booking badge on the card
-        location.reload();
+      if (!resp.ok) { alert("Could not update status."); location.reload(); return; }
+      const data = await resp.json().catch(() => ({}));
+      if (data.isBooked) {
+        pill.dataset.status = "BOOKED";
+        pill.className = "kit-status-pill kit-status-booked";
+        pill.querySelector(".kit-status-label").textContent = "Booked";
+        pill.querySelector(".kit-status-dot").style.background = "#1E88E5";
       }
-    } catch {
-      alert("Could not update status. Please try again.");
-      location.reload();
-    }
+      if (removeBooking && data.bookingRemoved) location.reload();
+    } catch { alert("Could not update status."); location.reload(); }
   }
 
-  // Status confirmation dialog handler
   const statusDialog = document.getElementById("kit-status-dialog");
   document.getElementById("kit-status-dialog-confirm").addEventListener("click", async () => {
-    const dialog = statusDialog;
-    const removeBooking = dialog.querySelector("[name=booking-action]:checked")?.value === "remove";
-    dialog.close();
-    await commitStatus(dialog.dataset.kitId, dialog._opt, dialog._pill, removeBooking);
+    const removeBooking = statusDialog.querySelector("[name=booking-action]:checked")?.value === "remove";
+    statusDialog.close();
+    await commitStatus(statusDialog.dataset.kitId, statusDialog._opt, statusDialog._pill, removeBooking);
   });
   document.getElementById("kit-status-dialog-cancel").addEventListener("click", () => {
     statusDialog.close();
@@ -510,16 +451,5 @@ function toggleNested(wrapId, headerEl) {
   };
 })();
 </script>
-
-<!-- Kit status change confirmation dialog -->
-<dialog id="kit-status-dialog" style="background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;padding:20px 24px;max-width:400px;color:var(--text);">
-  <h2 style="font-size:15px;margin:0 0 8px;font-weight:600;">Kit is currently booked</h2>
-  <p id="kit-status-dialog-msg" style="font-size:13px;color:var(--text-dim);margin:0 0 14px;line-height:1.5;"></p>
-  <div id="kit-status-remove-line" style="display:flex;flex-direction:column;gap:4px;margin-bottom:18px;"></div>
-  <div style="display:flex;gap:8px;justify-content:flex-end;">
-    <button id="kit-status-dialog-cancel" class="btn" type="button">Cancel</button>
-    <button id="kit-status-dialog-confirm" class="btn btn-primary" type="button">Confirm</button>
-  </div>
-</dialog>
 
 {% endblock %}

@@ -237,14 +237,15 @@
 </div>
 <!-- History panel -->
 <div>
-  <div class="form-section" style="margin-bottom:0;">
-    <div class="form-section-head" style="display:flex; align-items:center; justify-content:space-between;">
+  <div class="form-section collapsed" id="section-history" style="margin-bottom:0;">
+    <div class="form-section-head" onclick="toggleSection('section-history')" style="display:flex; align-items:center; justify-content:space-between;">
       <span>History</span>
-      <div class="history-filters">
+      <div style="display:flex;align-items:center;gap:8px;"><div class="history-filters">
         <a class="history-filter-btn {% if history_mode == 'week' %}active{% endif %}" href="?history=week">This week</a>
         <a class="history-filter-btn {% if history_mode == 'month' %}active{% endif %}" href="?history=month">This month</a>
         <a class="history-filter-btn {% if history_mode == 'all' %}active{% endif %}" href="?history=all">All time</a>
-      </div>
+      </div></div>
+      <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
     </div>
     <div class="history-feed">
       {% for entry in history_page %}

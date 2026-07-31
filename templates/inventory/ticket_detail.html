@@ -149,8 +149,8 @@ async function confirmDeleteTicket() {
 </script>
       </div>
     </div>
-    <div class="form-section" style="margin-bottom:0;">
-      <div class="form-section-head">History</div>
+    <div class="form-section collapsed" id="section-history" style="margin-bottom:0;">
+      <div class="form-section-head" onclick="toggleSection('section-history')" style="display:flex;align-items:center;justify-content:space-between;">History <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>
       <div class="history-feed">
         {% for item in history %}
         {% with entry=item.entry %}
