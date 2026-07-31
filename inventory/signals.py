@@ -10,6 +10,32 @@ from .models import Asset, AssetBooking, KitAssetTag, KitBooking
 from .status_sync import recompute_for_asset_ids
 
 
+def _recompute_kit_status(kit_id):
+    """Auto-set Kit.status to BOOKED when it has an active booking today,
+    clear back to READY when it doesn't — but only when the kit is currently
+    in an auto-managed state (BOOKED or READY).  Manual statuses (PREP,
+    FAULTY, ARCHIVED) are sticky and never overwritten here."""
+    import datetime
+    from .models import Kit, KitBooking as _KB
+
+    try:
+        kit = Kit.objects.get(pk=kit_id)
+    except Kit.DoesNotExist:
+        return
+
+    # Only touch auto-managed states
+    if kit.status not in (Kit.Status.BOOKED, Kit.Status.READY):
+        return
+
+    today = datetime.date.today()
+    is_booked_today = _KB.objects.filter(
+        kit=kit, start_date__lte=today, end_date__gte=today
+    ).exists()
+    new_status = Kit.Status.BOOKED if is_booked_today else Kit.Status.READY
+    if kit.status != new_status:
+        Kit.objects.filter(pk=kit_id).update(status=new_status)
+
+
 @receiver(post_save, sender=KitAssetTag)
 def _kit_asset_tag_saved(sender, instance, **kwargs):
     recompute_for_asset_ids([instance.asset_id])
@@ -24,12 +50,14 @@ def _kit_asset_tag_deleted(sender, instance, **kwargs):
 def _kit_booking_saved(sender, instance, **kwargs):
     member_ids = list(KitAssetTag.objects.filter(kit_id=instance.kit_id).values_list("asset_id", flat=True))
     recompute_for_asset_ids(member_ids)
+    _recompute_kit_status(instance.kit_id)
 
 
 @receiver(post_delete, sender=KitBooking)
 def _kit_booking_deleted(sender, instance, **kwargs):
     member_ids = list(KitAssetTag.objects.filter(kit_id=instance.kit_id).values_list("asset_id", flat=True))
     recompute_for_asset_ids(member_ids)
+    _recompute_kit_status(instance.kit_id)
 
 
 @receiver(post_save, sender=AssetBooking)

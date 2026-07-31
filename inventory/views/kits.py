@@ -2,7 +2,7 @@ import datetime
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -48,6 +48,14 @@ def kit_list_view(request):
         current_booking = next(
             (b for b in kit.bookings.all() if b.start_date <= today <= b.end_date), None
         )
+        # Keep DB status in sync with booking reality for display.
+        # The signal does this on every booking save/delete, but existing kits
+        # may have stale status — override in memory so the card always shows
+        # the correct state without requiring a migration-based backfill.
+        if current_booking and kit.status == Kit.Status.READY:
+            kit.status = Kit.Status.BOOKED
+        elif not current_booking and kit.status == Kit.Status.BOOKED:
+            kit.status = Kit.Status.READY
         rows.append({
             "kit": kit,
             "members": members,
@@ -81,20 +89,55 @@ def _kit_eligible_assets_qs(current_kit=None):
     )
 
 
-def _other_kit_asset_info(current_kit=None):
-    """Returns two dicts keyed by asset id:
-      - other_kit_ids: set of asset ids that are in another kit (non-bulk exclusive)
-      - asset_kit_name: asset_id -> name of the other kit it belongs to
+def _other_kit_asset_info(current_kit=None, date_from=None, date_to=None):
+    """Returns dicts keyed by asset id for non-bulk (qty=1) assets in other kits.
+
+    When date_from/date_to are provided, an asset is a hard conflict only if
+    the other kit has a booking overlapping that window.
+
+    When no dates are provided, we still do a date check against today so that
+    assets in another kit that isn't currently booked can still be added
+    (they get an informational 'also in Kit X' hint instead of a hard block).
+    Only kits with an ACTIVE booking today are treated as hard conflicts when
+    no explicit date range is given.
     """
+    import datetime as _dt
+    from ..models import KitBooking
+
     kat_qs = KitAssetTag.objects.select_related("kit", "asset").filter(asset__qty=1)
     if current_kit is not None:
         kat_qs = kat_qs.exclude(kit=current_kit)
-    other_kit_ids = set()
-    asset_kit_name = {}
+
+    asset_to_kit = {}
     for kat in kat_qs:
-        other_kit_ids.add(kat.asset_id)
-        asset_kit_name[kat.asset_id] = kat.kit.name
-    return other_kit_ids, asset_kit_name
+        asset_to_kit[kat.asset_id] = kat.kit
+
+    if not asset_to_kit:
+        return {}, {}, {}
+
+    other_kit_ids_set = {k.id for k in asset_to_kit.values()}
+
+    # Use the provided date range, or fall back to today (so the picker is
+    # still useful without explicit dates — only kits actively booked today
+    # are hard conflicts, not kits sitting idle on the shelf).
+    check_from = date_from or _dt.date.today()
+    check_to = date_to or _dt.date.today()
+
+    conflicting_kit_ids = set(
+        KitBooking.objects.filter(
+            kit_id__in=other_kit_ids_set,
+            start_date__lte=check_to,
+            end_date__gte=check_from,
+        ).values_list("kit_id", flat=True)
+    )
+
+    other_kit_ids = set(asset_to_kit.keys())
+    asset_kit_name = {aid: kit.name for aid, kit in asset_to_kit.items()}
+    asset_booking_conflict = {
+        aid: (kit.id in conflicting_kit_ids)
+        for aid, kit in asset_to_kit.items()
+    }
+    return other_kit_ids, asset_kit_name, asset_booking_conflict
 
 
 def _bulk_committed_elsewhere(current_kit=None):
@@ -109,13 +152,22 @@ def _bulk_committed_elsewhere(current_kit=None):
     return committed
 
 
-def _kit_picker_assets(current_kit=None):
-    """All picker-eligible assets, annotated with kit-membership and availability info."""
+def _kit_picker_assets(current_kit=None, date_from=None, date_to=None):
+    """All picker-eligible assets, annotated with kit-membership and availability info.
+
+    date_from / date_to are optional datetime.date objects. When provided, the
+    'inAnotherKit' hint is date-aware: assets in a different kit are only a
+    hard conflict if that kit has a booking overlapping the given window. If the
+    dates don't overlap, the Add button is shown with a softer 'also in Kit X'
+    informational hint, and bookingConflict=False in the JSON.
+    """
     assets = _kit_eligible_assets_qs(current_kit).order_by(
         "asset_type", "asset_id"
     ).prefetch_related("nested_assets")
     committed_elsewhere = _bulk_committed_elsewhere(current_kit)
-    other_kit_ids, asset_kit_name = _other_kit_asset_info(current_kit)
+    other_kit_ids, asset_kit_name, asset_booking_conflict = _other_kit_asset_info(
+        current_kit, date_from=date_from, date_to=date_to
+    )
 
     data = []
     for a in assets:
@@ -128,12 +180,14 @@ def _kit_picker_assets(current_kit=None):
         is_bulk = a.qty > 1
         available = max(a.qty - committed_elsewhere.get(a.id, 0), 0) if is_bulk else 1
         in_another_kit = not is_bulk and a.id in other_kit_ids
+        booking_conflict = in_another_kit and asset_booking_conflict.get(a.id, True)
         data.append({
             "id": a.id, "assetId": a.asset_id, "makeModel": a.make_model,
             "type": a.get_asset_type_display(), "status": a.status.lower(),
             "statusDisplay": a.get_status_display(), "nested": nested,
             "isBulk": is_bulk, "totalQty": a.qty, "available": available,
             "inAnotherKit": in_another_kit,
+            "bookingConflict": booking_conflict,
             "otherKitName": asset_kit_name.get(a.id, ""),
         })
     return list(assets), data
@@ -191,8 +245,23 @@ def _apply_kit_tag_selection(kit, selected_ids, tag_by_asset_id, qty_by_asset_id
 
 
 @login_required
+def _parse_picker_dates(request):
+    """Parse optional ?from=YYYY-MM-DD&to=YYYY-MM-DD query params for date-aware
+    conflict checking in the asset picker. Returns (date_from, date_to) or (None, None)."""
+    try:
+        date_from = datetime.date.fromisoformat(request.GET.get("from", ""))
+        date_to = datetime.date.fromisoformat(request.GET.get("to", ""))
+        if date_from <= date_to:
+            return date_from, date_to
+    except (ValueError, TypeError):
+        pass
+    return None, None
+
+
+@login_required
 def kit_create_view(request):
-    assets, assets_json = _kit_picker_assets()
+    date_from, date_to = _parse_picker_dates(request)
+    assets, assets_json = _kit_picker_assets(date_from=date_from, date_to=date_to)
     tags_json = _tags_json()
 
     if request.method == "POST":
@@ -224,7 +293,9 @@ def kit_create_view(request):
                 "selected_ids": selected_ids, "name": name, "notes": notes, "active_nav": "kits",
             })
 
-        kit = Kit.objects.create(name=name, notes=notes)
+        raw_status = request.POST.get("status", Kit.Status.READY).strip()
+        status = raw_status if raw_status in [s for s in Kit.Status.values if s != Kit.Status.BOOKED] else Kit.Status.READY
+        kit = Kit.objects.create(name=name, notes=notes, status=status)
         changed_by = StaffMember.for_user(request.user)
         KitHistory.objects.create(kit=kit, changed_by=changed_by, field_changed="created")
         KitHistory.record_note(kit, changed_by, "", notes)
@@ -238,6 +309,10 @@ def kit_create_view(request):
     return render(request, "inventory/kit_form.html", {
         "assets": assets, "assets_json": assets_json, "tags_json": tags_json,
         "selected_ids": [], "active_nav": "kits",
+        "kit_status_choices": Kit.Status.choices,
+        "status": Kit.Status.READY,
+        "picker_date_from": date_from.isoformat() if date_from else "",
+        "picker_date_to": date_to.isoformat() if date_to else "",
     })
 
 
@@ -259,7 +334,17 @@ def _packed_by_default(user):
 @login_required
 def kit_edit_view(request, kit_id):
     kit = get_object_or_404(Kit, pk=kit_id)
-    assets, assets_json = _kit_picker_assets(current_kit=kit)
+    date_from, date_to = _parse_picker_dates(request)
+    # If no explicit date range was passed, use this kit's own future/active
+    # booking window so the conflict check is meaningful. A kit booked for
+    # Aug 1–5 should block assets that are in another kit also booked Aug 1–5,
+    # not just assets whose other kit happens to be booked today.
+    if not (date_from and date_to):
+        kit_booking = kit.bookings.order_by("start_date").first()
+        if kit_booking:
+            date_from = kit_booking.start_date
+            date_to = kit_booking.end_date
+    assets, assets_json = _kit_picker_assets(current_kit=kit, date_from=date_from, date_to=date_to)
     tags_json = _tags_json()
 
     if request.method == "POST":
@@ -291,10 +376,15 @@ def kit_edit_view(request, kit_id):
                 "selected_ids": selected_ids, "name": name, "notes": notes, "active_nav": "kits",
             })
 
+        raw_status = request.POST.get("status", kit.status).strip()
+        new_status = raw_status if raw_status in [s for s in Kit.Status.values if s != Kit.Status.BOOKED] else kit.status
+
         before_name = kit.name
         before_note = kit.notes
+        before_status = kit.status
         kit.name = name
         kit.notes = notes
+        kit.status = new_status
         kit.save()
 
         changed_by = StaffMember.for_user(request.user)
@@ -302,6 +392,11 @@ def kit_edit_view(request, kit_id):
             KitHistory.objects.create(
                 kit=kit, changed_by=changed_by, field_changed="name",
                 old_value=before_name, new_value=kit.name,
+            )
+        if before_status != kit.status:
+            KitHistory.objects.create(
+                kit=kit, changed_by=changed_by, field_changed="status",
+                old_value=before_status, new_value=kit.status,
             )
         KitHistory.record_note(kit, changed_by, before_note, notes)
 
@@ -331,6 +426,10 @@ def kit_edit_view(request, kit_id):
         "selected_qty_json": selected_qty_json,
         "name": kit.name,
         "notes": kit.notes,
+        "status": kit.status,
+        "kit_status_choices": Kit.Status.choices,
+        "picker_date_from": date_from.isoformat() if date_from else "",
+        "picker_date_to": date_to.isoformat() if date_to else "",
         "active_nav": "kits",
         "pdf_items": get_kit_checklist_rows(kit),
         "history_mode": history_mode,
@@ -347,6 +446,36 @@ def kit_delete_view(request, kit_id):
     kit = get_object_or_404(Kit, pk=kit_id)
     kit.delete()
     return redirect("/kits/")
+
+
+@login_required
+def kit_set_status_view(request, kit_id):
+    """POST-only API: set Kit.status from the traffic-light dropdown on the
+    kit card. Only accepts valid non-BOOKED values (BOOKED is auto-managed).
+    Returns JSON {status, statusDisplay} on success."""
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required."}, status=405)
+    kit = get_object_or_404(Kit, pk=kit_id)
+    new_status = request.POST.get("status", "").strip()
+    allowed = [s for s in Kit.Status.values if s != Kit.Status.BOOKED]
+    if new_status not in allowed:
+        return JsonResponse({"error": f"Invalid status '{new_status}'."}, status=400)
+    old_status = kit.status
+    kit.status = new_status
+    kit.save(update_fields=["status"])
+    # Log the change to kit history
+    changed_by = StaffMember.for_user(request.user)
+    KitHistory.objects.create(
+        kit=kit,
+        changed_by=changed_by,
+        field_changed="status",
+        old_value=old_status,
+        new_value=new_status,
+    )
+    return JsonResponse({
+        "status": kit.status,
+        "statusDisplay": kit.get_status_display(),
+    })
 
 
 @login_required

@@ -1,0 +1,348 @@
+{% extends "inventory/base.html" %}
+{% block title %}{% if asset_obj %}Edit {{ asset_obj.asset_id }}{% else %}New asset{% endif %} — Kit scheduler{% endblock %}
+{% block brand_sub %}{% if asset_obj %}Editing asset{% else %}New asset{% endif %}{% endblock %}
+
+{% block header_actions %}
+  <a class="btn" href="/assets/" id="cancel-link">Cancel</a>
+{% endblock %}
+
+{% block extra_style %}
+  .form-page {
+    max-width: 820px; margin: 0 auto; padding: 24px;
+  }
+  .form-page-wide { max-width: 1220px; margin: 0 auto; padding: 24px; }
+  .detail-columns {
+    display: grid; grid-template-columns: 1fr minmax(320px, 400px); gap: 16px; align-items: start;
+  }
+  @media (max-width: 960px) { .detail-columns { grid-template-columns: 1fr; } }
+  .detail-columns .form-page { max-width: none; margin: 0; padding: 0; }
+
+  .history-feed { max-height: 640px; overflow-y: auto; }
+  .history-item {
+    display: flex; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border);
+  }
+  .history-item:first-child { border-top: none; }
+  .history-dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--accent);
+    flex-shrink: 0; margin-top: 4px;
+  }
+  .history-body { flex: 1; min-width: 0; }
+  .history-change { font-size: 13px; color: var(--text); }
+  .history-change .val { font-family: var(--mono); background: var(--surface); padding: 1px 4px; border-radius: 3px; }
+  .history-change .from-to { color: var(--text-dim); }
+  .history-meta { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+  .history-who { color: var(--text-dim); }
+  .history-comment { font-size: 12px; color: var(--text-dim); margin-top: 3px; font-style: italic; }
+  .history-item.is-created .history-dot { background: var(--green); }
+  .history-item.is-note .history-dot { background: var(--blue); }
+  .history-filters { display: flex; gap: 4px; }
+  .history-filter-btn {
+    font-size: 11px; padding: 4px 8px; border-radius: 5px; text-decoration: none;
+    color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border);
+  }
+  .history-filter-btn:hover { color: var(--text); }
+  .history-filter-btn.active { color: var(--accent); border-color: var(--accent-deep); background: var(--accent-glow); }
+  .history-empty { padding: 16px; font-size: 12px; color: var(--text-faint); text-align: center; }
+  .history-pagination { display: flex; justify-content: space-between; padding: 8px 16px; font-size: 12px; color: var(--text-dim); border-top: 1px solid var(--border); }
+  .history-pagination a { color: var(--accent); text-decoration: none; }
+
+  .back-link { display: inline-block; margin-bottom: 16px; font-size: 13px; color: var(--text-dim); text-decoration: none; }
+  .back-link:hover { color: var(--text); }
+  .error-msg { background: var(--red-dim); border: 1px solid var(--red); color: var(--red); border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; }
+
+  .form-section {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden;
+  }
+  .form-section-head {
+    padding: 12px 16px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-dim); cursor: pointer; user-select: none;
+    background: var(--surface);
+  }
+  .collapse-btn {
+    background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 0;
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+  }
+  .collapse-btn svg { width: 14px; height: 14px; transition: transform 0.2s; }
+  .form-section.collapsed .collapse-btn svg { transform: rotate(-90deg); }
+  .form-section-body { padding: 16px; }
+  .form-section.collapsed .form-section-body { display: none; }
+
+  .form-field { margin-bottom: 14px; }
+  .form-field:last-child { margin-bottom: 0; }
+  .form-field label { display: block; font-size: 12px; font-weight: 500; color: var(--text-dim); margin-bottom: 5px; }
+  .form-field input[type="text"],
+  .form-field input[type="number"],
+  .form-field input[type="date"],
+  .form-field select,
+  .form-field textarea {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px;
+    font-family: inherit; box-sizing: border-box;
+  }
+  .form-field input:focus, .form-field select:focus, .form-field textarea:focus { outline: none; border-color: var(--accent); }
+  .form-field textarea { resize: vertical; min-height: 80px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .checkbox-field { display: flex; align-items: center; gap: 8px; }
+  .checkbox-field input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
+
+  .form-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px; }
+  {% if asset_obj %}
+  .delete-zone {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin-top: 24px;
+  }
+  .delete-zone p { margin: 0; font-size: 13px; color: var(--text-dim); }
+  {% endif %}
+
+  /* asset_type change confirmation dialog */
+  #type-confirm-dialog::backdrop { background: rgba(0,0,0,0.55); }
+  #type-confirm-dialog {
+    background: var(--surface-2); border: 1px solid var(--border-strong);
+    border-radius: 10px; padding: 20px 24px; max-width: 380px; color: var(--text);
+  }
+  #type-confirm-dialog h2 { font-size: 15px; margin: 0 0 8px; }
+  #type-confirm-dialog p { font-size: 13px; color: var(--text-dim); margin: 0 0 16px; line-height: 1.5; }
+  .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
+{% endblock %}
+
+{% block content %}
+{% if asset_obj %}
+<div class="form-page-wide">
+  <a class="back-link" href="/assets/">&larr; All assets</a>
+  <div class="detail-columns"><div>
+{% endif %}
+<div class="form-page">
+  {% if not asset_obj %}<a class="back-link" href="/assets/">&larr; All assets</a>{% endif %}
+
+  {% if error %}
+  <div class="error-msg">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" id="asset-form">
+    {% csrf_token %}
+
+    <div class="form-section" id="section-details">
+      <div class="form-section-head" onclick="toggleSection('section-details')" style="display:flex;align-items:center;justify-content:space-between;">Asset details <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+      <div class="form-section-body">
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="f-asset-id">Asset ID <span style="color:var(--red);">*</span></label>
+            <input type="text" id="f-asset-id" name="asset_id" value="{{ asset_id|default:'' }}" autofocus>
+          </div>
+          <div class="form-field">
+            <label for="f-make-model">Make / model</label>
+            <input type="text" id="f-make-model" name="make_model" value="{{ make_model|default:'' }}">
+          </div>
+        </div>
+
+        <div class="form-row-3">
+          <div class="form-field">
+            <label for="f-asset-type">Asset type{% if asset_obj %} <span style="color:var(--text-faint);font-weight:400;">(confirm to change)</span>{% endif %}</label>
+            <select id="f-asset-type" name="asset_type" {% if asset_obj %}data-original="{{ asset_type }}" onchange="confirmTypeChange(this)"{% endif %}>
+              {% for val, label in asset_type_choices %}
+                <option value="{{ val }}" {% if asset_type == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="f-serial">Serial</label>
+            <input type="text" id="f-serial" name="serial" value="{{ serial|default:'' }}">
+          </div>
+          <div class="form-field">
+            <label for="f-qty">Quantity</label>
+            <input type="number" id="f-qty" name="qty" min="1" value="{{ qty|default:'1' }}">
+          </div>
+        </div>
+
+        <div class="form-field" style="max-width:220px;">
+            <label for="f-status">Status</label>
+            <select id="f-status" name="status">
+              {% for value, label in statuses %}
+                <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+        <div class="form-field">
+          <label for="f-notes">Notes <span style="color:var(--text-faint); font-weight:400;">(optional)</span></label>
+          <textarea id="f-notes" name="notes" placeholder="Any notes about this asset...">{{ notes|default:'' }}</textarea>
+        </div>
+
+        <div class="checkbox-field">
+          <input type="checkbox" id="f-archived" name="archived" {% if archived %}checked{% endif %}>
+          <label for="f-archived" style="margin:0;">Archived <span style="color:var(--text-faint);">(hides from availability and pickers, keeps history)</span></label>
+        </div>
+
+        {% if asset_obj and asset_obj.parent_engine %}
+        <div style="margin-top:14px; padding:10px 12px; background:var(--surface); border:1px solid var(--border); border-radius:6px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
+          <span style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint);">Nested inside</span>
+          <a href="/engines/{{ asset_obj.parent_engine.pk }}/edit/" style="font-family:var(--mono); font-size:13px; color:var(--accent); text-decoration:none;">{{ asset_obj.parent_engine.asset_id }}</a>
+          {% if asset_obj.parent_engine.make_model %}<span style="font-size:13px; color:var(--text-dim);">&middot; {{ asset_obj.parent_engine.make_model }}</span>{% endif %}
+          <span style="font-size:11px; color:var(--text-faint); margin-left:auto;">Edit the parent engine to remove this nesting</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="form-section collapsed" id="section-lastupdated">
+      <div class="form-section-head" onclick="toggleSection('section-lastupdated')" style="display:flex;align-items:center;justify-content:space-between;"><span>Last updated <span style="color:var(--red); text-transform:none; letter-spacing:normal;">* Required</span></span><button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+      <div class="form-section-body">
+        <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
+          Every save needs a date so the team knows this record is current. You can't save until this is filled in.
+        </p>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="f-last-updated-by">Updated by</label>
+            <select id="f-last-updated-by" name="last_updated_by">
+              <option value="">-</option>
+              {% for staff in staff_members %}
+                <option value="{{ staff.id }}" {% if last_updated_by_id == staff.id|stringformat:"s" %}selected{% endif %}>{{ staff.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="f-last-updated-date">Date <span style="color:var(--red);">*</span></label>
+            <input type="date" id="f-last-updated-date" name="last_updated_date" value="{{ last_updated_date|default:'' }}" required>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="f-last-updated-notes">What changed? <span style="color:var(--text-faint); font-weight:400;">(optional)</span></label>
+          <textarea id="f-last-updated-notes" name="last_updated_notes" placeholder="e.g. Replaced cable, retested OK" style="min-height:50px;">{{ last_updated_notes|default:'' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a class="btn" href="/assets/">Cancel</a>
+      <button type="submit" class="btn btn-primary">{% if asset_obj %}Save changes{% else %}Create asset{% endif %}</button>
+    </div>
+  </form>
+
+  {% if asset_obj %}
+  <div class="delete-zone">
+    <p>Permanently delete <strong>{{ asset_obj.asset_id }}</strong>. This cannot be undone.</p>
+    <form method="post" action="/assets/{{ asset_obj.pk }}/delete/" onsubmit="return confirm('Delete {{ asset_obj.asset_id }}? This cannot be undone.');">
+      {% csrf_token %}
+      <button type="submit" class="btn" style="border-color:var(--red); color:var(--red);">Delete asset</button>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+
+{% if asset_obj %}
+</div>
+<!-- History panel -->
+<div>
+  <div class="form-section" style="margin-bottom:0;">
+    <div class="form-section-head" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>History</span>
+      <div class="history-filters">
+        <a class="history-filter-btn {% if history_mode == 'week' %}active{% endif %}" href="?history=week">This week</a>
+        <a class="history-filter-btn {% if history_mode == 'month' %}active{% endif %}" href="?history=month">This month</a>
+        <a class="history-filter-btn {% if history_mode == 'all' %}active{% endif %}" href="?history=all">All time</a>
+      </div>
+    </div>
+    <div class="history-feed">
+      {% for entry in history_page %}
+      <div class="history-item {% if entry.field_changed == 'created' %}is-created{% elif entry.field_changed == 'note' %}is-note{% endif %}">
+        <div class="history-dot"></div>
+        <div class="history-body">
+          {% if entry.field_changed == "created" %}
+            <div class="history-change">Asset created</div>
+          {% elif entry.field_changed == "note" %}
+            <div class="history-change">Note added</div>
+            <div class="history-comment">{{ entry.note }}</div>
+          {% elif entry.field_changed == "asset_type" %}
+            <div class="history-change">Type changed <span class="from-to">from <span class="val">{{ entry.old_value }}</span> to <span class="val">{{ entry.new_value }}</span></span></div>
+          {% else %}
+            <div class="history-change">{{ entry.field_label }} changed <span class="from-to">from <span class="val">{{ entry.old_value }}</span> to <span class="val">{{ entry.new_value }}</span></span></div>
+          {% endif %}
+          <div class="history-meta">
+            <span class="history-who">{% if entry.changed_by %}{{ entry.changed_by.name }}{% else %}Unknown{% endif %}</span>
+            <span class="history-when">&middot; {{ entry.created_at|date:"j M Y, g:ia" }}</span>
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="history-empty">No changes logged {% if history_mode == 'week' %}this week{% elif history_mode == 'month' %}this month{% endif %}.</div>
+      {% endfor %}
+    </div>
+    {% if history_page.has_other_pages %}
+    <div class="history-pagination">
+      {% if history_page.has_previous %}
+        <a href="?history={{ history_mode }}&history_page={{ history_page.previous_page_number }}">&larr; Newer</a>
+      {% else %}<span></span>{% endif %}
+      <span>Page {{ history_page.number }} of {{ history_page.paginator.num_pages }}</span>
+      {% if history_page.has_next %}
+        <a href="?history={{ history_mode }}&history_page={{ history_page.next_page_number }}">Older &rarr;</a>
+      {% else %}<span></span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+</div></div>
+{% endif %}
+
+<!-- Asset type change confirmation dialog -->
+<dialog id="type-confirm-dialog">
+  <h2>Change asset type?</h2>
+  <p id="type-confirm-msg"></p>
+  <div class="dialog-actions">
+    <button type="button" class="btn" onclick="cancelTypeChange()">Cancel</button>
+    <button type="button" class="btn btn-primary" onclick="acceptTypeChange()">Yes, change it</button>
+  </div>
+</dialog>
+
+<script>
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle("collapsed");
+}
+
+{% if asset_obj %}
+const typeSelect = document.getElementById("f-asset-type");
+let pendingType = null;
+
+function confirmTypeChange(sel) {
+  const original = sel.dataset.original;
+  const newVal = sel.value;
+  if (newVal === original) return;
+  pendingType = newVal;
+  const originalLabel = sel.options[Array.from(sel.options).findIndex(o => o.value === original)].text;
+  const newLabel = sel.options[sel.selectedIndex].text;
+  document.getElementById("type-confirm-msg").textContent =
+    `You're changing this asset from "${originalLabel}" to "${newLabel}". ` +
+    `This affects how it appears in pickers and reports. Are you sure?`;
+  document.getElementById("type-confirm-dialog").showModal();
+  // Revert visually until confirmed
+  sel.value = original;
+}
+
+function cancelTypeChange() {
+  pendingType = null;
+  document.getElementById("type-confirm-dialog").close();
+}
+
+function acceptTypeChange() {
+  if (pendingType) {
+    typeSelect.value = pendingType;
+    typeSelect.dataset.original = pendingType;
+    pendingType = null;
+  }
+  document.getElementById("type-confirm-dialog").close();
+}
+{% endif %}
+
+// Warn on unsaved changes
+let dirty = false;
+document.getElementById("asset-form").addEventListener("change", () => dirty = true);
+document.getElementById("asset-form").addEventListener("input", () => dirty = true);
+document.getElementById("asset-form").addEventListener("submit", () => dirty = false);
+document.getElementById("cancel-link")?.addEventListener("click", e => {
+  if (dirty && !confirm("You have unsaved changes. Leave anyway?")) e.preventDefault();
+});
+</script>
+{% endblock %}

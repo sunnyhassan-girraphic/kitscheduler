@@ -1,45 +1,43 @@
 {% extends "inventory/base.html" %}
-{% block title %}Ticket #{{ ticket.id }} - Kit scheduler{% endblock %}
+{% block title %}Ticket #{{ ticket.id }} — Kit scheduler{% endblock %}
 {% block brand_sub %}Ticket #{{ ticket.id }}{% endblock %}
 {% block header_actions %}
-  <a class="btn" href="/tickets/">Back to tickets</a>
+  <a class="btn" href="/tickets/" id="cancel-link">Back to tickets</a>
 {% endblock %}
 
 {% block extra_style %}
-  .detail-page { max-width: 1100px; margin: 0 auto; padding: 24px; }
-  .back-link {
-    display: inline-flex; align-items: center; gap: 6px;
-    color: var(--text-dim); text-decoration: none; font-size: 13px;
-    margin-bottom: 16px;
-  }
-  .back-link:hover { color: var(--accent); }
+  .form-page-wide { max-width: 1220px; margin: 0 auto; padding: 24px; }
+  .form-page { padding: 0; }
+  .back-link { display: inline-block; margin-bottom: 16px; font-size: 13px; color: var(--text-dim); text-decoration: none; }
+  .back-link:hover { color: var(--text); }
   .detail-columns {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr minmax(320px, 400px);
     gap: 16px;
     align-items: start;
   }
-  @media (max-width: 860px) {
-    .detail-columns { grid-template-columns: 1fr; }
-  }
+  @media (max-width: 960px) { .detail-columns { grid-template-columns: 1fr; } }
+  .detail-columns .form-page { max-width: none; margin: 0; padding: 0; }
+
   .form-section {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; margin-bottom: 16px; overflow: hidden;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 12px; overflow: hidden;
   }
   .form-section-head {
-    padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border);
+    padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
     font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim);
   }
   .form-section-body { padding: 16px; }
-  .detail-row { display: flex; gap: 8px; padding: 6px 0; font-size: 13px; }
-  .detail-row .k { color: var(--text-dim); min-width: 100px; flex-shrink: 0; }
+
+  .detail-row { display: flex; gap: 8px; padding: 5px 0; font-size: 13px; }
+  .detail-row .k { color: var(--text-dim); min-width: 110px; flex-shrink: 0; }
   .detail-row .v { color: var(--text); }
   .description-block {
-    background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 12px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; margin-top: 8px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px 12px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; margin-top: 6px;
   }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
-  .form-field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
+  .form-field label { display: block; font-size: 12px; font-weight: 500; color: var(--text-dim); margin-bottom: 5px; }
   .form-field select, .form-field textarea {
     width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
     color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px;
@@ -48,15 +46,14 @@
   .form-field select:focus, .form-field textarea:focus { outline: none; border-color: var(--accent); }
   .form-field textarea { resize: vertical; min-height: 70px; }
   .form-actions { display: flex; justify-content: flex-end; padding-top: 8px; }
-
   .delete-zone {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 16px; background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px;
+    padding: 14px 16px; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 8px; margin-top: 0;
   }
   .delete-zone p { margin: 0; font-size: 13px; color: var(--text-dim); }
 
-  /* History feed */
+  /* History — no tabs, running log, matches engine_form style */
   .history-feed { max-height: 720px; overflow-y: auto; }
   .history-item {
     display: flex; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border);
@@ -69,34 +66,30 @@
   .history-item.is-comment .history-dot { background: var(--blue); }
   .history-item.is-created .history-dot { background: var(--green); }
   .history-body { flex: 1; min-width: 0; }
-  .history-change { color: var(--text); font-size: 13px; font-weight: 600; }
-  .history-change .from-to { font-weight: 400; color: var(--text-dim); }
-  .history-change .val { font-weight: 600; }
+  .history-change { color: var(--text); font-size: 13px; }
+  .history-change .val { font-family: var(--mono); background: var(--surface); padding: 1px 4px; border-radius: 3px; }
+  .history-change .from-to { color: var(--text-dim); }
   .history-comment {
-    color: var(--text); margin-top: 4px; white-space: pre-wrap; font-size: 13px;
-    background: var(--surface-2); border-radius: 6px; padding: 8px 10px;
+    color: var(--text-dim); margin-top: 4px; white-space: pre-wrap; font-size: 13px;
+    background: var(--surface); border-radius: 6px; padding: 8px 10px; font-style: italic;
   }
-  .history-meta {
-    display: flex; align-items: center; gap: 6px; margin-top: 6px;
-  }
-  .history-who {
-    font-size: 12px; font-weight: 600; color: var(--accent);
-  }
-  .history-who.is-public { color: var(--text-dim); font-weight: 500; font-style: italic; }
+  .history-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .history-who { font-size: 12px; font-weight: 600; color: var(--accent); }
+  .history-who.is-public { color: var(--text-dim); font-weight: 400; font-style: italic; }
   .history-when { font-size: 11px; color: var(--text-faint); }
+  .history-empty { padding: 16px; font-size: 13px; color: var(--text-faint); }
 {% endblock %}
 
 {% block content %}
-<div class="detail-page">
-
+<div class="form-page-wide">
   <a class="back-link" href="/tickets/">&larr; All tickets</a>
 
   <div class="detail-columns">
-    <div>
+    <div class="form-page">
       <div class="form-section">
         <div class="form-section-head">Ticket details</div>
         <div class="form-section-body">
-          <div class="detail-row"><span class="k">Asset</span><span class="v">{% if ticket.asset %}{{ ticket.asset.asset_id }}{% if ticket.asset.make_model %} - {{ ticket.asset.make_model }}{% endif %}{% else %}Not specified{% endif %}</span></div>
+          <div class="detail-row"><span class="k">Asset</span><span class="v">{% if ticket.asset %}<a href="/assets/{{ ticket.asset.pk }}/edit/" style="color:var(--accent);text-decoration:none;">{{ ticket.asset.asset_id }}</a>{% if ticket.asset.make_model %} &middot; {{ ticket.asset.make_model }}{% endif %}{% else %}Not specified{% endif %}</span></div>
           <div class="detail-row"><span class="k">Reported by</span><span class="v">{{ ticket.reporter_name }}{% if ticket.reporter_contact %} ({{ ticket.reporter_contact }}){% endif %}</span></div>
           <div class="detail-row"><span class="k">Reported</span><span class="v">{{ ticket.created_at|date:"j M Y, g:ia" }}</span></div>
           <div class="detail-row"><span class="k">Description</span></div>
@@ -143,15 +136,15 @@
         <form method="post" action="/tickets/{{ ticket.id }}/delete/"
               onsubmit="return confirm('Delete ticket #{{ ticket.id }}? This cannot be undone.');">
           {% csrf_token %}
-          <button class="btn" type="submit" style="color:var(--red);">Delete ticket</button>
+          <button class="btn" type="submit" style="color:var(--red); border-color:var(--red);">Delete ticket</button>
         </form>
       </div>
     </div>
-
     <div class="form-section" style="margin-bottom:0;">
       <div class="form-section-head">History</div>
       <div class="history-feed">
-        {% for entry in history %}
+        {% for item in history %}
+        {% with entry=item.entry %}
         <div class="history-item {% if entry.field_changed == 'created' %}is-created{% elif entry.field_changed == 'comment' %}is-comment{% endif %}">
           <div class="history-dot"></div>
           <div class="history-body">
@@ -160,17 +153,31 @@
             {% elif entry.field_changed == "comment" %}
               <div class="history-change">Comment added</div>
               <div class="history-comment">{{ entry.note }}</div>
+            {% elif entry.field_changed == "status" or entry.field_changed == "priority" %}
+              <div class="history-change">{{ entry.field_changed|capfirst }} changed
+                <span class="from-to">from
+                  {% if item.old_css %}<span class="badge badge-{{ item.old_css }}" style="font-size:11px; padding:1px 7px;">{{ entry.old_value }}</span>{% else %}<span class="val">{{ entry.old_value }}</span>{% endif %}
+                  to
+                  {% if item.new_css %}<span class="badge badge-{{ item.new_css }}" style="font-size:11px; padding:1px 7px;">{{ entry.new_value }}</span>{% else %}<span class="val">{{ entry.new_value }}</span>{% endif %}
+                </span>
+              </div>
             {% else %}
               <div class="history-change">{{ entry.field_changed|capfirst }} changed <span class="from-to">from <span class="val">{{ entry.old_value }}</span> to <span class="val">{{ entry.new_value }}</span></span></div>
             {% endif %}
             <div class="history-meta">
-              <span class="history-who {% if not entry.changed_by %}is-public{% endif %}">{% if entry.changed_by %}{{ entry.changed_by.get_username }}{% else %}Public submission{% endif %}</span>
-              <span class="history-when">&middot; {{ entry.created_at|date:"j M Y, g:ia" }}</span>
+              {% if item.is_public %}
+                <span class="history-who is-public">{{ ticket.reporter_name }}{% if ticket.reporter_contact %} ({{ ticket.reporter_contact }}){% endif %}</span>
+                <span class="history-when">&middot; {{ entry.created_at|date:"j M Y, g:ia" }}</span>
+              {% else %}
+                <span class="history-who">{{ item.display_name }}</span>
+                <span class="history-when">&middot; {{ entry.created_at|date:"j M Y, g:ia" }}</span>
+              {% endif %}
             </div>
           </div>
         </div>
+        {% endwith %}
         {% empty %}
-        <div class="form-section-body" style="color:var(--text-faint); font-size:13px;">No history yet.</div>
+        <div class="history-empty">No history yet.</div>
         {% endfor %}
       </div>
     </div>

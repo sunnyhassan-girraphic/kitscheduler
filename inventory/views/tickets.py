@@ -3,6 +3,8 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from ..models import StaffMember
+
 from ..models import Asset, Ticket, TicketHistory
 
 
@@ -134,11 +136,54 @@ def ticket_detail_view(request, ticket_id):
 
         return redirect("/tickets/%d/" % ticket.id)
 
+    history_qs = ticket.history.select_related("changed_by").order_by("-created_at")
+
+    # Pre-resolve Django User → StaffMember name for consistent display.
+    # Other history feeds use StaffMember.name; this was using get_username()
+    # (raw Django username, always lowercase). Build a user_id → name map once.
+    user_ids = {e.changed_by_id for e in history_qs if e.changed_by_id}
+    staff_by_user_id = {}
+    if user_ids:
+        for sm in StaffMember.objects.filter(user_id__in=user_ids).select_related("user"):
+            staff_by_user_id[sm.user_id] = sm.name
+
+    # Build label→css_key maps so the template can render coloured badges.
+    # History stores display labels (e.g. "In progress") not raw values.
+    # CSS classes are badge-{value.lower().replace(' ','_')}, e.g. badge-in_progress.
+    status_label_to_key = {label: value.lower() for value, label in Ticket.Status.choices}
+    priority_label_to_key = {label: value.lower() for value, label in Ticket.Priority.choices}
+
+    history = []
+    for entry in history_qs:
+        if entry.changed_by_id:
+            display_name = staff_by_user_id.get(entry.changed_by_id) or entry.changed_by.get_username()
+            is_public = False
+        else:
+            display_name = None
+            is_public = True
+
+        # For status/priority entries, add CSS keys for badge colouring
+        old_css = new_css = None
+        if entry.field_changed == "status":
+            old_css = status_label_to_key.get(entry.old_value)
+            new_css = status_label_to_key.get(entry.new_value)
+        elif entry.field_changed == "priority":
+            old_css = priority_label_to_key.get(entry.old_value)
+            new_css = priority_label_to_key.get(entry.new_value)
+
+        history.append({
+            "entry": entry,
+            "display_name": display_name,
+            "is_public": is_public,
+            "old_css": old_css,
+            "new_css": new_css,
+        })
+
     return render(request, "inventory/ticket_detail.html", {
         "ticket": ticket,
         "statuses": Ticket.Status.choices,
         "priorities": Ticket.Priority.choices,
-        "history": ticket.history.select_related("changed_by").order_by("-created_at"),
+        "history": history,
         "active_nav": "tickets",
     })
 

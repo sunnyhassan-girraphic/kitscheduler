@@ -42,6 +42,9 @@ from .assets import (
     engine_list_view,
     io_device_edit_view,
     io_device_delete_view,
+    asset_create_view,
+    asset_edit_view,
+    asset_delete_view,
 )
 
 from .kits import (
@@ -49,6 +52,7 @@ from .kits import (
     kit_create_view,
     kit_edit_view,
     kit_delete_view,
+    kit_set_status_view,
     kit_pdf_view,
 )
 

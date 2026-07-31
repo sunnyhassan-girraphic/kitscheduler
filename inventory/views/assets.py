@@ -512,3 +512,250 @@ def io_device_delete_view(request, io_id):
     return _container_delete_view(request, Asset.AssetType.IO_DEVICE, io_id)
 
 
+
+# ── Non-engine asset create / edit ──────────────────────────────────────────
+# Covers every asset type that is NOT an Engine or I/O Device (those have their
+# own richer form with a component picker). These are simpler: ID, type,
+# make/model, serial, qty, status, notes, archived, and the mandatory
+# Last Updated block for QC.
+
+# Asset types that have their own dedicated form and should NOT be editable here
+_CONTAINER_TYPES_WITH_OWN_FORM = {Asset.AssetType.ENGINE, Asset.AssetType.IO_DEVICE}
+
+# Asset types the user may pick from when creating/editing a generic asset
+GENERIC_ASSET_TYPE_CHOICES = [
+    (v, l) for v, l in Asset.AssetType.choices
+    if v not in _CONTAINER_TYPES_WITH_OWN_FORM
+]
+
+
+def _asset_history_page(asset, mode, page_num):
+    from django.core.paginator import Paginator
+    qs = asset.history.select_related("changed_by").order_by("-created_at")
+    if mode == "week":
+        import datetime as _dt
+        qs = qs.filter(created_at__gte=_dt.date.today() - _dt.timedelta(days=7))
+    elif mode == "month":
+        import datetime as _dt
+        qs = qs.filter(created_at__gte=_dt.date.today() - _dt.timedelta(days=30))
+    return Paginator(qs, 25).get_page(page_num)
+
+
+@login_required
+def asset_create_view(request):
+    """Create a new non-engine asset with Last Updated required."""
+    staff_members = list(StaffMember.objects.filter(active=True).order_by("name"))
+    current_staff = StaffMember.for_user(request.user)
+
+    def _base_ctx(**extra):
+        ctx = {
+            "asset_type_choices": GENERIC_ASSET_TYPE_CHOICES,
+            "statuses": Asset.Status.choices,
+            "staff_members": staff_members,
+            "active_nav": "assets",
+            "asset_obj": None,
+            "last_updated_by_id": str(current_staff.id) if current_staff else "",
+            "last_updated_date": datetime.date.today().isoformat(),
+        }
+        ctx.update(extra)
+        return ctx
+
+    if request.method == "POST":
+        asset_id    = request.POST.get("asset_id", "").strip()
+        asset_type  = request.POST.get("asset_type", "").strip()
+        make_model  = request.POST.get("make_model", "").strip()
+        serial      = request.POST.get("serial", "").strip()
+        qty_raw     = request.POST.get("qty", "1").strip()
+        status      = request.POST.get("status", Asset.Status.AVAILABLE)
+        archived    = request.POST.get("archived") == "on"
+        notes       = request.POST.get("notes", "").strip()
+        lu_by_id    = request.POST.get("last_updated_by", "").strip()
+        lu_date     = request.POST.get("last_updated_date", "").strip()
+        lu_notes    = request.POST.get("last_updated_notes", "").strip()
+
+        valid_types = {v for v, _ in GENERIC_ASSET_TYPE_CHOICES}
+        form_ctx = _base_ctx(
+            asset_id=asset_id, asset_type=asset_type, make_model=make_model,
+            serial=serial, qty=qty_raw, status=status, archived=archived,
+            notes=notes, last_updated_by_id=lu_by_id,
+            last_updated_date=lu_date, last_updated_notes=lu_notes,
+        )
+
+        if not asset_id:
+            form_ctx["error"] = "Asset ID is required."
+            return render(request, "inventory/asset_form.html", form_ctx)
+        if asset_type not in valid_types:
+            form_ctx["error"] = "Please select a valid asset type."
+            return render(request, "inventory/asset_form.html", form_ctx)
+        if Asset.objects.filter(asset_id=asset_id).exists():
+            form_ctx["error"] = f'An asset with ID "{asset_id}" already exists.'
+            return render(request, "inventory/asset_form.html", form_ctx)
+        if not lu_date:
+            form_ctx["error"] = "Last updated date is required before you can save."
+            return render(request, "inventory/asset_form.html", form_ctx)
+
+        try:
+            lu_date_parsed = datetime.date.fromisoformat(lu_date)
+        except ValueError:
+            form_ctx["error"] = "Last updated date is invalid."
+            return render(request, "inventory/asset_form.html", form_ctx)
+
+        if status not in Asset.Status.values:
+            status = Asset.Status.AVAILABLE
+        try:
+            qty_val = max(1, int(qty_raw))
+        except ValueError:
+            qty_val = 1
+
+        lu_by = None
+        if lu_by_id.isdigit():
+            lu_by = StaffMember.objects.filter(pk=lu_by_id).first()
+
+        asset = Asset.objects.create(
+            asset_id=asset_id, asset_type=asset_type, make_model=make_model,
+            serial=serial, qty=qty_val, status=status, archived=archived,
+            notes=notes, last_updated_by=lu_by,
+            last_updated_date=lu_date_parsed, last_updated_notes=lu_notes,
+        )
+        AssetHistory.objects.create(asset=asset, changed_by=lu_by, field_changed="created")
+        AssetHistory.record_note(asset, lu_by, "", lu_notes)
+        return redirect("/assets/")
+
+    return render(request, "inventory/asset_form.html", _base_ctx(
+        asset_id="", asset_type="", make_model="", serial="", qty="1",
+        status=Asset.Status.AVAILABLE, archived=False, notes="",
+        last_updated_notes="",
+    ))
+
+
+@login_required
+def asset_edit_view(request, asset_id):
+    """Edit any non-Engine, non-I/O-Device asset. Includes Last Updated (required)
+    and asset_type dropdown with a JS confirmation on change."""
+    asset = get_object_or_404(Asset, pk=asset_id)
+    if asset.asset_type in _CONTAINER_TYPES_WITH_OWN_FORM:
+        # Redirect engine/IO edits to their dedicated forms
+        if asset.asset_type == Asset.AssetType.ENGINE:
+            return redirect(f"/engines/{asset.pk}/edit/")
+        return redirect(f"/io-devices/{asset.pk}/edit/")
+
+    staff_members = list(StaffMember.objects.filter(active=True).order_by("name"))
+    current_staff = StaffMember.for_user(request.user)
+    history_mode = request.GET.get("history", "month")
+    if history_mode not in ("week", "month", "all"):
+        history_mode = "month"
+    try:
+        history_page_num = int(request.GET.get("history_page", "1"))
+    except ValueError:
+        history_page_num = 1
+
+    def _base_ctx(**extra):
+        ctx = {
+            "asset_obj": asset,
+            "asset_type_choices": GENERIC_ASSET_TYPE_CHOICES,
+            "statuses": Asset.Status.choices,
+            "staff_members": staff_members,
+            "active_nav": "assets",
+            "history_mode": history_mode,
+            "history_page": _asset_history_page(asset, history_mode, history_page_num),
+        }
+        ctx.update(extra)
+        return ctx
+
+    if request.method == "POST":
+        new_asset_id  = request.POST.get("asset_id", "").strip()
+        asset_type    = request.POST.get("asset_type", asset.asset_type).strip()
+        make_model    = request.POST.get("make_model", "").strip()
+        serial        = request.POST.get("serial", "").strip()
+        qty_raw       = request.POST.get("qty", "1").strip()
+        status        = request.POST.get("status", Asset.Status.AVAILABLE)
+        archived      = request.POST.get("archived") == "on"
+        notes         = request.POST.get("notes", "").strip()
+        lu_by_id      = request.POST.get("last_updated_by", "").strip()
+        lu_date       = request.POST.get("last_updated_date", "").strip()
+        lu_notes      = request.POST.get("last_updated_notes", "").strip()
+
+        valid_types = {v for v, _ in GENERIC_ASSET_TYPE_CHOICES}
+        form_ctx = _base_ctx(
+            asset_id=new_asset_id, asset_type=asset_type, make_model=make_model,
+            serial=serial, qty=qty_raw, status=status, archived=archived,
+            notes=notes, last_updated_by_id=lu_by_id,
+            last_updated_date=lu_date, last_updated_notes=lu_notes,
+        )
+
+        if not new_asset_id:
+            form_ctx["error"] = "Asset ID is required."
+            return render(request, "inventory/asset_form.html", form_ctx)
+        if asset_type not in valid_types:
+            form_ctx["error"] = "Please select a valid asset type."
+            return render(request, "inventory/asset_form.html", form_ctx)
+        if Asset.objects.filter(asset_id=new_asset_id).exclude(pk=asset.pk).exists():
+            form_ctx["error"] = f'An asset with ID "{new_asset_id}" already exists.'
+            return render(request, "inventory/asset_form.html", form_ctx)
+        if not lu_date:
+            form_ctx["error"] = "Last updated date is required before you can save."
+            return render(request, "inventory/asset_form.html", form_ctx)
+
+        try:
+            lu_date_parsed = datetime.date.fromisoformat(lu_date)
+        except ValueError:
+            form_ctx["error"] = "Last updated date is invalid."
+            return render(request, "inventory/asset_form.html", form_ctx)
+
+        if status not in Asset.Status.values:
+            status = Asset.Status.AVAILABLE
+        try:
+            qty_val = max(1, int(qty_raw))
+        except ValueError:
+            qty_val = 1
+
+        lu_by = None
+        if lu_by_id.isdigit():
+            lu_by = StaffMember.objects.filter(pk=lu_by_id).first()
+
+        before_values = {f: getattr(asset, f) for f in ASSET_HISTORY_SHARED_FIELDS}
+        before_type   = asset.asset_type
+        before_note   = asset.last_updated_notes
+
+        asset.asset_id          = new_asset_id
+        asset.asset_type        = asset_type
+        asset.make_model        = make_model
+        asset.serial            = serial
+        asset.qty               = qty_val
+        asset.status            = status
+        asset.archived          = archived
+        asset.notes             = notes
+        asset.last_updated_by   = lu_by
+        asset.last_updated_date = lu_date_parsed
+        asset.last_updated_notes = lu_notes
+        asset.save()
+
+        AssetHistory.record_scalar_changes(asset, before_values, lu_by, ASSET_HISTORY_SHARED_FIELDS)
+        # Log asset_type change separately (not in ASSET_HISTORY_SHARED_FIELDS)
+        if before_type != asset.asset_type:
+            AssetHistory.objects.create(
+                asset=asset, changed_by=lu_by, field_changed="asset_type",
+                old_value=before_type, new_value=asset_type,
+            )
+        AssetHistory.record_note(asset, lu_by, before_note, lu_notes)
+        return redirect("/assets/")
+
+    return render(request, "inventory/asset_form.html", _base_ctx(
+        asset_id=asset.asset_id, asset_type=asset.asset_type,
+        make_model=asset.make_model or "", serial=asset.serial or "",
+        qty=str(asset.qty), status=asset.status, archived=asset.archived,
+        notes=asset.notes or "",
+        last_updated_by_id=str(current_staff.id) if current_staff else "",
+        last_updated_date=datetime.date.today().isoformat(),
+        last_updated_notes=asset.last_updated_notes or "",
+    ))
+
+
+@login_required
+@require_POST
+def asset_delete_view(request, asset_id):
+    asset = get_object_or_404(Asset, pk=asset_id)
+    if asset.asset_type in _CONTAINER_TYPES_WITH_OWN_FORM:
+        return redirect("/assets/")
+    asset.delete()
+    return redirect("/assets/")

@@ -23,7 +23,8 @@
   .kit-head .name { font-weight: 600; font-size: 14px; }
   .kit-head .name a { color: var(--text); text-decoration: none; }
   .kit-head .name a:hover { color: var(--accent); }
-  .kit-head .meta { font-size: 12px; color: var(--text-dim); margin-left: auto; font-family: var(--mono); }
+  .kit-head .meta { font-size: 12px; color: var(--text-dim); font-family: var(--mono); }
+  .kit-head .meta-spacer { flex: 1; }
   .member-row, .nested-row {
     display: grid; grid-template-columns: 20px 140px 1fr;
     align-items: center; column-gap: 10px;
@@ -68,6 +69,43 @@
   .kit-card.pinned { order: -1; border-color: var(--accent-deep); }
   .kit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
   @media (max-width: 900px) { .kit-grid { grid-template-columns: 1fr; } }
+
+  /* Status pill on kit card */
+  .kit-status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 8px 2px 7px; border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    font-size: 11px; font-weight: 500; cursor: pointer;
+    color: var(--text-dim);
+    user-select: none; white-space: nowrap; flex-shrink: 0;
+  }
+  .kit-status-pill:hover { border-color: var(--accent-deep); color: var(--text); }
+  .kit-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .kit-status-caret { width: 8px; height: 8px; flex-shrink: 0; opacity: 0.5; margin-left: 1px; }
+
+  /* Dot colours only — pill background/border stays neutral to match the card */
+  .kit-status-ready   .kit-status-dot { background: var(--green); }
+  .kit-status-prep    .kit-status-dot { background: var(--accent); }
+  .kit-status-booked  .kit-status-dot { background: var(--blue); }
+  .kit-status-faulty  .kit-status-dot { background: var(--red); }
+  .kit-status-archived .kit-status-dot { background: var(--text-faint); }
+
+  /* Dropdown menu — positioned fixed via JS using getBoundingClientRect */
+  .kit-status-menu {
+    z-index: 9999;
+    background: var(--surface-2); border: 1px solid var(--border-strong);
+    border-radius: 8px; padding: 4px; min-width: 170px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .kit-status-menu-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 5px; font-size: 12px;
+    cursor: pointer; color: var(--text-dim);
+  }
+  .kit-status-menu-item:hover { background: var(--surface); color: var(--text); }
+  .kit-status-menu-item.active { color: var(--text); font-weight: 500; }
+  .kit-status-menu-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 {% endblock %}
 {% block content %}
 <form id="csrf-holder" style="display:none;">{% csrf_token %}</form>
@@ -92,12 +130,26 @@
   <div class="kit-card" data-kit-id="{{ row.kit.id }}">
     <div class="kit-head">
       <span class="name">{{ row.kit.name }}</span>
+      <div class="kit-status-pill kit-status-{{ row.kit.status|lower }}"
+           data-kit-id="{{ row.kit.id }}"
+           data-status="{{ row.kit.status }}"
+           tabindex="0"
+           role="button"
+           aria-label="Kit status: {{ row.kit.get_status_display }}"
+           onclick="openStatusMenu(this)"
+           onkeydown="if(event.key==='Enter'||event.key===' ')openStatusMenu(this)">
+        <span class="kit-status-dot"></span>
+        <span class="kit-status-label">{{ row.kit.get_status_display }}</span>
+        <svg class="kit-status-caret" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
       {% if row.current_booking %}
         <span class="badge badge-in_use">Booked: {{ row.current_booking.job.name }}</span>
-      {% else %}
-        <span class="badge badge-available">Free today</span>
+      {% endif %}
+      {% if row.kit.status == "FAULTY" and not row.current_booking %}
+        <span class="badge badge-needs_repair">Faulty</span>
       {% endif %}
       <span class="meta">{% kit_member_summary row.members %}</span>
+      <div class="meta-spacer"></div>
       <div class="kit-card-actions">
         <a class="kit-card-btn" href="/kits/{{ row.kit.id }}/edit/" title="Edit" aria-label="Edit">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -224,6 +276,81 @@ function toggleNested(wrapId, headerEl) {
     });
     cards.forEach(c => grid.appendChild(c));
   };
+
+  const STATUS_OPTIONS = [
+    { value: "READY",    label: "Ready",             dot: "#3fb950" },
+    { value: "PREP",     label: "Prep / in progress", dot: "#eab308" },
+    { value: "FAULTY",   label: "Faulty",             dot: "#f85149" },
+    { value: "ARCHIVED", label: "Archived",           dot: "#65625a" },
+  ];
+
+  let activeMenu = null;
+  let activePill = null;
+
+  function closeMenu() {
+    if (activeMenu) { activeMenu.remove(); activeMenu = null; activePill = null; }
+  }
+
+  document.addEventListener("mousedown", (e) => {
+    if (activeMenu && !activeMenu.contains(e.target) && !e.target.closest(".kit-status-pill")) {
+      closeMenu();
+    }
+  });
+
+  window.openStatusMenu = function(pill) {
+    // Toggle: clicking the open pill's button closes it
+    if (activePill === pill) { closeMenu(); return; }
+    closeMenu();
+
+    const kitId = pill.dataset.kitId;
+    const current = pill.dataset.status;
+    const rect = pill.getBoundingClientRect();
+
+    const menu = document.createElement("div");
+    menu.className = "kit-status-menu";
+    menu.style.cssText = `position:fixed;top:${rect.bottom + 4}px;left:${rect.left}px;`;
+
+    STATUS_OPTIONS.forEach(opt => {
+      const item = document.createElement("div");
+      item.className = "kit-status-menu-item" + (opt.value === current ? " active" : "");
+      item.innerHTML = `<span class="kit-status-menu-dot" style="background:${opt.dot}"></span>${opt.label}`;
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault(); // prevent blur before click
+        e.stopPropagation();
+        applyStatus(kitId, opt, pill);
+        closeMenu();
+      });
+      menu.appendChild(item);
+    });
+
+    document.body.appendChild(menu);
+    activeMenu = menu;
+    activePill = pill;
+  };
+
+  async function applyStatus(kitId, opt, pill) {
+    const csrf = document.querySelector("[name=csrfmiddlewaretoken]");
+    const csrfToken = csrf ? csrf.value : "";
+    pill.dataset.status = opt.value;
+    pill.className = `kit-status-pill kit-status-${opt.value.toLowerCase()}`;
+    pill.querySelector(".kit-status-label").textContent = opt.label;
+    pill.querySelector(".kit-status-dot").style.background = opt.dot;
+    try {
+      const resp = await fetch(`/kits/${kitId}/set-status/`, {
+        method: "POST",
+        headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
+        body: `status=${encodeURIComponent(opt.value)}`,
+      });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        alert(data.error || "Could not update status. Please try again.");
+        location.reload();
+      }
+    } catch {
+      alert("Could not update status. Please try again.");
+      location.reload();
+    }
+  }
 
   window.dismissCard = async function(btn, kitId, kitName) {
     if (!confirm(`Delete "${kitName}"? This removes the kit and every booking on it. This cannot be undone.`)) return;

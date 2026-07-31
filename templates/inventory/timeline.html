@@ -781,7 +781,7 @@ function openKitDetail(kitId) {
         <div class="kd-member-row">
           <span class="kd-aid">${m.assetId}</span>
           <span class="kd-amodel">${m.type}${m.model ? " &middot; " + m.model : ""}</span>
-          ${m.tag ? `<span class="kd-tag">${m.tag}</span>` : ""}
+          ${m.tag ? `<span class="kd-tag" style="background:${m.tag.color}22;color:${m.tag.color};border-color:${m.tag.color}44;">${m.tag.name}</span>` : ""}
           ${kdBadge(m.status)}
         </div>`;
       m.nested.forEach(n => {

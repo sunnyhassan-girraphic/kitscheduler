@@ -3,7 +3,7 @@
 {% block title %}Inventory - Kit scheduler{% endblock %}
 {% block brand_sub %}{{ total_active }} asset{{ total_active|pluralize }} tracked{% endblock %}
 {% block header_actions %}
-  <a class="btn btn-primary" href="/admin/inventory/asset/add/">+ Add asset</a>
+  <a class="btn btn-primary" href="/assets/new/">+ New asset</a>
 {% endblock %}
 {% block extra_style %}
 {% endblock %}
@@ -68,7 +68,7 @@
         {% elif asset.asset_type == "LICENSE" %}
           <a href="/licenses/{{ asset.id }}/edit/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
         {% else %}
-          <a href="/admin/inventory/asset/{{ asset.id }}/change/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
+          <a href="/assets/{{ asset.id }}/edit/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
         {% endif %}
         {% if asset.is_nested %}<span style="color:var(--text-faint);"> (in {{ asset.parent_engine.asset_id }})</span>{% endif %}
         {% if asset.archived %}<span class="badge badge-archived" style="margin-left:6px;">Archived</span>{% endif %}

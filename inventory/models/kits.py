@@ -4,6 +4,7 @@ from .assets import Asset, Tag
 
 KIT_HISTORY_FIELD_LABELS = {
     "name": "Kit name",
+    "status": "Kit status",
 }
 
 
@@ -120,8 +121,32 @@ class KitHistory(models.Model):
 
 
 class Kit(models.Model):
+    class Status(models.TextChoices):
+        READY = "READY", "Ready"
+        PREP = "PREP", "Prep / in progress"
+        BOOKED = "BOOKED", "Booked"
+        FAULTY = "FAULTY", "Faulty"
+        ARCHIVED = "ARCHIVED", "Archived"
+
+    # BOOKED is auto-managed: set when a KitBooking overlaps today (via
+    # status_sync / nightly recompute), cleared when no booking is active.
+    # READY / PREP / FAULTY / ARCHIVED are manual and sticky - the
+    # auto-recompute never overwrites them, so someone must set the kit
+    # back to READY for automatic management to resume.  A FAULTY kit that
+    # also has an active booking will show both the booking badge and a
+    # FAULTY badge on the card so neither fact is hidden.
+    AUTO_MANAGED_STATUSES = (Status.BOOKED,)
+
     name = models.CharField(max_length=120, unique=True)
     notes = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.READY,
+        help_text=(
+            "Manual status for this kit. 'Booked' is set automatically when "
+            "the kit has an active booking; Ready/Prep/Faulty/Archived are "
+            "sticky and never overwritten by the auto-recompute."
+        ),
+    )
     assets = models.ManyToManyField(
         Asset,
         blank=True,
