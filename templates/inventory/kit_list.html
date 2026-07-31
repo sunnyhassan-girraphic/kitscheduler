@@ -9,15 +9,32 @@
   .kit-grid {
     display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
     padding: 16px 24px;
+    grid-auto-rows: min-content;
     align-items: start;
   }
   @media (max-width: 900px) { .kit-grid { grid-template-columns: 1fr; } }
   .kit-card {
     border: 1px solid var(--border); border-radius: 8px;
-    margin: 0; overflow: hidden; background: var(--surface);
+    margin: 0; background: var(--surface);
     display: flex; flex-direction: column;
-    resize: vertical; min-height: 60px;
+    min-height: 56px; overflow: hidden;
+    position: relative;
   }
+  .kit-card-inner { flex: 1; overflow-y: auto; min-height: 0; }
+  .kit-card-resize-handle {
+    height: 6px; cursor: ns-resize; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent;
+  }
+  .kit-card-resize-handle::after {
+    content: ''; display: block;
+    width: 32px; height: 2px; border-radius: 2px;
+    background: var(--border-strong); opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .kit-card:hover .kit-card-resize-handle::after { opacity: 1; }
+  .kit-card-resize-handle:hover::after,
+  .kit-card-resize-handle.dragging::after { opacity: 1; background: var(--accent); }
   .kit-head {
     display: flex; align-items: center; gap: 12px; padding: 12px 16px;
     background: var(--surface-2); border-bottom: 1px solid var(--border);
@@ -69,8 +86,6 @@
   .kit-card-btn svg { width: 15px; height: 15px; }
   .kit-card-btn.close-btn:hover { color: var(--red); }
   .kit-card.pinned { order: -1; border-color: var(--accent-deep); }
-  .kit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-  @media (max-width: 900px) { .kit-grid { grid-template-columns: 1fr; } }
 
   /* Status pill on kit card */
   .kit-status-pill {
@@ -219,6 +234,7 @@
     {% endfor %}
   </div>
   {% endfor %}
+  <div class="kit-card-resize-handle" data-kit-id="{{ row.kit.id }}"></div>
 </div>
 {% else %}
 <div class="empty">
@@ -236,7 +252,56 @@ function toggleNested(wrapId, headerEl) {
 </script>
 <script>
 (function() {
-  const PINNED_KEY = "ks_pinned_kits";
+  // ── Kit card drag-to-resize ───────────────────────────────────────────────
+  // Each card has a .kit-card-resize-handle at the bottom. Dragging it sets
+  // an explicit height on the card so grid-auto-rows:min-content is overridden
+  // only for that card. Heights are saved to localStorage per kit ID.
+  const HEIGHTS_KEY = "ks_kit_heights";
+  function getSavedHeights() {
+    try { return JSON.parse(localStorage.getItem(HEIGHTS_KEY) || "{}"); } catch { return {}; }
+  }
+  function saveHeight(kitId, h) {
+    const heights = getSavedHeights();
+    heights[kitId] = h;
+    localStorage.setItem(HEIGHTS_KEY, JSON.stringify(heights));
+  }
+  // Restore saved heights on load
+  const savedHeights = getSavedHeights();
+  document.querySelectorAll(".kit-card[data-kit-id]").forEach(card => {
+    const h = savedHeights[card.dataset.kitId];
+    if (h) card.style.height = h + "px";
+  });
+  // Wire up drag handles
+  document.querySelectorAll(".kit-card-resize-handle").forEach(handle => {
+    handle.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      const card = handle.closest(".kit-card");
+      const startY = e.clientY;
+      const startH = card.getBoundingClientRect().height;
+      handle.classList.add("dragging");
+      function onMove(ev) {
+        const newH = Math.max(56, startH + (ev.clientY - startY));
+        card.style.height = newH + "px";
+      }
+      function onUp() {
+        handle.classList.remove("dragging");
+        const finalH = parseInt(card.style.height, 10);
+        if (finalH) saveHeight(card.dataset.kitId, finalH);
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      }
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+    // Double-click the handle to reset to natural height
+    handle.addEventListener("dblclick", () => {
+      const card = handle.closest(".kit-card");
+      card.style.height = "";
+      const heights = getSavedHeights();
+      delete heights[card.dataset.kitId];
+      localStorage.setItem(HEIGHTS_KEY, JSON.stringify(heights));
+    });
+  });
   const DISMISSED_KEY = "ks_dismissed_kits";
 
   function getPinned() { try { return new Set(JSON.parse(localStorage.getItem(PINNED_KEY) || "[]")); } catch { return new Set(); } }
