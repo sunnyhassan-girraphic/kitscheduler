@@ -287,7 +287,13 @@ async function openDashJobDetail(jobId) {
 }
 
 async function dashDeleteJob() {
-  if (!dashActiveJobId || !confirm("Delete this ENTIRE job and all its bookings? This cannot be undone.")) return;
+  if (!dashActiveJobId) return;
+  const okDashDel = await showConfirm({
+    title: "Delete entire job?",
+    message: "This will permanently delete the job and all its bookings. This cannot be undone.",
+    okLabel: "Delete", cancelLabel: "Cancel"
+  });
+  if (!okDashDel) return;
   const csrf = document.querySelector("[name=csrfmiddlewaretoken]")?.value || "{{ csrf_token }}";
   await fetch(`/api/jobs/${dashActiveJobId}/delete/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
   dashJobDialog.close();

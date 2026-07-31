@@ -128,7 +128,7 @@
           <td>{{ log.destination|default:"-" }}</td>
           <td>{% if log.start_mileage and log.end_mileage %}{{ log.start_mileage }} &rarr; {{ log.end_mileage }} <span style="color:var(--text-faint);">({{ log.distance }} mi)</span>{% elif log.start_mileage %}{{ log.start_mileage }}{% else %}-{% endif %}</td>
           <td>
-            <form method="post" action="/vans/usage/{{ log.id }}/delete/" onsubmit="return confirm('Delete this trip entry?');">
+            <form method="post" action="/vans/usage/{{ log.id }}/delete/" onsubmit="showConfirm({title:'Delete trip?',message:'This trip entry will be permanently removed.',okLabel:'Delete',cancelLabel:'Cancel'}).then(ok=>{if(ok)this.submit();}); return false;">
               {% csrf_token %}
               <button type="submit" class="row-delete-btn" title="Delete">&times;</button>
             </form>
@@ -188,7 +188,7 @@
           <td>{% if log.cost %}&pound;{{ log.cost }}{% else %}-{% endif %}</td>
           <td>{% if log.next_due_date %}{{ log.next_due_date|date:"j M Y" }}{% else %}-{% endif %}</td>
           <td>
-            <form method="post" action="/vans/maintenance/{{ log.id }}/delete/" onsubmit="return confirm('Delete this maintenance entry?');">
+            <form method="post" action="/vans/maintenance/{{ log.id }}/delete/" onsubmit="showConfirm({title:'Delete maintenance entry?',message:'This entry will be permanently removed.',okLabel:'Delete',cancelLabel:'Cancel'}).then(ok=>{if(ok)this.submit();}); return false;">
               {% csrf_token %}
               <button type="submit" class="row-delete-btn" title="Delete">&times;</button>
             </form>
@@ -257,7 +257,7 @@
           </span>
           <span style="margin-left:auto; display:flex; gap:10px; align-items:center;">
             <button type="button" class="expand-btn" onclick="document.getElementById('cl-detail-{{ cl.id }}').classList.toggle('open')">View items</button>
-            <form method="post" action="/vans/checklist/{{ cl.id }}/delete/" onsubmit="return confirm('Delete this checklist entry?');">
+            <form method="post" action="/vans/checklist/{{ cl.id }}/delete/" onsubmit="showConfirm({title:'Delete checklist entry?',message:'This entry will be permanently removed.',okLabel:'Delete',cancelLabel:'Cancel'}).then(ok=>{if(ok)this.submit();}); return false;">
               {% csrf_token %}
               <button type="submit" class="row-delete-btn" title="Delete">&times;</button>
             </form>

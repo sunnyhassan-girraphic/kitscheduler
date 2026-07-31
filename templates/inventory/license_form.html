@@ -302,10 +302,20 @@
   <div class="delete-zone">
     <p>Permanently delete this license.</p>
     <form method="post" action="/licenses/{{ license.id }}/delete/"
-          onsubmit="window.__formDirty = false; return confirm('Delete {{ license.asset_id }}? This removes the license and every booking on it. This cannot be undone.');">
+          id="delete-license-form">
       {% csrf_token %}
-      <button class="btn" type="submit" style="color:var(--red);">Delete license</button>
+      <button class="btn" type="button" style="color:var(--red);" onclick="confirmDeleteLicense()">Delete license</button>
     </form>
+<script>
+async function confirmDeleteLicense() {
+  const ok = await showConfirm({
+    title: "Delete license?",
+    message: "This will permanently delete {{ license.asset_id }} and every booking on it. This cannot be undone.",
+    okLabel: "Delete", cancelLabel: "Cancel"
+  });
+  if (ok) { window.__formDirty = false; document.getElementById("delete-license-form").submit(); }
+}
+</script>
   </div>
   {% endif %}
 
@@ -386,15 +396,18 @@ function toggleSection(id) {
     }
   });
 
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
     if (!dirty || submitting) return;
     const link = e.target.closest("a[href]");
     if (!link || link.target === "_blank") return;
-    if (!confirm("You have unsaved changes. Leave this page without saving?")) {
-      e.preventDefault();
-    } else {
-      submitting = true;
-    }
+    if (link.closest("dialog")) return;
+    e.preventDefault();
+    const ok = await showConfirm({
+      title: "Leave without saving?",
+      message: "You have unsaved changes. If you leave now they will be lost.",
+      okLabel: "Leave page", cancelLabel: "Stay"
+    });
+    if (ok) { submitting = true; window.location.href = link.href; }
   });
 })();
 </script>

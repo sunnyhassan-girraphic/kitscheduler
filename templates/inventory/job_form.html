@@ -299,7 +299,7 @@
             <input type="text" class="add-search-input" id="staff-search" placeholder="Search staff to add&hellip;" oninput="renderStaffResults()">
             <div class="add-results" id="staff-results"></div>
             <div class="add-error" id="staff-add-error"></div>
-            <div style="font-size:11px; color:var(--text-faint); margin-top:6px;">Staff bookings don't block on overlap — if someone's already booked elsewhere in this window, both will simply show.</div>
+            <div style="font-size:11px; color:var(--text-faint); margin-top:6px;">Staff bookings don't block on overlap - if someone's already booked elsewhere in this window, both will simply show.</div>
           </div>
         </div>
       </div>
@@ -488,7 +488,12 @@ async function removeBooking(kind, bookingId, btn) {
 
 // ── Delete job ───────────────────────────────────────────────────────────────
 async function deleteJobFromPage(jobId) {
-  if (!confirm("Delete this job? This removes all its kit/staff/license bookings too. This cannot be undone.")) return;
+  const ok = await showConfirm({
+    title: "Delete job?",
+    message: "This will permanently delete this job and remove all its kit, staff and license bookings. This cannot be undone.",
+    okLabel: "Delete", cancelLabel: "Cancel"
+  });
+  if (!ok) return;
   const resp = await fetch(`/api/jobs/${jobId}/delete/`, { method: "POST", headers: { "X-CSRFToken": CSRF } });
   if (resp.ok) window.location.href = "/timeline/";
 }
@@ -674,11 +679,12 @@ document.addEventListener("click", (e) => {
   const link = e.target.closest("a[href]");
   if (!link || link.target === "_blank") return;
   if (link.closest("dialog")) return;
-  if (!confirm("You have unsaved changes. Leave this page without saving?")) {
-    e.preventDefault();
-  } else {
-    submitting = true;
-  }
+  e.preventDefault();
+  showConfirm({
+    title: "Leave without saving?",
+    message: "You have unsaved changes. If you leave now they will be lost.",
+    okLabel: "Leave page", cancelLabel: "Stay"
+  }).then(ok => { if (ok) { submitting = true; window.location.href = link.href; } });
 });
 </script>
 {% endblock %}

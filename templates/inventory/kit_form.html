@@ -316,7 +316,7 @@
       <div class="form-section-head" onclick="toggleSection('section-job')" style="display:flex;align-items:center;justify-content:space-between;">
         Assigned job
         {% if current_booking %}
-          <a href="/jobs/{{ current_booking.job.id }}/edit/" onclick="event.stopPropagation();" style="font-size:11px;font-weight:400;color:var(--accent);text-transform:none;letter-spacing:0;text-decoration:none;">{{ current_booking.job.name }} &mdash; {{ current_booking.start_date|date:"j M Y" }} to {{ current_booking.end_date|date:"j M Y" }} &nearr;</a>
+          <a href="/jobs/{{ current_booking.job.id }}/edit/" onclick="event.stopPropagation();" style="font-size:11px;font-weight:400;color:var(--accent);text-transform:none;letter-spacing:0;text-decoration:none;">{{ current_booking.job.name }} - {{ current_booking.start_date|date:"j M Y" }} to {{ current_booking.end_date|date:"j M Y" }} ↗</a>
         {% endif %}
         <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
       </div>
@@ -386,7 +386,7 @@
           </select>
         </div>
         <div class="picker-results" id="picker-results"></div>
-        <div class="picker-hint">Components inside an Engine travel with it automatically — add the Engine itself. Assets in other kits with non-overlapping bookings can still be added.</div>
+        <div class="picker-hint">Components inside an Engine travel with it automatically - add the Engine itself. Assets in other kits with non-overlapping bookings can still be added.</div>
       </div>
     </div>
 
@@ -401,12 +401,21 @@
   {% if kit %}
   <div class="delete-zone">
     <p>Permanently delete this kit and all its bookings.</p>
-    <form method="post" action="/kits/{{ kit.id }}/delete/"
-          onsubmit="return confirm('Delete {{ kit.name }}? This removes the kit and every booking on it. This cannot be undone.');">
+    <form method="post" action="/kits/{{ kit.id }}/delete/" id="delete-kit-form">
       {% csrf_token %}
-      <button class="btn" type="submit" style="color:var(--red);">Delete kit</button>
+      <button class="btn" type="button" style="color:var(--red);" onclick="confirmDeleteKit()">Delete kit</button>
     </form>
   </div>
+<script>
+async function confirmDeleteKit() {
+  const ok = await showConfirm({
+    title: "Delete kit?",
+    message: "This will permanently delete {{ kit.name }} and all its bookings. This cannot be undone.",
+    okLabel: "Delete", cancelLabel: "Cancel"
+  });
+  if (ok) document.getElementById("delete-kit-form").submit();
+}
+</script>
 
   <dialog id="pdfMetaDialog" style="background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 10px; padding: 20px; width: 560px; max-width: 92vw; max-height: 85vh; overflow-y: auto;">
     <button type="button" class="dialog-close-x" onclick="document.getElementById('pdfMetaDialog').close()" aria-label="Close">&times;</button>
@@ -789,7 +798,7 @@ function downloadKitPdf(kitId) {
         : "";
       let hint = "";
       if (inAnotherKit && bookingConflict) {
-        hint = `<span class="picker-in-hint picker-in-hint-conflict">in ${a.otherKitName} — dates conflict</span>`;
+        hint = `<span class="picker-in-hint picker-in-hint-conflict">in ${a.otherKitName} - dates conflict</span>`;
       } else if (inAnotherKit) {
         hint = `<span class="picker-in-hint">also in ${a.otherKitName}</span>`;
       }
@@ -884,16 +893,18 @@ function downloadKitPdf(kitId) {
     }
   });
 
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
     if (!dirty || submitting) return;
     const link = e.target.closest("a[href]");
     if (!link || link.target === "_blank") return;
     if (link.closest("dialog")) return;
-    if (!confirm("You have unsaved changes. Leave this page without saving?")) {
-      e.preventDefault();
-    } else {
-      submitting = true;
-    }
+    e.preventDefault();
+    const ok = await showConfirm({
+      title: "Leave without saving?",
+      message: "You have unsaved changes. If you leave now they will be lost.",
+      okLabel: "Leave page", cancelLabel: "Stay"
+    });
+    if (ok) { submitting = true; window.location.href = link.href; }
   });
 })();
 </script>

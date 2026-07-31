@@ -80,7 +80,7 @@
         <span class="bank-chip">
           <span class="tag-swatch" style="background-color: {{ tag.color|default:'#EAB308' }};"></span>
           {{ tag.name }}
-          <form method="post" action="/settings/tags/{{ tag.id }}/delete/" onsubmit="return confirm('Remove tag &quot;{{ tag.name }}&quot;? Any kit assets using it will lose the tag.');">
+          <form method="post" action="/settings/tags/{{ tag.id }}/delete/" onsubmit="return new Promise(r=>showConfirm({title:'Remove tag?',message:'Any kit assets using this tag will lose it.',okLabel:'Remove',cancelLabel:'Cancel'}).then(ok=>{if(ok)this.submit();})) && false;">
             {% csrf_token %}
             <button class="chip-del" type="submit" title="Remove tag">&times;</button>
           </form>
@@ -106,7 +106,7 @@
         {% for f in functionalities %}
         <span class="bank-chip">
           {{ f.name }}
-          <form method="post" action="/settings/functionalities/{{ f.id }}/delete/" onsubmit="return confirm('Remove functionality &quot;{{ f.name }}&quot;? It will be unticked from any licenses that had it.');">
+          <form method="post" action="/settings/functionalities/{{ f.id }}/delete/" onsubmit="return new Promise(r=>showConfirm({title:'Remove functionality?',message:'This will be unticked from any licenses that had it.',okLabel:'Remove',cancelLabel:'Cancel'}).then(ok=>{if(ok)this.submit();})) && false;">
             {% csrf_token %}
             <button class="chip-del" type="submit" title="Remove functionality">&times;</button>
           </form>

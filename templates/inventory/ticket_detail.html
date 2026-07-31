@@ -133,11 +133,20 @@
 
       <div class="delete-zone">
         <p>Permanently delete this ticket and its history.</p>
-        <form method="post" action="/tickets/{{ ticket.id }}/delete/"
-              onsubmit="return confirm('Delete ticket #{{ ticket.id }}? This cannot be undone.');">
+        <form method="post" action="/tickets/{{ ticket.id }}/delete/" id="delete-ticket-form">
           {% csrf_token %}
-          <button class="btn" type="submit" style="color:var(--red); border-color:var(--red);">Delete ticket</button>
+          <button class="btn" type="button" style="color:var(--red); border-color:var(--red);" onclick="confirmDeleteTicket()">Delete ticket</button>
         </form>
+<script>
+async function confirmDeleteTicket() {
+  const ok = await showConfirm({
+    title: "Delete ticket?",
+    message: "This will permanently delete ticket #{{ ticket.id }} and its entire history. This cannot be undone.",
+    okLabel: "Delete", cancelLabel: "Cancel"
+  });
+  if (ok) document.getElementById("delete-ticket-form").submit();
+}
+</script>
       </div>
     </div>
     <div class="form-section" style="margin-bottom:0;">

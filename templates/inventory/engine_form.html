@@ -261,7 +261,7 @@
 
         {% if engine %}
         <div class="form-field">
-          <label>Kit tag <span style="color:var(--text-faint); font-weight:400;">(what this is used for in its kit &mdash; manage the tag bank in <a href="/settings/" style="color:var(--accent);">Settings</a>)</span></label>
+          <label>Kit tag <span style="color:var(--text-faint); font-weight:400;">(what this is used for in its kit - manage the tag bank in <a href="/settings/" style="color:var(--accent);">Settings</a>)</span></label>
           {% if kit_membership %}
             <div style="display:flex; align-items:center; gap:10px;">
               <span style="font-size:12px; color:var(--text-dim);">In kit <strong>{{ kit_membership.kit.name }}</strong>:</span>
@@ -273,7 +273,7 @@
               </select>
             </div>
           {% else %}
-            <p style="font-size:12px; color:var(--text-faint); margin:0;">Not currently in a kit &mdash; add it to a kit first, then tags can be set here or on the kit page.</p>
+            <p style="font-size:12px; color:var(--text-faint); margin:0;">Not currently in a kit - add it to a kit first, then tags can be set here or on the kit page.</p>
           {% endif %}
         </div>
         {% endif %}
@@ -377,12 +377,21 @@
   {% if engine %}
   <div class="delete-zone">
     <p>Permanently delete this {{ kind_label|lower }}. Nested components will be unassigned, not deleted.</p>
-    <form method="post" action="{{ delete_url }}"
-          onsubmit="window.__formDirty = false; return confirm('Delete {{ engine.asset_id }}? This removes the {{ kind_label|lower }} and every booking on it. Components inside it will become unassigned. This cannot be undone.');">
+    <form method="post" action="{{ delete_url }}" id="delete-engine-form">
       {% csrf_token %}
-      <button class="btn" type="submit" style="color:var(--red);">Delete {{ kind_label|lower }}</button>
+      <button class="btn" type="button" style="color:var(--red);" onclick="confirmDeleteEngine()">Delete {{ kind_label|lower }}</button>
     </form>
   </div>
+<script>
+async function confirmDeleteEngine() {
+  const ok = await showConfirm({
+    title: "Delete {{ kind_label|lower }}?",
+    message: "This will permanently delete {{ engine.asset_id }}. Its bookings will be removed and any nested components will become unassigned. This cannot be undone.",
+    okLabel: "Delete", cancelLabel: "Cancel"
+  });
+  if (ok) { window.__formDirty = false; document.getElementById("delete-engine-form").submit(); }
+}
+</script>
   {% endif %}
 
 </div>
@@ -701,15 +710,18 @@ function toggleSection(id) {
     }
   });
 
-  document.addEventListener("click", (e) => {
+  document.addEventListener("click", async (e) => {
     if (!dirty || submitting) return;
     const link = e.target.closest("a[href]");
     if (!link || link.target === "_blank") return;
-    if (!confirm("You have unsaved changes. Leave this page without saving?")) {
-      e.preventDefault();
-    } else {
-      submitting = true;
-    }
+    if (link.closest("dialog")) return;
+    e.preventDefault();
+    const ok = await showConfirm({
+      title: "Leave without saving?",
+      message: "You have unsaved changes. If you leave now they will be lost.",
+      okLabel: "Leave page", cancelLabel: "Stay"
+    });
+    if (ok) { submitting = true; window.location.href = link.href; }
   });
 })();
 </script>

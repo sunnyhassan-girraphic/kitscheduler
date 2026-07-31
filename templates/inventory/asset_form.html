@@ -224,9 +224,9 @@
   {% if asset_obj %}
   <div class="delete-zone">
     <p>Permanently delete <strong>{{ asset_obj.asset_id }}</strong>. This cannot be undone.</p>
-    <form method="post" action="/assets/{{ asset_obj.pk }}/delete/" onsubmit="return confirm('Delete {{ asset_obj.asset_id }}? This cannot be undone.');">
+    <form method="post" action="/assets/{{ asset_obj.pk }}/delete/" id="delete-asset-form">
       {% csrf_token %}
-      <button type="submit" class="btn" style="border-color:var(--red); color:var(--red);">Delete asset</button>
+      <button type="button" class="btn" style="border-color:var(--red); color:var(--red);" onclick="confirmDeleteAsset()">Delete asset</button>
     </form>
   </div>
   {% endif %}
@@ -341,8 +341,15 @@ let dirty = false;
 document.getElementById("asset-form").addEventListener("change", () => dirty = true);
 document.getElementById("asset-form").addEventListener("input", () => dirty = true);
 document.getElementById("asset-form").addEventListener("submit", () => dirty = false);
-document.getElementById("cancel-link")?.addEventListener("click", e => {
-  if (dirty && !confirm("You have unsaved changes. Leave anyway?")) e.preventDefault();
+document.getElementById("cancel-link")?.addEventListener("click", async e => {
+  if (!dirty) return;
+  e.preventDefault();
+  const ok = await showConfirm({
+    title: "Leave without saving?",
+    message: "You have unsaved changes. If you leave now they will be lost.",
+    okLabel: "Leave page", cancelLabel: "Stay"
+  });
+  if (ok) window.location.href = e.currentTarget.href;
 });
 </script>
 {% endblock %}

@@ -79,7 +79,7 @@
   <div class="delete-zone">
     <p>Permanently delete this van and all its usage/maintenance/checklist history.</p>
     <form method="post" action="/vans/{{ vehicle.id }}/delete/"
-          onsubmit="return confirm('Delete {{ vehicle.name }}? This removes the van and all its logged history. This cannot be undone.');">
+          id="delete-van-form" onsubmit="return false;">
       {% csrf_token %}
       <button class="btn" type="submit" style="color:var(--red);">Delete van</button>
     </form>

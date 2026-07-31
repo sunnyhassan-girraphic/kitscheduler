@@ -573,9 +573,11 @@ function closeJobDetail() {
 
 async function deleteJob() {
   if (!activeJobDetailId) return;
-  const confirmed = confirm(
-    `Delete "${activeJobDetailName}"? This removes the job and every kit/staff booking on it. This can't be undone.`
-  );
+  const confirmed = await showConfirm({
+    title: "Delete job?",
+    message: `This will permanently delete "${activeJobDetailName}" and all its kit and staff bookings. This cannot be undone.`,
+    okLabel: "Delete", cancelLabel: "Cancel"
+  });
   if (!confirmed) return;
 
   const resp = await fetch(`/api/jobs/${activeJobDetailId}/delete/`, {

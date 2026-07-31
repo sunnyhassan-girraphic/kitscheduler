@@ -303,5 +303,40 @@
   });
 })();
 </script>
+<!-- Shared confirmation dialog — used by showConfirm() across all pages -->
+<dialog id="confirm-dialog" style="background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;padding:20px 24px;max-width:400px;color:var(--text);margin:auto;">
+  <h2 id="confirm-dialog-title" style="font-size:15px;margin:0 0 8px;font-weight:600;"></h2>
+  <p id="confirm-dialog-msg" style="font-size:13px;color:var(--text-dim);margin:0 0 20px;line-height:1.5;"></p>
+  <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <button id="confirm-dialog-cancel" class="btn" type="button">Cancel</button>
+    <button id="confirm-dialog-ok" class="btn btn-primary" type="button">Confirm</button>
+  </div>
+</dialog>
+<script>
+(function() {
+  const dialog = document.getElementById("confirm-dialog");
+  const titleEl = document.getElementById("confirm-dialog-title");
+  const msgEl = document.getElementById("confirm-dialog-msg");
+  const okBtn = document.getElementById("confirm-dialog-ok");
+  const cancelBtn = document.getElementById("confirm-dialog-cancel");
+  let resolveFn = null;
+
+  window.showConfirm = function({ title, message, okLabel = "Confirm", cancelLabel = "Cancel" }) {
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    okBtn.textContent = okLabel;
+    cancelBtn.textContent = cancelLabel;
+    dialog.showModal();
+    return new Promise(resolve => { resolveFn = resolve; });
+  };
+
+  okBtn.addEventListener("click", () => { dialog.close(); if (resolveFn) resolveFn(true); });
+  cancelBtn.addEventListener("click", () => { dialog.close(); if (resolveFn) resolveFn(false); });
+  dialog.addEventListener("cancel", () => { if (resolveFn) resolveFn(false); }); // Esc key
+})();
+</script>
+<style>
+  #confirm-dialog::backdrop { background: rgba(0,0,0,0.55); }
+</style>
 </body>
 </html>

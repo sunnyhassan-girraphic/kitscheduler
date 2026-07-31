@@ -355,19 +355,19 @@ function toggleNested(wrapId, headerEl) {
         // Going to Ready: offer to keep or remove the booking
         removeLine.innerHTML = `
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
-            <input type="radio" name="booking-action" value="keep" checked> Set to Ready — keep the booking
+            <input type="radio" name="booking-action" value="keep" checked> Set to Ready - keep the booking
           </label>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px;">
-            <input type="radio" name="booking-action" value="remove"> Set to Ready — remove from job
+            <input type="radio" name="booking-action" value="remove"> Set to Ready - remove from job
           </label>`;
       } else {
         // Going to Prep/Faulty/Archived from Booked: same choice
         removeLine.innerHTML = `
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
-            <input type="radio" name="booking-action" value="keep" checked> Set to ${opt.label} — keep the booking
+            <input type="radio" name="booking-action" value="keep" checked> Set to ${opt.label} - keep the booking
           </label>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px;">
-            <input type="radio" name="booking-action" value="remove"> Set to ${opt.label} — remove from job
+            <input type="radio" name="booking-action" value="remove"> Set to ${opt.label} - remove from job
           </label>`;
       }
 
@@ -425,7 +425,12 @@ function toggleNested(wrapId, headerEl) {
   });
 
   window.dismissCard = async function(btn, kitId, kitName) {
-    if (!confirm(`Delete "${kitName}"? This removes the kit and every booking on it. This cannot be undone.`)) return;
+    const ok = await showConfirm({
+      title: "Delete kit?",
+      message: `This will permanently delete "${kitName}" and every booking on it. This cannot be undone.`,
+      okLabel: "Delete", cancelLabel: "Cancel"
+    });
+    if (!ok) return;
     const csrf = document.querySelector("[name=csrfmiddlewaretoken]");
     const csrfToken = csrf ? csrf.value : "";
     const resp = await fetch(`/kits/${kitId}/delete/`, {

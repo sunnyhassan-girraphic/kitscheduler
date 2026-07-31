@@ -239,7 +239,7 @@
 {% endif %}{# end show_kits #}
 
 {% if show_licenses %}
-<div class="section-label">Licenses <span style="font-weight:400; color:var(--text-faint); text-transform:none; letter-spacing:normal;">&mdash; <span style="display:inline-block; width:10px; height:10px; background:rgba(52,199,89,0.35); border-radius:2px; vertical-align:middle;"></span> shaded days are within the license's active Duration window; drag across days to book a job on it</span></div>
+<div class="section-label">Licenses <span style="font-weight:400; color:var(--text-faint); text-transform:none; letter-spacing:normal;">- <span style="display:inline-block; width:10px; height:10px; background:rgba(52,199,89,0.35); border-radius:2px; vertical-align:middle;"></span> shaded days are within the license's active Duration window; drag across days to book a job on it</span></div>
 {% if license_rows %}
 <div class="grid-wrap">
 <div class="cal-grid resizable-grid" data-resize-key="timeline-licenses">
@@ -803,7 +803,12 @@ function openKitDetail(kitId) {
 async function unassignBooking() {
   if (!activeBookingKind || !activeBookingId) return;
   const kindLabel = { kit: "kit", staff: "staff member", license: "license" }[activeBookingKind] || "item";
-  if (!confirm(`Unassign this ${kindLabel} from the job? The job itself, and any other assignments on it, will stay.`)) return;
+  const okUnassign = await showConfirm({
+    title: `Unassign ${kindLabel}?`,
+    message: "The job itself and any other assignments on it will stay.",
+    okLabel: "Unassign", cancelLabel: "Cancel"
+  });
+  if (!okUnassign) return;
   const base = ENDPOINTS[activeBookingKind]?.deleteBase;
   if (!base) return;
   const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
@@ -813,7 +818,13 @@ async function unassignBooking() {
 }
 
 async function deleteJob() {
-  if (!activeJobId || !confirm("Delete this ENTIRE job and all its bookings (kits, staff, licenses)? This cannot be undone.")) return;
+  if (!activeJobId) return;
+  const okDel = await showConfirm({
+    title: "Delete entire job?",
+    message: "This will permanently delete the job and all its kit, staff and license bookings. This cannot be undone.",
+    okLabel: "Delete", cancelLabel: "Cancel"
+  });
+  if (!okDel) return;
   const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
   await fetch(`/api/jobs/${activeJobId}/delete/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
   jobDetailDialog.close();
