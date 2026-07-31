@@ -101,6 +101,7 @@
     margin-bottom: 5px;
   }
   .form-field input[type="text"],
+  .form-field input[type="date"],
   .form-field select,
   .form-field textarea {
     width: 100%;
@@ -114,9 +115,14 @@
     box-sizing: border-box;
   }
   .form-field input[type="text"]:focus,
+  .form-field input[type="date"]:focus,
   .form-field select:focus,
   .form-field textarea:focus { outline: none; border-color: var(--accent); }
   .form-field textarea { resize: vertical; min-height: 80px; }
+  .form-field input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.6); cursor: pointer; opacity: 0.6;
+  }
+  .form-field input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
   .date-input-wrap { position: relative; display: flex; align-items: center; }
   .date-input-wrap input[type="text"] { padding-right: 38px; }
   .date-icon-btn {
@@ -229,6 +235,12 @@
   .picker-search-wrap input:focus { outline: none; border-color: var(--accent); }
   .picker-results { margin-top: 8px; max-height: 260px; overflow-y: auto; }
   .picker-hint { font-size: 11px; color: var(--text-faint); margin-top: 6px; }
+  .job-result-row { border-bottom: 0.5px solid var(--border); }
+  .job-result-row:last-child { border-bottom: none; }
+  .job-result-row:hover { background: var(--surface-2); }
+  .job-status-done { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--surface-2); color: var(--text-faint); }
+  .job-status-upcoming { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--green-dim); color: var(--green); }
+  .job-status-active { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--accent-glow); color: var(--accent); }
 
   .selected-count {
     font-size: 12px;
@@ -300,6 +312,56 @@
       </div>
     </div>
 
+    <div class="form-section {% if not current_booking %}collapsed{% endif %}" id="section-job">
+      <div class="form-section-head" onclick="toggleSection('section-job')" style="display:flex;align-items:center;justify-content:space-between;">
+        Assigned job
+        {% if current_booking %}
+          <a href="/jobs/{{ current_booking.job.id }}/edit/" onclick="event.stopPropagation();" style="font-size:11px;font-weight:400;color:var(--accent);text-transform:none;letter-spacing:0;text-decoration:none;">{{ current_booking.job.name }} &mdash; {{ current_booking.start_date|date:"j M Y" }} to {{ current_booking.end_date|date:"j M Y" }} &nearr;</a>
+        {% endif %}
+        <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+      </div>
+      <div class="form-section-body">
+        <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
+          Assign this kit to a job. Dates auto-fill from the job but can be adjusted if the kit is only needed for part of the window.
+          {% if picker_date_from and picker_date_to %}
+          Checking asset availability for <strong style="color:var(--text-dim);">{{ picker_date_from|date:"j M Y" }} &rarr; {{ picker_date_to|date:"j M Y" }}</strong> — assets in another kit with non-overlapping bookings can still be added.
+          {% endif %}
+        </p>
+
+        <input type="hidden" name="linked_job_id" id="linked-job-id" value="{% if current_booking %}{{ current_booking.job.id }}{% endif %}">
+
+        <div class="form-field" style="margin-bottom:10px;">
+          <label>Job</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="job-search" placeholder="Search by job name or date..." autocomplete="off" style="flex:1;"
+                   value="{% if current_booking %}{{ current_booking.job.name }}{% endif %}">
+            <button type="button" class="btn" style="color:var(--text-dim);white-space:nowrap;flex-shrink:0;" onclick="clearJobLink()">Clear</button>
+          </div>
+          <div id="job-results" style="margin-top:4px;background:var(--surface);border:1px solid var(--border-strong);border-radius:6px;max-height:200px;overflow-y:auto;display:none;"></div>
+        </div>
+
+        <div id="job-dates-row" style="display:{% if current_booking %}grid{% else %}none{% endif %};grid-template-columns:1fr 1fr;gap:14px;">
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="booking-start">Kit from</label>
+            <input type="date" id="booking-start" name="booking_start" value="{% if current_booking %}{{ current_booking.start_date|date:'Y-m-d' }}{% endif %}">
+          </div>
+          <div class="form-field" style="margin-bottom:0;">
+            <label for="booking-end">Kit to</label>
+            <input type="date" id="booking-end" name="booking_end" value="{% if current_booking %}{{ current_booking.end_date|date:'Y-m-d' }}{% endif %}">
+          </div>
+        </div>
+
+        {% if current_booking %}
+        <div style="margin-top:12px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;">
+            <input type="checkbox" name="remove_booking" value="1" id="remove-booking-cb">
+            Remove this kit from {{ current_booking.job.name }} on save
+          </label>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
     <div class="form-section" id="section-assets">
       <div class="form-section-head" onclick="toggleSection('section-assets')" style="display:flex;align-items:center;justify-content:space-between;">Assets in this kit <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>
       <div class="form-section-body">
@@ -324,10 +386,7 @@
           </select>
         </div>
         <div class="picker-results" id="picker-results"></div>
-        <div class="picker-hint">Individually-tracked components aren't listed here directly — add the Engine they're nested in instead. Non-available assets are shown but cannot be added until their status changes.</div>
-        {% if picker_date_from and picker_date_to %}
-        <div class="picker-hint" style="margin-top:4px; color:var(--accent);">Checking availability for {{ picker_date_from }} → {{ picker_date_to }}. Assets in another kit with non-overlapping bookings can still be added.</div>
-        {% endif %}
+        <div class="picker-hint">Components inside an Engine travel with it automatically — add the Engine itself. Assets in other kits with non-overlapping bookings can still be added.</div>
       </div>
     </div>
 
@@ -437,6 +496,12 @@
             <div class="history-change">Added asset <span class="val">{{ entry.new_value }}</span></div>
           {% elif entry.field_changed == "asset_removed" %}
             <div class="history-change">Removed asset <span class="val">{{ entry.old_value }}</span></div>
+          {% elif entry.field_changed == "job_assigned" %}
+            <div class="history-change">Job assigned <span class="from-to"><span class="val">{{ entry.new_value }}</span></span></div>
+          {% elif entry.field_changed == "job_changed" %}
+            <div class="history-change">Job changed <span class="from-to">from <span class="val">{{ entry.old_value }}</span> to <span class="val">{{ entry.new_value }}</span></span></div>
+          {% elif entry.field_changed == "job_removed" %}
+            <div class="history-change">Job removed <span class="from-to"><span class="val">{{ entry.old_value }}</span></span></div>
           {% elif entry.field_changed == "quantity_changed" %}
             <div class="history-change">Quantity changed <span class="from-to">from <span class="val">{{ entry.old_value }}</span> to <span class="val">{{ entry.new_value }}</span></span></div>
           {% else %}
@@ -525,6 +590,67 @@ function downloadKitPdf(kitId) {
 
 {{ assets_json|json_script:"assets-data" }}
 {{ tags_json|json_script:"tags-data" }}
+{{ jobs_json|json_script:"jobs-data" }}
+<script>
+// Job picker for Linked Job section
+(function() {
+  const JOBS = JSON.parse(document.getElementById("jobs-data").textContent);
+  const searchInput = document.getElementById("job-search");
+  const resultsDiv = document.getElementById("job-results");
+  const jobIdInput = document.getElementById("linked-job-id");
+  const datesRow = document.getElementById("job-dates-row");
+  const startInput = document.getElementById("booking-start");
+  const endInput = document.getElementById("booking-end");
+
+  if (!searchInput) return;
+
+  searchInput.addEventListener("input", () => {
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q) { resultsDiv.style.display = "none"; return; }
+    const matches = JOBS.filter(j => j.label.toLowerCase().includes(q)).slice(0, 8);
+    if (!matches.length) { resultsDiv.style.display = "none"; return; }
+    resultsDiv.innerHTML = matches.map(j => `
+      <div class="job-result-row" data-id="${j.id}" data-start="${j.startDate}" data-end="${j.endDate}"
+           style="padding:8px 12px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:500;color:var(--text);flex:1;">${j.name}</span>
+        <span style="font-size:11px;color:var(--text-dim);">${j.displayRange}</span>
+        <span class="${j.statusClass}">${j.statusLabel}</span>
+      </div>`).join("");
+    resultsDiv.style.display = "block";
+    resultsDiv.querySelectorAll(".job-result-row").forEach(row => {
+      row.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        selectJob(row.dataset.id, row.dataset.start, row.dataset.end);
+        searchInput.value = JOBS.find(j => j.id == row.dataset.id)?.name || searchInput.value;
+      });
+    });
+  });
+
+  function selectJob(id, start, end) {
+    jobIdInput.value = id;
+    resultsDiv.style.display = "none";
+    if (startInput && !startInput.value) startInput.value = start;
+    if (endInput && !endInput.value) endInput.value = end;
+    if (datesRow) datesRow.style.display = "grid";
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
+      resultsDiv.style.display = "none";
+    }
+  });
+
+  window.clearJobLink = function() {
+    jobIdInput.value = "";
+    searchInput.value = "";
+    if (startInput) startInput.value = "";
+    if (endInput) endInput.value = "";
+    if (datesRow) datesRow.style.display = "none";
+    const removeCb = document.getElementById("remove-booking-cb");
+    if (removeCb) removeCb.checked = true;
+  };
+})();
+</script>
 <script>
 (function() {
   const ALL = JSON.parse(document.getElementById("assets-data").textContent);
@@ -543,10 +669,13 @@ function downloadKitPdf(kitId) {
 
   let selected = new Set([{{ selected_ids|join:"," }}]);
   const initialTags = {{ selected_tags_json|default:"{}"|safe }};
+  const initialTags2 = {{ selected_tags2_json|default:"{}"|safe }};
   const initialQty = {{ selected_qty_json|default:"{}"|safe }};
   const assetTags = {};
+  const assetTags2 = {};
   const assetQty = {};
   Object.keys(initialTags).forEach(k => { assetTags[k] = initialTags[k]; });
+  Object.keys(initialTags2).forEach(k => { assetTags2[k] = initialTags2[k]; });
   Object.keys(initialQty).forEach(k => { assetQty[k] = initialQty[k]; });
 
   // Populate the type filter from whatever types actually exist in the pool
@@ -573,7 +702,16 @@ function downloadKitPdf(kitId) {
     const options = [`<option value="">No tag</option>`].concat(
       TAGS.map(t => `<option value="${t.id}" style="color: ${t.color || '#EAB308'};" ${String(t.id) === String(current) ? "selected" : ""}>${t.name}</option>`)
     ).join("");
-    return `<select class="tag-select" data-id="${id}" title="What is this used for in this kit?">${options}</select>`;
+    const select1 = `<select class="tag-select" data-id="${id}" data-slot="1" title="Channel 1 tag">${options}</select>`;
+    // Second tag select only for G3 engines
+    const isG3 = a.makeModel && a.makeModel.toUpperCase().includes("G3");
+    if (!isG3) return select1;
+    const current2 = assetTags2[id] || "";
+    const options2 = [`<option value="">No tag</option>`].concat(
+      TAGS.map(t => `<option value="${t.id}" style="color: ${t.color || '#EAB308'};" ${String(t.id) === String(current2) ? "selected" : ""}>${t.name}</option>`)
+    ).join("");
+    const select2 = `<select class="tag-select" data-id="${id}" data-slot="2" title="Channel 2 tag">${options2}</select>`;
+    return select1 + select2;
   }
 
   function qtyInputHtml(id, a) {
@@ -605,6 +743,7 @@ function downloadKitPdf(kitId) {
           <button type="button" class="picker-remove-btn" title="Remove" data-id="${id}">&times;</button>
           <input type="hidden" name="assets" value="${id}">
           <input type="hidden" name="tag_${id}" value="${assetTags[id] || ""}">
+          <input type="hidden" name="tag2_${id}" value="${assetTags2[id] || ""}">
           <input type="hidden" name="qty_${id}" value="${assetQty[id] || 1}">
         </div>
         ${nestedHtml(a)}
@@ -688,9 +827,16 @@ function downloadKitPdf(kitId) {
     const select = e.target.closest(".tag-select");
     if (select) {
       const id = select.dataset.id;
-      assetTags[id] = select.value;
-      const hidden = select.closest(".picker-row").querySelector(`input[name="tag_${id}"]`);
-      if (hidden) hidden.value = select.value;
+      const slot = select.dataset.slot || "1";
+      if (slot === "2") {
+        assetTags2[id] = select.value;
+        const hidden = select.closest(".picker-row").querySelector(`input[name="tag2_${id}"]`);
+        if (hidden) hidden.value = select.value;
+      } else {
+        assetTags[id] = select.value;
+        const hidden = select.closest(".picker-row").querySelector(`input[name="tag_${id}"]`);
+        if (hidden) hidden.value = select.value;
+      }
       return;
     }
     const qtyInput = e.target.closest(".qty-input");

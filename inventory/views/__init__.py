@@ -53,6 +53,7 @@ from .kits import (
     kit_edit_view,
     kit_delete_view,
     kit_set_status_view,
+    kit_booking_info_view,
     kit_pdf_view,
 )
 

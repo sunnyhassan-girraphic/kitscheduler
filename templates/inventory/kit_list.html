@@ -9,12 +9,14 @@
   .kit-grid {
     display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
     padding: 16px 24px;
+    align-items: start;
   }
   @media (max-width: 900px) { .kit-grid { grid-template-columns: 1fr; } }
   .kit-card {
     border: 1px solid var(--border); border-radius: 8px;
     margin: 0; overflow: hidden; background: var(--surface);
     display: flex; flex-direction: column;
+    resize: vertical; min-height: 60px;
   }
   .kit-head {
     display: flex; align-items: center; gap: 12px; padding: 12px 16px;
@@ -106,6 +108,7 @@
   .kit-status-menu-item:hover { background: var(--surface); color: var(--text); }
   .kit-status-menu-item.active { color: var(--text); font-weight: 500; }
   .kit-status-menu-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  #kit-status-dialog::backdrop { background: rgba(0,0,0,0.55); }
 {% endblock %}
 {% block content %}
 <form id="csrf-holder" style="display:none;">{% csrf_token %}</form>
@@ -170,7 +173,7 @@
           <span class="mname">{{ member.asset_id }}</span>
           <div class="mright">
             <span class="mmodel">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
-            {% if member.kit_tag %}<span class="kit-tag" style="background: {{ member.kit_tag.color|default:'#EAB308' }}1A; color: {{ member.kit_tag.color|default:'#EAB308' }}; border-color: {{ member.kit_tag.color|default:'#EAB308' }};">{{ member.kit_tag.name }}</span>{% endif %}
+            {% if member.kit_tag %}<span class="kit-tag" style="background: {{ member.kit_tag.color|default:'#EAB308' }}1A; color: {{ member.kit_tag.color|default:'#EAB308' }}; border-color: {{ member.kit_tag.color|default:'#EAB308' }};">{{ member.kit_tag.name }}</span>{% endif %}{% if member.kit_tag_2 %}<span class="kit-tag" style="background: {{ member.kit_tag_2.color|default:'#EAB308' }}1A; color: {{ member.kit_tag_2.color|default:'#EAB308' }}; border-color: {{ member.kit_tag_2.color|default:'#EAB308' }};">{{ member.kit_tag_2.name }}</span>{% endif %}
             <span class="badge badge-{{ member.status|lower }}">{{ member.get_status_display }}</span>
           </div>
         </div>
@@ -205,7 +208,7 @@
           <span class="mname">{{ member.asset_id }}</span>
           <div class="mright">
             <span class="mmodel">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
-            {% if member.kit_tag %}<span class="kit-tag" style="background: {{ member.kit_tag.color|default:'#EAB308' }}1A; color: {{ member.kit_tag.color|default:'#EAB308' }}; border-color: {{ member.kit_tag.color|default:'#EAB308' }};">{{ member.kit_tag.name }}</span>{% endif %}
+            {% if member.kit_tag %}<span class="kit-tag" style="background: {{ member.kit_tag.color|default:'#EAB308' }}1A; color: {{ member.kit_tag.color|default:'#EAB308' }}; border-color: {{ member.kit_tag.color|default:'#EAB308' }};">{{ member.kit_tag.name }}</span>{% endif %}{% if member.kit_tag_2 %}<span class="kit-tag" style="background: {{ member.kit_tag_2.color|default:'#EAB308' }}1A; color: {{ member.kit_tag_2.color|default:'#EAB308' }}; border-color: {{ member.kit_tag_2.color|default:'#EAB308' }};">{{ member.kit_tag_2.name }}</span>{% endif %}
             {% if member.kit_qty > 1 %}<span class="member-qty">&times;{{ member.kit_qty }}</span>{% endif %}
             <span class="badge badge-{{ member.status|lower }}">{{ member.get_status_display }}</span>
           </div>
@@ -329,21 +332,78 @@ function toggleNested(wrapId, headerEl) {
   };
 
   async function applyStatus(kitId, opt, pill) {
+    // Check if this kit has a booking — if so, show a confirmation dialog
+    // before setting certain statuses (going away from Booked, or setting Ready).
+    const needsBookingCheck = true; // always check; modal only shows if booking exists
+    let bookingInfo = null;
+    try {
+      const r = await fetch(`/kits/${kitId}/booking-info/`);
+      if (r.ok) bookingInfo = await r.json();
+    } catch {}
+
+    const hasBooking = bookingInfo && bookingInfo.hasBooking;
+
+    if (hasBooking) {
+      // Show confirmation dialog
+      const dialog = document.getElementById("kit-status-dialog");
+      const msg = document.getElementById("kit-status-dialog-msg");
+      const removeLine = document.getElementById("kit-status-remove-line");
+
+      msg.textContent = `This kit is booked on "${bookingInfo.jobName}" (${bookingInfo.startDate} → ${bookingInfo.endDate}).`;
+
+      if (opt.value === "READY") {
+        // Going to Ready: offer to keep or remove the booking
+        removeLine.innerHTML = `
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="radio" name="booking-action" value="keep" checked> Set to Ready — keep the booking
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px;">
+            <input type="radio" name="booking-action" value="remove"> Set to Ready — remove from job
+          </label>`;
+      } else {
+        // Going to Prep/Faulty/Archived from Booked: same choice
+        removeLine.innerHTML = `
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+            <input type="radio" name="booking-action" value="keep" checked> Set to ${opt.label} — keep the booking
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px;">
+            <input type="radio" name="booking-action" value="remove"> Set to ${opt.label} — remove from job
+          </label>`;
+      }
+
+      dialog.showModal();
+      // Store pending action for when the user confirms
+      dialog.dataset.kitId = kitId;
+      dialog.dataset.pillId = pill.id || "";
+      dialog._pill = pill;
+      dialog._opt = opt;
+    } else {
+      // No booking — apply directly
+      await commitStatus(kitId, opt, pill, false);
+    }
+  }
+
+  async function commitStatus(kitId, opt, pill, removeBooking) {
     const csrf = document.querySelector("[name=csrfmiddlewaretoken]");
     const csrfToken = csrf ? csrf.value : "";
+    // Optimistic update
     pill.dataset.status = opt.value;
     pill.className = `kit-status-pill kit-status-${opt.value.toLowerCase()}`;
     pill.querySelector(".kit-status-label").textContent = opt.label;
     pill.querySelector(".kit-status-dot").style.background = opt.dot;
     try {
+      const body = `status=${encodeURIComponent(opt.value)}${removeBooking ? "&remove_booking=1" : ""}`;
       const resp = await fetch(`/kits/${kitId}/set-status/`, {
         method: "POST",
         headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
-        body: `status=${encodeURIComponent(opt.value)}`,
+        body,
       });
       if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
         alert(data.error || "Could not update status. Please try again.");
+        location.reload();
+      } else if (removeBooking) {
+        // Booking was removed — reload to update the booking badge on the card
         location.reload();
       }
     } catch {
@@ -351,6 +411,18 @@ function toggleNested(wrapId, headerEl) {
       location.reload();
     }
   }
+
+  // Status confirmation dialog handler
+  const statusDialog = document.getElementById("kit-status-dialog");
+  document.getElementById("kit-status-dialog-confirm").addEventListener("click", async () => {
+    const dialog = statusDialog;
+    const removeBooking = dialog.querySelector("[name=booking-action]:checked")?.value === "remove";
+    dialog.close();
+    await commitStatus(dialog.dataset.kitId, dialog._opt, dialog._pill, removeBooking);
+  });
+  document.getElementById("kit-status-dialog-cancel").addEventListener("click", () => {
+    statusDialog.close();
+  });
 
   window.dismissCard = async function(btn, kitId, kitName) {
     if (!confirm(`Delete "${kitName}"? This removes the kit and every booking on it. This cannot be undone.`)) return;
@@ -368,4 +440,16 @@ function toggleNested(wrapId, headerEl) {
   };
 })();
 </script>
+
+<!-- Kit status change confirmation dialog -->
+<dialog id="kit-status-dialog" style="background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;padding:20px 24px;max-width:400px;color:var(--text);">
+  <h2 style="font-size:15px;margin:0 0 8px;font-weight:600;">Kit is currently booked</h2>
+  <p id="kit-status-dialog-msg" style="font-size:13px;color:var(--text-dim);margin:0 0 14px;line-height:1.5;"></p>
+  <div id="kit-status-remove-line" style="display:flex;flex-direction:column;gap:4px;margin-bottom:18px;"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <button id="kit-status-dialog-cancel" class="btn" type="button">Cancel</button>
+    <button id="kit-status-dialog-confirm" class="btn btn-primary" type="button">Confirm</button>
+  </div>
+</dialog>
+
 {% endblock %}

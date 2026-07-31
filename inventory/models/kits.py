@@ -5,6 +5,9 @@ from .assets import Asset, Tag
 KIT_HISTORY_FIELD_LABELS = {
     "name": "Kit name",
     "status": "Kit status",
+    "job_assigned": "Job assigned",
+    "job_changed": "Job changed",
+    "job_removed": "Job removed",
 }
 
 
@@ -190,12 +193,17 @@ class Kit(models.Model):
 
 class KitAssetTag(models.Model):
     """Through model for Kit<->Asset membership, so a specific asset can be
-    tagged (e.g. 'MAIN engine') within the context of one particular kit."""
+    tagged (e.g. 'MAIN engine') within the context of one particular kit.
+    G3 engines support two tags (one per channel output)."""
     kit = models.ForeignKey(Kit, on_delete=models.CASCADE, related_name="kit_asset_tags")
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE, related_name="kit_asset_tags")
     tag = models.ForeignKey(
         Tag, null=True, blank=True, on_delete=models.SET_NULL, related_name="kit_asset_tags",
         help_text="Optional label for what this asset is used for in this kit, e.g. MAIN.",
+    )
+    tag_2 = models.ForeignKey(
+        Tag, null=True, blank=True, on_delete=models.SET_NULL, related_name="kit_asset_tags_2",
+        help_text="Second tag for G3 engines (channel 2 output).",
     )
     quantity = models.PositiveIntegerField(
         default=1,

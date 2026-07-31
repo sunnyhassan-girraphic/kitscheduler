@@ -6,7 +6,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from ..models import Asset, Kit, KitAssetTag, KitHistory, StaffMember, Tag
+from ..models import Asset, Job, Kit, KitAssetTag, KitBooking, KitHistory, StaffMember, Tag
 from ..pdf_utils import build_kit_checklist_pdf, get_kit_checklist_rows
 
 
@@ -35,10 +35,12 @@ def kit_list_view(request):
     rows = []
     for kit in kits:
         tags_by_asset_id = {kat.asset_id: kat.tag for kat in kit.kit_asset_tags.all() if kat.tag_id}
+        tags2_by_asset_id = {kat.asset_id: kat.tag_2 for kat in kit.kit_asset_tags.all() if kat.tag_2_id}
         qty_by_asset_id = {kat.asset_id: kat.quantity for kat in kit.kit_asset_tags.all()}
         members = list(kit.assets.all().order_by("asset_type", "asset_id"))
         for m in members:
             m.kit_tag = tags_by_asset_id.get(m.id)
+            m.kit_tag_2 = tags2_by_asset_id.get(m.id)
             m.kit_qty = qty_by_asset_id.get(m.id, 1)
         nested_count = sum(
             m.nested_assets.count()
@@ -197,12 +199,45 @@ def _tags_json():
     return [{"id": t.id, "name": t.name, "color": t.color} for t in Tag.objects.all()]
 
 
-def _apply_kit_tag_selection(kit, selected_ids, tag_by_asset_id, qty_by_asset_id=None):
+def _jobs_json():
+    """All jobs as JSON for the kit form's job picker.
+    Ordered by start_date desc so most recent/upcoming are at the top."""
+    today = datetime.date.today()
+    jobs = Job.objects.order_by("-start_date").values(
+        "id", "name", "category", "start_date", "end_date"
+    )
+    result = []
+    for j in jobs:
+        if j["end_date"] < today:
+            status_label = "Done"
+            status_class = "job-status-done"
+        elif j["start_date"] > today:
+            status_label = "Upcoming"
+            status_class = "job-status-upcoming"
+        else:
+            status_label = "Active"
+            status_class = "job-status-active"
+        result.append({
+            "id": j["id"],
+            "name": j["name"],
+            "category": j["category"],
+            "startDate": j["start_date"].isoformat(),
+            "endDate": j["end_date"].isoformat(),
+            "displayRange": f"{j['start_date'].strftime('%d %b')} – {j['end_date'].strftime('%d %b %Y')}",
+            "label": f"{j['name']} ({j['start_date'].strftime('%d %b')} – {j['end_date'].strftime('%d %b %Y')})",
+            "statusLabel": status_label,
+            "statusClass": status_class,
+        })
+    return result
+
+
+def _apply_kit_tag_selection(kit, selected_ids, tag_by_asset_id, qty_by_asset_id=None, tag2_by_asset_id=None):
     """Sync KitAssetTag rows for a kit: keep tags/quantity for assets that
     stay, create rows (with tag/quantity) for newly-added assets, remove
     rows for assets no longer in the kit. Returns (before_ids, after_ids,
     before_qty, after_qty) so the caller can log history."""
     qty_by_asset_id = qty_by_asset_id or {}
+    tag2_by_asset_id = tag2_by_asset_id or {}
     selected_ids = set(selected_ids)
     existing = {kat.asset_id: kat for kat in kit.kit_asset_tags.all()}
     before_ids = set(existing)
@@ -216,8 +251,13 @@ def _apply_kit_tag_selection(kit, selected_ids, tag_by_asset_id, qty_by_asset_id
     after_qty = {}
     for asset_id in selected_ids:
         asset = assets_by_id.get(asset_id)
-        tag_id = tag_by_asset_id.get(asset_id) if asset and asset.asset_type == Asset.AssetType.ENGINE else None
+        is_engine = asset and asset.asset_type == Asset.AssetType.ENGINE
+        tag_id = tag_by_asset_id.get(asset_id) if is_engine else None
         tag_id = tag_id if tag_id else None
+        # tag_2 only applies to G3 engines (make_model contains "G3")
+        is_g3 = is_engine and asset and "G3" in (asset.make_model or "").upper()
+        tag_2_id = tag2_by_asset_id.get(asset_id) if is_g3 else None
+        tag_2_id = tag_2_id if tag_2_id else None
 
         if asset and asset.qty > 1:
             available = max(asset.qty - committed_elsewhere.get(asset_id, 0), 0)
@@ -232,14 +272,20 @@ def _apply_kit_tag_selection(kit, selected_ids, tag_by_asset_id, qty_by_asset_id
             changed = []
             if row.tag_id != tag_id:
                 row.tag_id = tag_id
-                changed.append("tag")
+                changed.append("tag_id")
+            if row.tag_2_id != tag_2_id:
+                row.tag_2_id = tag_2_id
+                changed.append("tag_2_id")
             if row.quantity != quantity:
                 row.quantity = quantity
                 changed.append("quantity")
             if changed:
                 row.save(update_fields=changed)
         else:
-            KitAssetTag.objects.create(kit=kit, asset_id=asset_id, tag_id=tag_id, quantity=quantity)
+            KitAssetTag.objects.create(
+                kit=kit, asset_id=asset_id,
+                tag_id=tag_id, tag_2_id=tag_2_id, quantity=quantity,
+            )
 
     return before_ids, selected_ids, before_qty, after_qty
 
@@ -263,6 +309,7 @@ def kit_create_view(request):
     date_from, date_to = _parse_picker_dates(request)
     assets, assets_json = _kit_picker_assets(date_from=date_from, date_to=date_to)
     tags_json = _tags_json()
+    jobs_json = _jobs_json()
 
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
@@ -270,18 +317,28 @@ def kit_create_view(request):
         asset_ids = request.POST.getlist("assets")
         selected_ids = [int(i) for i in asset_ids if i.isdigit()]
         tag_by_asset_id = {}
+        tag2_by_asset_id = {}
         qty_by_asset_id = {}
         for aid in selected_ids:
             raw = request.POST.get(f"tag_{aid}", "").strip()
             if raw.isdigit():
                 tag_by_asset_id[aid] = int(raw)
+            raw2 = request.POST.get(f"tag2_{aid}", "").strip()
+            if raw2.isdigit():
+                tag2_by_asset_id[aid] = int(raw2)
             raw_qty = request.POST.get(f"qty_{aid}", "").strip()
             if raw_qty.isdigit() and int(raw_qty) > 0:
                 qty_by_asset_id[aid] = int(raw_qty)
 
+        # Job assignment fields
+        linked_job_id = request.POST.get("linked_job_id", "").strip()
+        booking_start = request.POST.get("booking_start", "").strip()
+        booking_end = request.POST.get("booking_end", "").strip()
+
         if not name:
             return render(request, "inventory/kit_form.html", {
                 "assets": assets, "assets_json": assets_json, "tags_json": tags_json,
+                "jobs_json": jobs_json,
                 "error": "Kit name is required.",
                 "selected_ids": selected_ids, "notes": notes, "active_nav": "kits",
             })
@@ -289,6 +346,7 @@ def kit_create_view(request):
         if Kit.objects.filter(name=name).exists():
             return render(request, "inventory/kit_form.html", {
                 "assets": assets, "assets_json": assets_json, "tags_json": tags_json,
+                "jobs_json": jobs_json,
                 "error": f'A kit named "{name}" already exists.',
                 "selected_ids": selected_ids, "name": name, "notes": notes, "active_nav": "kits",
             })
@@ -301,18 +359,34 @@ def kit_create_view(request):
         KitHistory.record_note(kit, changed_by, "", notes)
         if selected_ids:
             valid_ids = list(_kit_eligible_assets_qs(kit).filter(id__in=selected_ids).values_list("id", flat=True))
-            _, after_ids, _, after_qty = _apply_kit_tag_selection(kit, valid_ids, tag_by_asset_id, qty_by_asset_id)
+            _, after_ids, _, after_qty = _apply_kit_tag_selection(kit, valid_ids, tag_by_asset_id, qty_by_asset_id, tag2_by_asset_id)
             KitHistory.record_asset_changes(kit, [], after_ids, changed_by)
+
+        # Create KitBooking if a job was linked with valid dates
+        if linked_job_id.isdigit() and booking_start and booking_end:
+            try:
+                job = Job.objects.get(pk=int(linked_job_id))
+                b_start = datetime.date.fromisoformat(booking_start)
+                b_end = datetime.date.fromisoformat(booking_end)
+                if b_start <= b_end:
+                    KitBooking.objects.create(kit=kit, job=job, start_date=b_start, end_date=b_end)
+                    KitHistory.objects.create(
+                        kit=kit, changed_by=changed_by, field_changed="job_assigned",
+                        new_value=f"{job.name} ({b_start} to {b_end})",
+                    )
+            except (Job.DoesNotExist, ValueError):
+                pass
 
         return redirect("/kits/")
 
     return render(request, "inventory/kit_form.html", {
         "assets": assets, "assets_json": assets_json, "tags_json": tags_json,
+        "jobs_json": jobs_json,
         "selected_ids": [], "active_nav": "kits",
         "kit_status_choices": Kit.Status.choices,
         "status": Kit.Status.READY,
-        "picker_date_from": date_from.isoformat() if date_from else "",
-        "picker_date_to": date_to.isoformat() if date_to else "",
+        "picker_date_from": date_from,
+        "picker_date_to": date_to,
     })
 
 
@@ -336,9 +410,7 @@ def kit_edit_view(request, kit_id):
     kit = get_object_or_404(Kit, pk=kit_id)
     date_from, date_to = _parse_picker_dates(request)
     # If no explicit date range was passed, use this kit's own future/active
-    # booking window so the conflict check is meaningful. A kit booked for
-    # Aug 1–5 should block assets that are in another kit also booked Aug 1–5,
-    # not just assets whose other kit happens to be booked today.
+    # booking window so the conflict check is meaningful.
     if not (date_from and date_to):
         kit_booking = kit.bookings.order_by("start_date").first()
         if kit_booking:
@@ -346,6 +418,7 @@ def kit_edit_view(request, kit_id):
             date_to = kit_booking.end_date
     assets, assets_json = _kit_picker_assets(current_kit=kit, date_from=date_from, date_to=date_to)
     tags_json = _tags_json()
+    jobs_json = _jobs_json()
 
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
@@ -353,25 +426,37 @@ def kit_edit_view(request, kit_id):
         asset_ids = request.POST.getlist("assets")
         selected_ids = [int(i) for i in asset_ids if i.isdigit()]
         tag_by_asset_id = {}
+        tag2_by_asset_id = {}
         qty_by_asset_id = {}
         for aid in selected_ids:
             raw = request.POST.get(f"tag_{aid}", "").strip()
             if raw.isdigit():
                 tag_by_asset_id[aid] = int(raw)
+            raw2 = request.POST.get(f"tag2_{aid}", "").strip()
+            if raw2.isdigit():
+                tag2_by_asset_id[aid] = int(raw2)
             raw_qty = request.POST.get(f"qty_{aid}", "").strip()
             if raw_qty.isdigit() and int(raw_qty) > 0:
                 qty_by_asset_id[aid] = int(raw_qty)
 
+        # Job assignment fields
+        linked_job_id = request.POST.get("linked_job_id", "").strip()
+        booking_start = request.POST.get("booking_start", "").strip()
+        booking_end = request.POST.get("booking_end", "").strip()
+        remove_booking = request.POST.get("remove_booking") == "1"
+
         if not name:
             return render(request, "inventory/kit_form.html", {
-                "kit": kit, "assets": assets, "assets_json": assets_json, "tags_json": tags_json,
+                "kit": kit, "assets": assets, "assets_json": assets_json,
+                "tags_json": tags_json, "jobs_json": jobs_json,
                 "error": "Kit name is required.",
                 "selected_ids": selected_ids, "notes": notes, "active_nav": "kits",
             })
 
         if Kit.objects.filter(name=name).exclude(pk=kit_id).exists():
             return render(request, "inventory/kit_form.html", {
-                "kit": kit, "assets": assets, "assets_json": assets_json, "tags_json": tags_json,
+                "kit": kit, "assets": assets, "assets_json": assets_json,
+                "tags_json": tags_json, "jobs_json": jobs_json,
                 "error": f'A kit named "{name}" already exists.',
                 "selected_ids": selected_ids, "name": name, "notes": notes, "active_nav": "kits",
             })
@@ -402,15 +487,55 @@ def kit_edit_view(request, kit_id):
 
         valid_ids = list(_kit_eligible_assets_qs(kit).filter(id__in=selected_ids).values_list("id", flat=True))
         before_ids, after_ids, before_qty, after_qty = _apply_kit_tag_selection(
-            kit, valid_ids, tag_by_asset_id, qty_by_asset_id
+            kit, valid_ids, tag_by_asset_id, qty_by_asset_id, tag2_by_asset_id
         )
         KitHistory.record_asset_changes(kit, before_ids, after_ids, changed_by)
         KitHistory.record_quantity_changes(kit, before_qty, after_qty, changed_by)
 
+        # Handle job booking changes
+        existing_booking = kit.bookings.order_by("start_date").first()
+        if remove_booking and existing_booking:
+            KitHistory.objects.create(
+                kit=kit, changed_by=changed_by, field_changed="job_removed",
+                old_value=f"{existing_booking.job.name} ({existing_booking.start_date} to {existing_booking.end_date})",
+            )
+            existing_booking.delete()
+        elif linked_job_id.isdigit() and booking_start and booking_end:
+            try:
+                job = Job.objects.get(pk=int(linked_job_id))
+                b_start = datetime.date.fromisoformat(booking_start)
+                b_end = datetime.date.fromisoformat(booking_end)
+                if b_start <= b_end:
+                    if existing_booking:
+                        # Update existing booking
+                        old_desc = f"{existing_booking.job.name} ({existing_booking.start_date} to {existing_booking.end_date})"
+                        existing_booking.job = job
+                        existing_booking.start_date = b_start
+                        existing_booking.end_date = b_end
+                        existing_booking.save()
+                        new_desc = f"{job.name} ({b_start} to {b_end})"
+                        if old_desc != new_desc:
+                            KitHistory.objects.create(
+                                kit=kit, changed_by=changed_by, field_changed="job_changed",
+                                old_value=old_desc, new_value=new_desc,
+                            )
+                    else:
+                        KitBooking.objects.create(kit=kit, job=job, start_date=b_start, end_date=b_end)
+                        KitHistory.objects.create(
+                            kit=kit, changed_by=changed_by, field_changed="job_assigned",
+                            new_value=f"{job.name} ({b_start} to {b_end})",
+                        )
+            except (Job.DoesNotExist, ValueError):
+                pass
+
         return redirect("/kits/")
+
+    # Build current booking context for the form
+    current_booking = kit.bookings.select_related("job").order_by("start_date").first()
 
     kit_asset_tags = list(kit.kit_asset_tags.order_by("created_at"))
     selected_tags_json = {kat.asset_id: kat.tag_id for kat in kit_asset_tags if kat.tag_id}
+    selected_tags2_json = {kat.asset_id: kat.tag_2_id for kat in kit_asset_tags if kat.tag_2_id}
     selected_qty_json = {kat.asset_id: kat.quantity for kat in kit_asset_tags}
     history_mode = request.GET.get("history", "month")
     if history_mode not in ("week", "month", "all"):
@@ -421,15 +546,18 @@ def kit_edit_view(request, kit_id):
         "assets": assets,
         "assets_json": assets_json,
         "tags_json": tags_json,
+        "jobs_json": jobs_json,
+        "current_booking": current_booking,
         "selected_ids": [kat.asset_id for kat in kit_asset_tags],
         "selected_tags_json": selected_tags_json,
+        "selected_tags2_json": selected_tags2_json,
         "selected_qty_json": selected_qty_json,
         "name": kit.name,
         "notes": kit.notes,
         "status": kit.status,
         "kit_status_choices": Kit.Status.choices,
-        "picker_date_from": date_from.isoformat() if date_from else "",
-        "picker_date_to": date_to.isoformat() if date_to else "",
+        "picker_date_from": date_from,
+        "picker_date_to": date_to,
         "active_nav": "kits",
         "pdf_items": get_kit_checklist_rows(kit),
         "history_mode": history_mode,
@@ -438,7 +566,6 @@ def kit_edit_view(request, kit_id):
         "pdf_event_date_default": datetime.date.today().strftime("%d/%m/%Y"),
         "pdf_event_date_iso": datetime.date.today().isoformat(),
     })
-
 
 @login_required
 @require_POST
@@ -452,7 +579,8 @@ def kit_delete_view(request, kit_id):
 def kit_set_status_view(request, kit_id):
     """POST-only API: set Kit.status from the traffic-light dropdown on the
     kit card. Only accepts valid non-BOOKED values (BOOKED is auto-managed).
-    Returns JSON {status, statusDisplay} on success."""
+    Optional: pass remove_booking=1 to also delete the kit's current booking.
+    Returns JSON {status, statusDisplay, bookingRemoved} on success."""
     if request.method != "POST":
         return JsonResponse({"error": "POST required."}, status=405)
     kit = get_object_or_404(Kit, pk=kit_id)
@@ -463,19 +591,45 @@ def kit_set_status_view(request, kit_id):
     old_status = kit.status
     kit.status = new_status
     kit.save(update_fields=["status"])
-    # Log the change to kit history
     changed_by = StaffMember.for_user(request.user)
     KitHistory.objects.create(
-        kit=kit,
-        changed_by=changed_by,
-        field_changed="status",
-        old_value=old_status,
-        new_value=new_status,
+        kit=kit, changed_by=changed_by, field_changed="status",
+        old_value=old_status, new_value=new_status,
     )
+
+    booking_removed = False
+    if request.POST.get("remove_booking") == "1":
+        existing = kit.bookings.order_by("start_date").first()
+        if existing:
+            KitHistory.objects.create(
+                kit=kit, changed_by=changed_by, field_changed="job_removed",
+                old_value=f"{existing.job.name} ({existing.start_date} to {existing.end_date})",
+            )
+            existing.delete()
+            booking_removed = True
+
     return JsonResponse({
         "status": kit.status,
         "statusDisplay": kit.get_status_display(),
+        "bookingRemoved": booking_removed,
     })
+
+
+@login_required
+def kit_booking_info_view(request, kit_id):
+    """GET: returns the kit's current active/upcoming booking as JSON.
+    Used by the status-change modal to show which job will be affected."""
+    kit = get_object_or_404(Kit, pk=kit_id)
+    booking = kit.bookings.select_related("job").order_by("start_date").first()
+    if booking:
+        return JsonResponse({
+            "hasBooking": True,
+            "jobName": booking.job.name,
+            "startDate": booking.start_date.isoformat(),
+            "endDate": booking.end_date.isoformat(),
+            "bookingId": booking.id,
+        })
+    return JsonResponse({"hasBooking": False})
 
 
 @login_required

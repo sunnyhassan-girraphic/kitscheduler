@@ -13,7 +13,11 @@ from .common import STEP_DAYS, _build_rows, _date_range, _month_range, _parse_an
 def _kit_member_rows(kit):
     tags_by_asset_id = {
         kat.asset_id: {"name": kat.tag.name, "color": kat.tag.color or "#EAB308"}
-        for kat in kit.kit_asset_tags.select_related("tag") if kat.tag_id
+        for kat in kit.kit_asset_tags.select_related("tag", "tag_2") if kat.tag_id
+    }
+    tags2_by_asset_id = {
+        kat.asset_id: {"name": kat.tag_2.name, "color": kat.tag_2.color or "#EAB308"}
+        for kat in kit.kit_asset_tags.select_related("tag_2") if kat.tag_2_id
     }
     qty_by_asset_id = {kat.asset_id: kat.quantity for kat in kit.kit_asset_tags.all()}
     rows = []
@@ -25,6 +29,7 @@ def _kit_member_rows(kit):
             "statusKey": m.status.lower(),
             "status": m.get_status_display(),
             "tag": tags_by_asset_id.get(m.id),
+            "tag2": tags2_by_asset_id.get(m.id),
             "qty": qty_by_asset_id.get(m.id, 1),
             "nested": [],
         }

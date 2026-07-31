@@ -782,6 +782,7 @@ function openKitDetail(kitId) {
           <span class="kd-aid">${m.assetId}</span>
           <span class="kd-amodel">${m.type}${m.model ? " &middot; " + m.model : ""}</span>
           ${m.tag ? `<span class="kd-tag" style="background:${m.tag.color}22;color:${m.tag.color};border-color:${m.tag.color}44;">${m.tag.name}</span>` : ""}
+          ${m.tag2 ? `<span class="kd-tag" style="background:${m.tag2.color}22;color:${m.tag2.color};border-color:${m.tag2.color}44;">${m.tag2.name}</span>` : ""}
           ${kdBadge(m.status)}
         </div>`;
       m.nested.forEach(n => {
