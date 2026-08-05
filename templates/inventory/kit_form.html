@@ -814,7 +814,10 @@ function downloadKitPdf(kitId) {
       // notAvailable blocks Needs Repair / Maintenance / Missing assets, but
       // NOT inAnotherKit assets — their IN_USE/BOOKED status is structural
       // (they're in a kit) not a genuine availability problem for these dates.
-      const notAvailable = !inAnotherKit && a.status !== "available";
+      // Also exempt bulk assets that still have units free — their status may
+      // read IN_USE because some units are in another kit, but that doesn't
+      // mean all units are gone. outOfStock handles the truly exhausted case.
+      const notAvailable = !inAnotherKit && a.status !== "available" && !(a.isBulk && a.available > 0);
       const cantAdd = outOfStock || notAvailable || bookingConflict;
       const availableHtml = a.isBulk
         ? `<span class="qty-available${outOfStock ? " qty-none" : ""}">${a.available} of ${a.totalQty} available</span>`

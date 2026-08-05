@@ -1,0 +1,175 @@
+{% extends "inventory/base.html" %}
+{% block title %}Stale Assets - Stock Take - Kit Scheduler{% endblock %}
+{% block brand_sub %}Stock Take{% endblock %}
+
+{% block header_actions %}
+{% endblock %}
+
+{% block extra_style %}
+  .stale-page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--text-dim); text-decoration: none; font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .back-link:hover { color: var(--accent); }
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin: 0 0 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .stale-heading .asset-count {
+    font-size: 12px;
+    color: var(--text-faint);
+    font-weight: 400;
+  }
+
+  /* Band filter pills */
+  .band-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .band-pill {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-size: 12px;
+    text-decoration: none;
+    transition: border-color 0.15s;
+    white-space: nowrap;
+  }
+  .band-pill:hover { border-color: var(--accent-deep); color: var(--text); }
+  .band-pill.active { border-color: var(--accent); background: var(--accent-glow); color: var(--accent); font-weight: 600; }
+  .band-pill.stale-red-pill.active { border-color: var(--red); background: var(--red-dim); color: var(--red); }
+  .band-pill.stale-amber-pill.active { border-color: var(--accent-deep); background: var(--accent-glow); color: var(--accent); }
+
+  /* Staleness indicators */
+  .stale-red { color: var(--red); }
+  .stale-amber { color: var(--accent); }
+  .stale-yellow { color: #e5c100; }
+  .stale-ok { color: var(--green); }
+
+  .days-ago {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .last-updated-by {
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  .st-empty {
+    text-align: center;
+    padding: 48px;
+    color: var(--text-faint);
+    font-size: 13px;
+  }
+
+  /* Edit link on hover */
+  table.list tr:hover .edit-link { opacity: 1; }
+  .edit-link {
+    opacity: 0;
+    font-size: 11px;
+    color: var(--accent);
+    text-decoration: none;
+    transition: opacity 0.15s;
+    margin-left: 6px;
+  }
+{% endblock %}
+
+{% block content %}
+<div class="stale-page">
+
+  <a class="back-link" href="/stocktake/">&larr; All sessions</a>
+
+  <!-- Band filter pills -->
+  <div class="band-filters">
+    <a class="band-pill stale-red-pill {% if days_param == '90' %}active{% endif %}"
+       href="/stocktake/stale/?days=90">90+ days / never</a>
+    <a class="band-pill stale-amber-pill {% if days_param == '60' %}active{% endif %}"
+       href="/stocktake/stale/?days=60">60-90 days</a>
+    <a class="band-pill {% if days_param == '30' %}active{% endif %}"
+       href="/stocktake/stale/?days=30">30-60 days</a>
+    <a class="band-pill {% if under30 == '1' %}active{% endif %}"
+       href="/stocktake/stale/?under30=1">Under 30 days</a>
+    <a class="band-pill {% if not days_param and not under30 %}active{% endif %}"
+       href="/stocktake/stale/">All assets</a>
+  </div>
+
+  <div class="stale-heading">
+    {{ band_label }}
+    <span class="asset-count">{{ assets|length }} asset{{ assets|length|pluralize }}</span>
+  </div>
+
+  {% if assets %}
+  <table class="list">
+    <thead>
+      <tr>
+        <th>Asset ID</th>
+        <th>Type</th>
+        <th>Make / Model</th>
+        <th>Status</th>
+        <th>Qty</th>
+        <th>Last Updated</th>
+        <th>Updated By</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in assets %}
+      {% with a=item.asset %}
+      <tr>
+        <td>
+          <span style="font-family:var(--mono);font-size:12px;font-weight:600;">{{ a.asset_id }}</span>
+          {% if a.asset_type == 'ENGINE' %}
+          <a class="edit-link" href="/engines/{{ a.pk }}/edit/">edit</a>
+          {% elif a.asset_type == 'IO_DEVICE' %}
+          <a class="edit-link" href="/io-devices/{{ a.pk }}/edit/">edit</a>
+          {% else %}
+          <a class="edit-link" href="/assets/{{ a.pk }}/edit/">edit</a>
+          {% endif %}
+        </td>
+        <td style="font-size:12px;color:var(--text-dim);">{{ a.get_asset_type_display }}</td>
+        <td style="font-size:12px;color:var(--text-dim);">{{ a.make_model|default:"-" }}</td>
+        <td><span class="badge badge-{{ a.status|lower }}">{{ a.get_status_display }}</span></td>
+        <td style="font-size:12px;color:var(--text-dim);text-align:center;">
+          {% if a.qty > 1 %}{{ a.qty }}{% else %}-{% endif %}
+        </td>
+        <td>
+          <span class="days-ago {{ item.staleness_cls }}">
+            {% if item.days_ago is not None %}
+              {{ item.days_ago }}d ago
+            {% else %}
+              Never
+            {% endif %}
+          </span>
+        </td>
+        <td>
+          {% if a.last_updated_by %}
+          <span class="last-updated-by">{{ a.last_updated_by.name }}</span>
+          {% else %}
+          <span style="color:var(--text-faint);font-size:11px;">-</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endwith %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="st-empty">No assets in this staleness band.</div>
+  {% endif %}
+
+</div>
+{% endblock %}

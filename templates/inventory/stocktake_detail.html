@@ -1,0 +1,709 @@
+{% extends "inventory/base.html" %}
+{% block title %}{{ session.display_label }} - Stock Take - Kit Scheduler{% endblock %}
+{% block brand_sub %}Stock Take{% endblock %}
+
+{% block header_actions %}
+  <a class="btn" href="/stocktake/{{ session.pk }}/pdf/">Export PDF</a>
+  {% if session.status == 'IN_PROGRESS' %}
+  <button type="button" class="btn btn-primary" id="close-btn">Finish session</button>
+  {% endif %}
+  <button type="button" id="delete-btn" title="Delete session"
+          style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--red);cursor:pointer;padding:0;transition:border-color 0.15s,background 0.15s;"
+          onmouseover="this.style.borderColor='var(--red)';this.style.background='var(--red-dim)'"
+          onmouseout="this.style.borderColor='var(--border-strong)';this.style.background='var(--surface-2)'">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+    </svg>
+  </button>
+{% endblock %}
+
+{% block extra_style %}
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--text-dim); text-decoration: none; font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .back-link:hover { color: var(--accent); }
+  .st-detail-page {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  /* Session header */
+  .st-header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .st-header-title {
+    font-size: 16px;
+    font-weight: 600;
+    flex: 1;
+    min-width: 200px;
+  }
+  .st-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .st-meta span { white-space: nowrap; }
+
+  /* Progress bar */
+  .progress-wrap {
+    margin-bottom: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 20px;
+  }
+  .progress-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .progress-label-row .pct {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .progress-label-row .counts {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 14px;
+  }
+  .progress-track {
+    background: var(--surface-2);
+    border-radius: 4px;
+    height: 8px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--green);
+    transition: width 0.4s ease;
+  }
+  .count-confirmed { color: var(--green); }
+  .count-flagged { color: var(--accent); }
+  .count-skipped { color: var(--text-faint); }
+  .count-pending { color: var(--text-dim); }
+
+  /* Filter tabs */
+  .st-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+  .st-tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  .st-tab:hover { border-color: var(--accent-deep); color: var(--text); }
+  .st-tab.active { border-color: var(--accent); background: var(--accent-glow); color: var(--accent); font-weight: 600; }
+
+  /* Entry rows */
+  .entry-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .entry-row.outcome-confirmed { border-color: rgba(63, 185, 80, 0.3); }
+  .entry-row.outcome-flagged { border-color: rgba(234, 179, 8, 0.3); }
+  .entry-row.outcome-skipped { opacity: 0.5; }
+
+  .entry-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+  }
+  .entry-main:hover { background: var(--surface-2); }
+
+  .entry-aid {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 130px;
+  }
+  .entry-model {
+    font-size: 12px;
+    color: var(--text-dim);
+    flex: 1;
+  }
+  .entry-type {
+    font-size: 11px;
+    color: var(--text-faint);
+    min-width: 80px;
+  }
+  .entry-staleness {
+    font-size: 11px;
+    font-family: var(--mono);
+    min-width: 100px;
+    text-align: right;
+  }
+  .stale-red { color: var(--red); }
+  .stale-amber { color: var(--accent); }
+  .stale-yellow { color: #e5c100; }
+  .stale-ok { color: var(--green); }
+
+  .entry-outcome-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    min-width: 70px;
+    text-align: center;
+  }
+  .outcome-badge-pending { background: var(--surface-2); color: var(--text-faint); }
+  .outcome-badge-confirmed { background: var(--green-dim); color: var(--green); }
+  .outcome-badge-flagged { background: var(--accent-glow); color: var(--accent); }
+  .outcome-badge-skipped { background: var(--surface-2); color: var(--text-faint); }
+
+  .entry-expand-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 2px;
+    line-height: 0;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .entry-row.open .entry-expand-btn { transform: rotate(180deg); }
+
+  /* Expanded panel */
+  .entry-panel {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 14px 16px;
+    background: var(--surface-2);
+  }
+  .entry-row.open .entry-panel { display: block; }
+
+  .panel-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .panel-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 160px;
+  }
+  .panel-field label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .panel-field select,
+  .panel-field input[type="text"] {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .panel-field select:focus,
+  .panel-field input[type="text"]:focus,
+  .panel-field input[type="number"]:focus { outline: none; border-color: var(--accent); }
+  .panel-field input[type="text"] { min-width: 260px; }
+  .panel-field input[type="number"] {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+
+  .panel-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .action-btn {
+    padding: 7px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    font-weight: 500;
+    transition: border-color 0.15s;
+  }
+  .action-btn:hover { border-color: var(--accent-deep); }
+  .action-btn.confirm { border-color: var(--green); color: var(--green); }
+  .action-btn.confirm:hover { background: var(--green-dim); }
+  .action-btn.flag { border-color: var(--accent-deep); color: var(--accent); }
+  .action-btn.flag:hover { background: var(--accent-glow); }
+  .action-btn.skip { color: var(--text-faint); }
+  .action-btn:disabled { opacity: 0.4; cursor: default; }
+
+  .panel-saving {
+    font-size: 12px;
+    color: var(--text-dim);
+    display: none;
+    align-items: center;
+    gap: 6px;
+  }
+  .panel-error {
+    font-size: 12px;
+    color: var(--red);
+    display: none;
+    margin-top: 6px;
+  }
+
+  /* Reviewed-by note in expanded view */
+  .reviewed-note {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    font-style: italic;
+  }
+
+  /* Empty state */
+  .st-empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-faint);
+    font-size: 13px;
+  }
+
+  /* Closed session banner */
+  .st-closed-banner {
+    background: var(--green-dim);
+    border: 1px solid rgba(63,185,80,0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--green);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* Summary stats (shown at top when complete) */
+  .st-summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+  }
+  .summary-card .sc-count { font-size: 24px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .summary-card .sc-label { font-size: 11px; color: var(--text-dim); }
+  .sc-confirmed .sc-count { color: var(--green); }
+  .sc-flagged .sc-count { color: var(--accent); }
+  .sc-skipped .sc-count { color: var(--text-faint); }
+  .sc-pending .sc-count { color: var(--text-dim); }
+{% endblock %}
+
+{% block content %}
+<div class="st-detail-page">
+
+  <a class="back-link" href="/stocktake/">&larr; All sessions</a>
+
+  {% if session.status == 'COMPLETE' %}
+  <div class="st-closed-banner">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    Session closed {{ session.closed_at|date:"d M Y, H:i" }}{% if session.created_by %} by {{ session.created_by.name }}{% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Session header info -->
+  <div class="st-header">
+    <div class="st-header-title">{{ session.display_label }}</div>
+    <div class="st-meta">
+      <span>Started {{ session.started_at|date:"d M Y" }}</span>
+      {% if session.created_by %}<span>By {{ session.created_by.name }}</span>{% endif %}
+      <span>Scope: {{ session.asset_types_display }}</span>
+      <span>Threshold: {{ session.staleness_display }}</span>
+    </div>
+  </div>
+
+  {% if session.status == 'COMPLETE' %}
+  <div class="st-summary">
+    <div class="summary-card sc-confirmed">
+      <div class="sc-count">{{ session.confirmed_count }}</div>
+      <div class="sc-label">Confirmed</div>
+    </div>
+    <div class="summary-card sc-flagged">
+      <div class="sc-count">{{ session.flagged_count }}</div>
+      <div class="sc-label">Flagged</div>
+    </div>
+    <div class="summary-card sc-skipped">
+      <div class="sc-count">{{ session.skipped_count }}</div>
+      <div class="sc-label">Skipped</div>
+    </div>
+    <div class="summary-card sc-pending">
+      <div class="sc-count">{{ session.pending_count }}</div>
+      <div class="sc-label">Not reviewed</div>
+    </div>
+  </div>
+  {% else %}
+  <!-- Progress bar (in progress only) -->
+  <div class="progress-wrap">
+    <div class="progress-label-row">
+      <span class="pct" id="progress-pct">
+        {% if session.total_count %}{% widthratio session.reviewed_count session.total_count 100 %}%{% else %}0%{% endif %}
+        reviewed
+      </span>
+      <span class="counts">
+        <span class="count-confirmed" id="count-confirmed">{{ session.confirmed_count }} confirmed</span>
+        <span class="count-flagged" id="count-flagged">{{ session.flagged_count }} flagged</span>
+        <span class="count-skipped" id="count-skipped">{{ session.skipped_count }} skipped</span>
+        <span class="count-pending" id="count-pending">{{ session.pending_count }} pending</span>
+      </span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"
+           style="width:{% if session.total_count %}{% widthratio session.reviewed_count session.total_count 100 %}{% else %}0{% endif %}%;"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Filter tabs -->
+  <div class="st-tabs">
+    <button class="st-tab active" data-filter="all">All ({{ session.total_count }})</button>
+    <button class="st-tab" data-filter="pending">Pending ({{ session.pending_count }})</button>
+    <button class="st-tab" data-filter="confirmed">Confirmed ({{ session.confirmed_count }})</button>
+    <button class="st-tab" data-filter="flagged">Flagged ({{ session.flagged_count }})</button>
+    <button class="st-tab" data-filter="skipped">Skipped ({{ session.skipped_count }})</button>
+  </div>
+
+  <!-- Entry list -->
+  <div id="entry-list">
+    {% if entries %}
+    {% for item in entries %}
+    {% with e=item.entry a=item.asset %}
+    <div class="entry-row outcome-{{ e.outcome|lower }}"
+         id="entry-{{ e.pk }}"
+         data-outcome="{{ e.outcome|lower }}"
+         data-entry-id="{{ e.pk }}">
+
+      <div class="entry-main" onclick="toggleEntry({{ e.pk }})">
+        <div class="entry-aid">{{ a.asset_id }}</div>
+        <div class="entry-model">{{ a.make_model|default:"-" }}</div>
+        <div class="entry-type">{{ a.get_asset_type_display }}</div>
+        <div class="entry-staleness {{ item.staleness_cls }}">
+          {% if item.days_ago is not None %}
+            {{ item.days_ago }}d ago
+          {% else %}
+            Never updated
+          {% endif %}
+        </div>
+        <div class="entry-outcome-badge outcome-badge-{{ e.outcome|lower }}">{{ e.get_outcome_display }}</div>
+        <button type="button" class="entry-expand-btn" tabindex="-1" aria-label="Expand">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      </div>
+
+      <div class="entry-panel">
+        <div class="panel-row">
+          <div class="panel-field">
+            <label>Reviewed by</label>
+            <select class="reviewed-by-sel">
+              <option value="">- Select person -</option>
+              {% for s in staff_members %}
+              <option value="{{ s.pk }}"
+                {% if e.reviewed_by_id == s.pk %}selected
+                {% elif not e.reviewed_by_id and current_staff and current_staff.pk == s.pk %}selected
+                {% endif %}>{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="panel-field">
+            <label>Status change <span style="color:var(--text-faint);font-size:10px;">(optional)</span></label>
+            <select class="status-sel">
+              <option value="">- Keep current ({{ a.get_status_display }}) -</option>
+              {% for val, lbl in status_choices %}
+              {% if val != a.status %}
+              <option value="{{ val }}">{{ lbl }}</option>
+              {% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          {% if item.is_bulk %}
+          <div class="panel-field">
+            <label>Physical count <span style="color:var(--text-faint);font-size:10px;">(system: {{ a.qty }})</span></label>
+            <input type="number" class="qty-input" min="0" placeholder="{{ a.qty }}"
+                   data-committed="{{ item.committed }}"
+                   style="width:90px;" value="">
+            {% if item.committed %}
+            <span class="qty-warn" style="display:none;font-size:11px;color:var(--accent);margin-top:3px;">
+              {{ item.committed }} unit{{ item.committed|pluralize }} in kits
+            </span>
+            {% endif %}
+          </div>
+          {% endif %}
+          <div class="panel-field" style="flex:1;">
+            <label>Notes <span style="color:var(--text-faint);font-size:10px;">(optional)</span></label>
+            <input type="text" class="notes-input" placeholder="e.g. Checked OK, cable wear noted..." maxlength="300"
+                   value="{{ e.notes }}">
+          </div>
+        </div>
+
+        {% if session.status == 'IN_PROGRESS' %}
+        <div class="panel-actions">
+          <button type="button" class="action-btn confirm" onclick="submitEntry({{ e.pk }}, 'CONFIRMED')">
+            Confirm present
+          </button>
+          <button type="button" class="action-btn flag" onclick="submitEntry({{ e.pk }}, 'FLAGGED')">
+            Flag for attention
+          </button>
+          <button type="button" class="action-btn skip" onclick="submitEntry({{ e.pk }}, 'SKIPPED')">
+            Skip
+          </button>
+          <span class="panel-saving" id="saving-{{ e.pk }}">Saving...</span>
+        </div>
+        <div class="panel-error" id="error-{{ e.pk }}"></div>
+        {% else %}
+        {% if e.reviewed_at %}
+        <div class="reviewed-note">
+          Reviewed {{ e.reviewed_at|date:"d M Y, H:i" }}{% if e.reviewed_by %} by {{ e.reviewed_by.name }}{% endif %}
+          {% if e.notes %} - "{{ e.notes }}"{% endif %}
+        </div>
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+    {% else %}
+    <div class="st-empty">No assets match this session's criteria.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Close session dialog -->
+<dialog id="close-dialog">
+  <div style="padding:24px;max-width:380px;">
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Finish stock take?</div>
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:20px;" id="close-summary"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button type="button" class="btn" onclick="document.getElementById('close-dialog').close()">Cancel</button>
+      <form method="post" action="/stocktake/{{ session.pk }}/close/" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary">Finish</button>
+      </form>
+    </div>
+  </div>
+</dialog>
+
+<form id="delete-form" method="post" action="/stocktake/{{ session.pk }}/delete/" style="display:none;">
+  {% csrf_token %}
+</form>
+
+<script>
+var SESSION_ID = {{ session.pk }};
+var CSRF = "{{ csrf_token }}";
+var IS_OPEN = {{ is_open|yesno:"true,false" }};
+
+// Track counts locally for instant updates
+var counts = {
+  total: {{ session.total_count }},
+  confirmed: {{ session.confirmed_count }},
+  flagged: {{ session.flagged_count }},
+  skipped: {{ session.skipped_count }},
+  pending: {{ session.pending_count }}
+};
+
+function toggleEntry(id) {
+  var row = document.getElementById("entry-" + id);
+  if (row) row.classList.toggle("open");
+}
+
+// Qty validation - warn if physical count is below what's committed to kits
+document.addEventListener("input", function (e) {
+  var inp = e.target;
+  if (!inp.classList.contains("qty-input")) return;
+  var committed = parseInt(inp.dataset.committed || "0", 10);
+  if (!committed) return;
+  var val = parseInt(inp.value, 10);
+  var warn = inp.parentElement.querySelector(".qty-warn");
+  if (!warn) return;
+  if (!isNaN(val) && val < committed) {
+    warn.style.display = "block";
+    warn.style.color = "var(--red)";
+    warn.textContent = "Warning: " + committed + " unit" + (committed !== 1 ? "s" : "") + " already in kits - setting below this may cause issues";
+  } else if (committed) {
+    warn.style.display = "block";
+    warn.style.color = "var(--text-faint)";
+    warn.textContent = committed + " unit" + (committed !== 1 ? "s" : "") + " currently in kits";
+  }
+});
+
+function submitEntry(entryId, outcome) {
+  var row = document.getElementById("entry-" + entryId);
+  var saving = document.getElementById("saving-" + entryId);
+  var errorEl = document.getElementById("error-" + entryId);
+  var reviewedBy = row.querySelector(".reviewed-by-sel");
+  var statusSel = row.querySelector(".status-sel");
+  var notesInput = row.querySelector(".notes-input");
+  var qtyInput = row.querySelector(".qty-input");
+
+  if (saving) saving.style.display = "flex";
+  if (errorEl) errorEl.style.display = "none";
+
+  var payload = {
+    outcome: outcome,
+    notes: notesInput ? notesInput.value : "",
+    status: statusSel ? statusSel.value : "",
+    reviewed_by_id: reviewedBy ? reviewedBy.value : "",
+    new_qty: qtyInput && qtyInput.value.trim() !== "" ? qtyInput.value : ""
+  };
+
+  fetch("/stocktake/" + SESSION_ID + "/entries/" + entryId + "/review/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": CSRF,
+    },
+    body: JSON.stringify(payload),
+  })
+  .then(function (r) { return r.json(); })
+  .then(function (data) {
+    if (saving) saving.style.display = "none";
+    if (!data.ok) {
+      if (errorEl) { errorEl.textContent = data.error || "Save failed."; errorEl.style.display = "block"; }
+      return;
+    }
+    // Update row appearance
+    row.dataset.outcome = outcome.toLowerCase();
+    row.className = row.className.replace(/outcome-\w+/g, "").trim() + " outcome-" + outcome.toLowerCase();
+
+    var badge = row.querySelector(".entry-outcome-badge");
+    if (badge) {
+      badge.className = "entry-outcome-badge outcome-badge-" + outcome.toLowerCase();
+      var labels = { CONFIRMED: "Confirmed", FLAGGED: "Flagged", SKIPPED: "Skipped", PENDING: "Pending" };
+      badge.textContent = labels[outcome] || outcome;
+    }
+
+    // Close the panel then sort reviewed rows to the bottom
+    row.classList.remove("open");
+    setTimeout(function () { sortReviewedToBottom(row); }, 200);
+
+    // Update progress
+    updateProgress(data);
+    applyActiveFilter();
+  })
+  .catch(function () {
+    if (saving) saving.style.display = "none";
+    if (errorEl) { errorEl.textContent = "Network error - try again."; errorEl.style.display = "block"; }
+  });
+}
+
+function sortReviewedToBottom(reviewedRow) {
+  var list = document.getElementById("entry-list");
+  if (!list) return;
+  // Only sort when showing all or pending - don't disrupt filtered views
+  if (activeFilter !== "all" && activeFilter !== "pending") return;
+  list.appendChild(reviewedRow);
+}
+
+function updateProgress(data) {
+  if (!IS_OPEN) return;
+  var total = data.total;
+  var reviewed = data.reviewed;
+  var pct = total ? Math.round((reviewed / total) * 100) : 0;
+
+  var fill = document.getElementById("progress-fill");
+  if (fill) fill.style.width = pct + "%";
+
+  var pctEl = document.getElementById("progress-pct");
+  if (pctEl) pctEl.textContent = pct + "% reviewed";
+
+  var el = function (id) { return document.getElementById(id); };
+  if (el("count-confirmed")) el("count-confirmed").textContent = data.confirmed + " confirmed";
+  if (el("count-flagged")) el("count-flagged").textContent = data.flagged + " flagged";
+  if (el("count-pending")) el("count-pending").textContent = data.pending + " pending";
+}
+
+// Filter tabs
+var activeFilter = "all";
+document.querySelectorAll(".st-tab").forEach(function (tab) {
+  tab.addEventListener("click", function () {
+    document.querySelectorAll(".st-tab").forEach(function (t) { t.classList.remove("active"); });
+    tab.classList.add("active");
+    activeFilter = tab.dataset.filter;
+    applyActiveFilter();
+  });
+});
+
+function applyActiveFilter() {
+  document.querySelectorAll(".entry-row").forEach(function (row) {
+    var outcome = row.dataset.outcome;
+    var show = activeFilter === "all" || outcome === activeFilter;
+    row.style.display = show ? "" : "none";
+  });
+}
+
+// Close button
+var closeBtn = document.getElementById("close-btn");
+if (closeBtn) {
+  closeBtn.addEventListener("click", function () {
+    var pending = {{ session.pending_count }};
+    var summary = "{{ session.confirmed_count }} confirmed, {{ session.flagged_count }} flagged, {{ session.skipped_count }} skipped";
+    if (pending > 0) {
+      summary += ", " + pending + " not yet reviewed";
+    }
+    document.getElementById("close-summary").textContent = summary + ". This cannot be undone.";
+    document.getElementById("close-dialog").showModal();
+  });
+}
+
+// Delete button
+var deleteBtn = document.getElementById("delete-btn");
+if (deleteBtn) {
+  deleteBtn.addEventListener("click", async function () {
+    const ok = await showConfirm({
+      title: "Delete session?",
+      message: "\"{{ session.display_label|escapejs }}\" and all its entries will be permanently deleted. This cannot be undone.",
+      okLabel: "Delete",
+      cancelLabel: "Cancel",
+    });
+    if (!ok) return;
+    document.getElementById("delete-form").submit();
+  });
+}
+</script>
+{% endblock %}

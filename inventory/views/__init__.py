@@ -97,3 +97,14 @@ from .vans import (
     van_maintenance_delete,
     van_checklist_delete,
 )
+
+from .stocktake import (
+    stocktake_index_view,
+    stocktake_new_view,
+    stocktake_detail_view,
+    stocktake_review_entry,
+    stocktake_close_view,
+    stocktake_delete_view,
+    stocktake_pdf_view,
+    stocktake_stale_view,
+)

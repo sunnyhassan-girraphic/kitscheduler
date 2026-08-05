@@ -19,6 +19,7 @@ from .kits import Kit, KitAssetTag, KitHistory
 from .jobs import Job, CategoryColour, KitBooking, AssetBooking, StaffBooking, JobHistory, JOB_HISTORY_SCALAR_FIELDS
 from .tickets import Ticket, TicketHistory
 from .vans import Vehicle, VanLog, VAN_CHECKLIST_ITEMS
+from .stocktake import StockTakeSession, StockTakeEntry
 
 __all__ = [
     "StaffMember",
@@ -40,4 +41,6 @@ __all__ = [
     "Vehicle",
     "VanLog",
     "VAN_CHECKLIST_ITEMS",
+    "StockTakeSession",
+    "StockTakeEntry",
 ]

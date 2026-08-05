@@ -71,4 +71,12 @@ urlpatterns = [
         views.delete_license_booking,
         name="delete_license_booking",
     ),
+    path("stocktake/", views.stocktake_index_view, name="stocktake_index"),
+    path("stocktake/new/", views.stocktake_new_view, name="stocktake_new"),
+    path("stocktake/stale/", views.stocktake_stale_view, name="stocktake_stale"),
+    path("stocktake/<int:session_id>/", views.stocktake_detail_view, name="stocktake_detail"),
+    path("stocktake/<int:session_id>/close/", views.stocktake_close_view, name="stocktake_close"),
+    path("stocktake/<int:session_id>/delete/", views.stocktake_delete_view, name="stocktake_delete"),
+    path("stocktake/<int:session_id>/pdf/", views.stocktake_pdf_view, name="stocktake_pdf"),
+    path("stocktake/<int:session_id>/entries/<int:entry_id>/review/", views.stocktake_review_entry, name="stocktake_review_entry"),
 ]

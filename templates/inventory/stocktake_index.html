@@ -1,0 +1,208 @@
+{% extends "inventory/base.html" %}
+{% block title %}Stock Take - Kit Scheduler{% endblock %}
+{% block brand_sub %}Stock Take{% endblock %}
+
+{% block header_actions %}
+  <a class="btn btn-primary" href="/stocktake/new/">+ New stock take</a>
+{% endblock %}
+
+{% block extra_style %}
+  .st-page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+  .st-section-head {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin: 0 0 12px 0;
+  }
+
+  /* Staleness dashboard */
+  .staleness-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .staleness-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    text-decoration: none;
+    display: block;
+    transition: border-color 0.15s;
+  }
+  .staleness-card:hover { border-color: var(--border-strong); }
+  .staleness-card .st-count {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .staleness-card .st-label {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .stale-red .st-count { color: var(--red); }
+  .stale-amber .st-count { color: var(--accent); }
+  .stale-yellow .st-count { color: #e5c100; }
+  .stale-ok .st-count { color: var(--green); }
+
+  /* Session history table */
+  .st-empty {
+    color: var(--text-faint);
+    font-size: 13px;
+    padding: 24px 0;
+    text-align: center;
+  }
+  .session-row td { vertical-align: middle; }
+  .progress-bar-wrap {
+    background: var(--surface-2);
+    border-radius: 4px;
+    height: 6px;
+    width: 120px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--green);
+    transition: width 0.3s;
+  }
+  .progress-bar-fill.incomplete { background: var(--accent); }
+  .session-status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-in_progress { background: var(--accent-glow); color: var(--accent); }
+  .badge-complete { background: var(--green-dim); color: var(--green); }
+  .row-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .btn-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 6px;
+    border: 1px solid var(--border-strong); background: var(--surface-2);
+    color: var(--red); cursor: pointer; padding: 0;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .btn-icon:hover { border-color: var(--red); background: var(--red-dim); }
+{% endblock %}
+
+{% block content %}
+<div class="st-page">
+
+  <!-- Staleness dashboard -->
+  <p class="st-section-head">Inventory staleness</p>
+  <div class="staleness-bar">
+  {% for band in staleness %}
+    {% if band.cls == 'stale-ok' %}
+    <a class="staleness-card {{ band.cls }}" href="/stocktake/stale/?under30=1">
+    {% elif band.days %}
+    <a class="staleness-card {{ band.cls }}" href="/stocktake/stale/?days={{ band.days }}">
+    {% else %}
+    <a class="staleness-card {{ band.cls }}" href="/stocktake/stale/">
+    {% endif %}
+      <div class="st-count">{{ band.count }}</div>
+      <div class="st-label">{{ band.label }}</div>
+    </a>
+  {% endfor %}
+  </div>
+
+  <!-- Session history -->
+  <p class="st-section-head">Session history</p>
+  {% if sessions %}
+  <table class="list">
+    <thead>
+      <tr>
+        <th>Label</th>
+        <th>Date</th>
+        <th>Run by</th>
+        <th>Scope</th>
+        <th>Threshold</th>
+        <th>Progress</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sessions %}
+      <tr class="session-row">
+        <td><a href="/stocktake/{{ s.pk }}/">{{ s.display_label }}</a></td>
+        <td style="font-family: var(--mono); font-size: 12px; color: var(--text-dim);">
+          {{ s.started_at|date:"d M Y" }}
+        </td>
+        <td>{{ s.created_by.name|default:"-" }}</td>
+        <td style="font-size: 12px; color: var(--text-dim);">{{ s.asset_types_display }}</td>
+        <td style="font-size: 12px; color: var(--text-dim);">{{ s.staleness_display }}</td>
+        <td>
+          {% with total=s.total_count reviewed=s.reviewed_count confirmed=s.confirmed_count flagged=s.flagged_count %}
+          {% if total %}
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div class="progress-bar-wrap">
+              <div class="progress-bar-fill {% if s.status == 'IN_PROGRESS' %}incomplete{% endif %}"
+                   style="width:{% widthratio reviewed total 100 %}%;"></div>
+            </div>
+            <span style="font-size:11px;color:var(--text-dim);white-space:nowrap;">
+              {{ reviewed }}/{{ total }}
+              {% if flagged %} &middot; <span style="color:var(--accent);">{{ flagged }} flagged</span>{% endif %}
+            </span>
+          </div>
+          {% else %}-{% endif %}
+          {% endwith %}
+        </td>
+        <td>
+          <span class="session-status-badge badge-{{ s.status|lower }}">
+            {{ s.get_status_display }}
+          </span>
+        </td>
+        <td>
+          <div class="row-actions">
+            <a class="btn" href="/stocktake/{{ s.pk }}/" style="font-size:12px;padding:4px 10px;">
+              {% if s.status == 'IN_PROGRESS' %}Continue{% else %}View{% endif %}
+            </a>
+            <button type="button" class="btn-icon" title="Delete session"
+                    onclick="deleteSession({{ s.pk }}, '{{ s.display_label|escapejs }}')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+              </svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="st-empty">No stock takes yet. Start one with the button above.</div>
+  {% endif %}
+
+</div>
+
+<form id="delete-form" method="post" action="" style="display:none;">
+  {% csrf_token %}
+</form>
+
+<script>
+async function deleteSession(id, label) {
+  const ok = await showConfirm({
+    title: "Delete session?",
+    message: "\"" + label + "\" and all its entries will be permanently deleted. This cannot be undone.",
+    okLabel: "Delete",
+    cancelLabel: "Cancel",
+  });
+  if (!ok) return;
+  var form = document.getElementById("delete-form");
+  form.action = "/stocktake/" + id + "/delete/";
+  form.submit();
+}
+</script>
+{% endblock %}
