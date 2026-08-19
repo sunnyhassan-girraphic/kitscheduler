@@ -1,5 +1,5 @@
 {% extends "inventory/base.html" %}
-{% block title %}{% if vehicle %}Edit {{ vehicle.name }}{% else %}New Van{% endif %} - Kit scheduler{% endblock %}
+{% block title %}G.R.E.G - {% if vehicle %}Edit {{ vehicle.name }}{% else %}New Van{% endif %}{% endblock %}
 {% block brand_sub %}{% if vehicle %}Editing van{% else %}New van{% endif %}{% endblock %}
 {% block header_actions %}
   <a class="btn" href="/vans/">Cancel</a>

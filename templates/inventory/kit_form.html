@@ -1,5 +1,5 @@
 {% extends "inventory/base.html" %}
-{% block title %}{% if kit %}Edit {{ kit.name }}{% else %}New Kit{% endif %} - Kit scheduler{% endblock %}
+{% block title %}G.R.E.G - {% if kit %}Edit {{ kit.name }}{% else %}New Kit{% endif %}{% endblock %}
 {% block brand_sub %}{% if kit %}Editing kit{% else %}New kit{% endif %}{% endblock %}
 
 {% block header_actions %}
@@ -384,7 +384,17 @@
     </div>
 
     <div class="form-section" id="section-assets">
-      <div class="form-section-head" onclick="toggleSection('section-assets')" style="display:flex;align-items:center;justify-content:space-between;">Assets in this kit <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>
+      <div class="form-section-head" onclick="toggleSection('section-assets')" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Assets in this kit</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="display:flex;align-items:center;gap:0;border:1px solid var(--border-strong);border-radius:6px;overflow:hidden;" onclick="event.stopPropagation()">
+            <button type="button" class="asset-sort-btn" data-sort="added" style="background:transparent;border:none;padding:4px 10px;font-size:11px;color:var(--text-dim);cursor:pointer;font-family:inherit;">Last added</button>
+            <span style="width:1px;background:var(--border-strong);align-self:stretch;"></span>
+            <button type="button" class="asset-sort-btn" data-sort="az" style="background:transparent;border:none;padding:4px 10px;font-size:11px;color:var(--text-dim);cursor:pointer;font-family:inherit;">A-Z</button>
+          </div>
+          <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+        </div>
+      </div>
       <div class="form-section-body">
         <p style="font-size:12px; color:var(--text-faint); margin:0 0 12px;">
           Search below to add Engines and standalone gear. Components inside an Engine (or an
@@ -700,6 +710,7 @@ function downloadKitPdf(kitId) {
   const pluralEl = document.getElementById("selected-plural");
 
   let selected = new Set([{{ selected_ids|join:"," }}]);
+  let assetSortMode = "added"; // "added" | "az"
   const initialTags = {{ selected_tags_json|default:"{}"|safe }};
   const initialTags2 = {{ selected_tags2_json|default:"{}"|safe }};
   const initialQty = {{ selected_qty_json|default:"{}"|safe }};
@@ -758,7 +769,13 @@ function downloadKitPdf(kitId) {
 
   function renderSelected() {
     selectedContainer.innerHTML = "";
-    const ids = Array.from(selected).filter(id => byId[id]);
+    let ids = Array.from(selected).filter(id => byId[id]);
+
+    if (assetSortMode === "az") {
+      ids.sort((a, b) => (byId[a].assetId || "").localeCompare(byId[b].assetId || ""));
+    }
+    // "added" = insertion order, which is already the Set iteration order
+
     ids.forEach(id => {
       const a = byId[id];
       if (a.isBulk && !assetQty[id]) assetQty[id] = 1;
@@ -901,6 +918,24 @@ function downloadKitPdf(kitId) {
   typeFilter.addEventListener("change", renderResults);
 
   renderSelected();
+
+  // ── Asset sort buttons ────────────────────────────────────────────────────
+  document.querySelectorAll(".asset-sort-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      assetSortMode = btn.dataset.sort;
+      document.querySelectorAll(".asset-sort-btn").forEach(b => {
+        const isActive = b.dataset.sort === assetSortMode;
+        b.style.color = isActive ? "var(--accent)" : "var(--text-dim)";
+        b.style.background = isActive ? "var(--accent-glow)" : "transparent";
+      });
+      renderSelected();
+    });
+  });
+  // Set initial active state
+  document.querySelectorAll(".asset-sort-btn").forEach(b => {
+    b.style.color = b.dataset.sort === assetSortMode ? "var(--accent)" : "var(--text-dim)";
+    b.style.background = b.dataset.sort === assetSortMode ? "var(--accent-glow)" : "transparent";
+  });
 
   // --- Unsaved changes warning ---
 

@@ -1,5 +1,5 @@
 {% extends "inventory/base.html" %}
-{% block title %}{% if engine %}Edit {{ engine.asset_id }}{% else %}New {{ kind_label }}{% endif %} - Kit scheduler{% endblock %}
+{% block title %}G.R.E.G - {% if engine %}Edit {{ engine.asset_id }}{% else %}New {{ kind_label }}{% endif %}{% endblock %}
 {% block brand_sub %}{% if engine %}Editing {{ kind_label|lower }}{% else %}New {{ kind_label|lower }}{% endif %}{% endblock %}
 
 {% block header_actions %}

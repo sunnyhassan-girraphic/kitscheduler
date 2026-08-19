@@ -75,6 +75,7 @@ from .settings import (
     settings_functionality_add,
     settings_functionality_delete,
     export_csv_view,
+    logout_view,
 )
 
 from .tickets import (
@@ -108,3 +109,5 @@ from .stocktake import (
     stocktake_pdf_view,
     stocktake_stale_view,
 )
+
+from .auth import login_view

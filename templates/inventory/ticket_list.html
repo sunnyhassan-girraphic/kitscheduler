@@ -1,5 +1,5 @@
 {% extends "inventory/base.html" %}
-{% block title %}Tickets - Kit scheduler{% endblock %}
+{% block title %}G.R.E.G - Tickets{% endblock %}
 {% block brand_sub %}{{ tickets|length }} ticket{{ tickets|length|pluralize }}{% if open_count %} &middot; {{ open_count }} open{% endif %}{% endblock %}
 {% block header_actions %}
   <a class="btn" href="/report-issue/" target="_blank">View public form</a>

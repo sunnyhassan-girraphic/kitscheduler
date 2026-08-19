@@ -79,4 +79,6 @@ urlpatterns = [
     path("stocktake/<int:session_id>/delete/", views.stocktake_delete_view, name="stocktake_delete"),
     path("stocktake/<int:session_id>/pdf/", views.stocktake_pdf_view, name="stocktake_pdf"),
     path("stocktake/<int:session_id>/entries/<int:entry_id>/review/", views.stocktake_review_entry, name="stocktake_review_entry"),
+    path("logout/", views.logout_view, name="logout"),
+    path("login/", views.login_view, name="login"),
 ]
