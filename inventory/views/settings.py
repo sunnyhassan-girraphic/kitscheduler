@@ -117,6 +117,7 @@ def export_csv_view(request):
 
 from django.contrib.auth import logout as auth_logout
 
+@require_POST
 def logout_view(request):
     auth_logout(request)
     return redirect("/login/")
