@@ -250,6 +250,16 @@
       <button type="button" class="btn" style="border-color:var(--red); color:var(--red);" onclick="confirmDeleteAsset()">Delete asset</button>
     </form>
   </div>
+  <script>
+  async function confirmDeleteAsset() {
+    const ok = await showConfirm({
+      title: "Delete asset?",
+      message: "This will permanently delete {{ asset_obj.asset_id }}. This cannot be undone.",
+      okLabel: "Delete", cancelLabel: "Cancel"
+    });
+    if (ok) { window.__formDirty = false; document.getElementById("delete-asset-form").submit(); }
+  }
+  </script>
   {% endif %}
 
 </div>

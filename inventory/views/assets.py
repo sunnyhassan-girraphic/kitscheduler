@@ -168,7 +168,7 @@ def _apply_component_selection(container, selected_ids, kind=None):
     kind = kind or container.asset_type
     excluded_types = [Asset.AssetType.ENGINE] if kind == Asset.AssetType.ENGINE else list(Asset.CONTAINER_TYPES)
     valid_components = Asset.objects.filter(
-        id__in=selected_ids, archived=False, status=Asset.Status.AVAILABLE
+        id__in=selected_ids, archived=False
     ).exclude(asset_type__in=excluded_types).filter(
         Q(parent_engine__isnull=True) | Q(parent_engine=container)
     )
