@@ -9,11 +9,13 @@ from ..models import Asset, Ticket, TicketHistory
 
 
 def _public_asset_picker_json():
-    assets = Asset.objects.filter(archived=False).order_by("asset_type", "asset_id")
+    assets = Asset.objects.filter(archived=False).exclude(
+        asset_type=Asset.AssetType.LICENSE
+    ).order_by("asset_type", "asset_id")
     return [
         {
             "id": a.id, "assetId": a.asset_id, "makeModel": a.make_model,
-            "type": a.get_asset_type_display(),
+            "type": a.get_asset_type_display(), "assetType": a.asset_type,
         }
         for a in assets
     ]
@@ -21,26 +23,37 @@ def _public_asset_picker_json():
 
 def ticket_report_view(request):
     """Public fault-report form. No login required - anyone with the link can submit."""
+    asset_types = [(v, l) for v, l in Asset.AssetType.choices if v != Asset.AssetType.LICENSE]
+
     if request.method == "POST":
         reporter_name = request.POST.get("reporter_name", "").strip()
         reporter_contact = request.POST.get("reporter_contact", "").strip()
         description = request.POST.get("description", "").strip()
         asset_id = request.POST.get("asset", "").strip()
+        priority = request.POST.get("priority", "MEDIUM").strip()
+        photo = request.FILES.get("photo")
 
         ctx = {
             "reporter_name": reporter_name,
             "reporter_contact": reporter_contact,
             "description": description,
             "selected_asset_id": asset_id,
+            "selected_priority": priority,
             "assets_json": _public_asset_picker_json(),
+            "asset_types": asset_types,
         }
 
         if not reporter_name:
             ctx["error"] = "Please tell us your name."
             return render(request, "inventory/ticket_report.html", ctx)
+        if not asset_id:
+            ctx["error"] = "Please select the item that has the fault."
+            return render(request, "inventory/ticket_report.html", ctx)
         if not description:
             ctx["error"] = "Please describe the fault."
             return render(request, "inventory/ticket_report.html", ctx)
+        if priority not in ["LOW", "MEDIUM", "HIGH", "URGENT"]:
+            priority = "MEDIUM"
 
         asset = None
         if asset_id.isdigit():
@@ -51,6 +64,8 @@ def ticket_report_view(request):
             reporter_name=reporter_name,
             reporter_contact=reporter_contact,
             description=description,
+            priority=priority,
+            photo=photo,
         )
         TicketHistory.objects.create(
             ticket=ticket,
@@ -63,6 +78,8 @@ def ticket_report_view(request):
 
     ctx = {
         "assets_json": _public_asset_picker_json(),
+        "asset_types": asset_types,
+        "selected_priority": "MEDIUM",
     }
     return render(request, "inventory/ticket_report.html", ctx)
 

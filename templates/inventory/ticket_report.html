@@ -1,219 +1,283 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Report a fault - G.R.E.G</title>
+<link rel="icon" type="image/x-icon" href="{% static 'inventory/img/favicon.ico' %}">
 <style>
   :root {
-    --bg: #0d0d0d;
-    --surface: #161616;
-    --surface-2: #1c1c1c;
-    --border: #2a2a2a;
-    --border-strong: #3a3a3a;
-    --text: #ededea;
-    --text-dim: #9a978c;
-    --text-faint: #65625a;
-    --accent: rgb(234, 179, 8);
-    --accent-deep: #a87c06;
-    --accent-glow: rgba(234, 179, 8, 0.1);
-    --accent-on: #1a1400;
-    --green: #3fb950;
-    --green-dim: rgba(63, 185, 80, 0.12);
-    --red: #f85149;
-    --red-dim: rgba(248, 81, 73, 0.12);
-    --mono: "SF Mono", "JetBrains Mono", Consolas, monospace;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --bg: #0d0d0d; --surface: #161616; --surface-2: #1c1c1c;
+    --border: #2a2a2a; --border-strong: #3a3a3a;
+    --text: #ededea; --text-dim: #9a978c; --text-faint: #65625a;
+    --accent: rgb(234,179,8); --accent-deep: #a87c06;
+    --accent-glow: rgba(234,179,8,0.1); --accent-on: #1a1400;
+    --green: #3fb950; --green-dim: rgba(63,185,80,0.12);
+    --red: #f85149; --red-dim: rgba(248,81,73,0.12);
+    --orange: #e67e22; --blue: #58a6ff;
+    --mono: "SF Mono","JetBrains Mono",Consolas,monospace;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font-size: 15px; }
-  .page {
-    max-width: 560px;
-    margin: 0 auto;
-    padding: 32px 20px 60px;
-  }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 16px; margin-bottom: 4px; }
-  .brand-mark {
-    width: 28px; height: 28px; border-radius: 6px;
-    background: var(--accent-glow); border: 1px solid var(--accent-deep);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--accent); font-family: var(--mono); font-size: 11px; font-weight: 700; flex-shrink: 0;
-  }
-  h1 { font-size: 20px; margin: 20px 0 4px; }
-  .subhead { color: var(--text-dim); font-size: 13px; margin: 0 0 24px; }
-  .form-section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 18px 16px;
-  }
-  .form-field { margin-bottom: 18px; }
-  .form-field:last-child { margin-bottom: 0; }
-  .form-field label {
-    display: block;
-    font-size: 13px;
-    color: var(--text-dim);
-    margin-bottom: 6px;
-  }
-  .form-field input[type="text"],
-  .form-field textarea {
-    width: 100%;
-    background: var(--surface-2);
-    border: 1px solid var(--border-strong);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 11px 12px;
-    font-size: 15px;
-    font-family: inherit;
-    box-sizing: border-box;
-  }
-  .form-field input:focus,
-  .form-field textarea:focus { outline: none; border-color: var(--accent); }
-  .form-field textarea { resize: vertical; min-height: 100px; }
-  .btn-primary {
-    background: var(--accent); border: 1px solid var(--accent); color: var(--accent-on);
-    border-radius: 6px; padding: 12px 18px; font-size: 15px; font-weight: 600;
-    cursor: pointer; width: 100%;
-  }
-  .btn-primary:hover { opacity: 0.9; }
-  .error-msg {
-    background: var(--red-dim);
-    color: var(--red);
-    border: 1px solid var(--red);
-    border-radius: 6px;
-    padding: 10px 14px;
-    font-size: 13px;
-    margin-bottom: 16px;
-  }
-  .confirm-box {
-    background: var(--surface);
-    border: 1px solid var(--green);
-    border-radius: 8px;
-    padding: 28px 20px;
-    text-align: center;
-  }
-  .confirm-box .tick {
-    width: 44px; height: 44px; border-radius: 50%;
-    background: var(--green-dim); color: var(--green);
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto 14px; font-size: 22px;
-  }
-  .confirm-box h2 { margin: 0 0 8px; font-size: 17px; }
-  .confirm-box p { color: var(--text-dim); font-size: 13px; margin: 0; }
-  .confirm-box .ref { font-family: var(--mono); color: var(--accent); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-size: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  .page { max-width: 1300px; margin: 0 auto; padding: 28px 24px 80px; }
 
-  /* Asset picker: search + tappable cards, easy for non-technical users */
-  .asset-picker-search input {
-    width: 100%;
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; margin-bottom: 24px; }
+  .brand img { width: 24px; height: 24px; }
+  .page-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .page-sub { color: var(--text-dim); font-size: 13px; margin-bottom: 28px; }
+
+  .form-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  .form-col { display: flex; flex-direction: column; gap: 14px; }
+  @media (max-width: 640px) { .form-layout { grid-template-columns: 1fr; } }
+
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin-bottom: 12px; }
+  .required-dot { color: var(--red); margin-left: 2px; }
+
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0;}
+  .field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
+  .field input[type="text"], .field textarea {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text); border-radius: 6px; padding: 10px 12px; font-size: 14px; font-family: inherit;
+  }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 140px; line-height: 1.5; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field textarea[name="description"] { height: 245px;}
+
+  /* Pills */
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .pill { padding: 4px 11px; border-radius: 20px; font-size: 11px; cursor: pointer; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-dim); transition: all 0.12s; user-select: none; font-family: inherit; }
+  .pill:hover { border-color: var(--accent); color: var(--text); }
+  .pill.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+
+  /* Asset search */
+  .asset-picker-wrap { position: relative; }
+  .asset-search-wrap { position: relative; }
+  .asset-search-wrap input { width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px; padding: 10px 12px 10px 36px; font-size: 14px; font-family: inherit; }
+  .asset-search-wrap input:focus { outline: none; border-color: var(--accent); }
+  .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-faint); pointer-events: none; }
+  .asset-results {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    z-index: 100; max-height: 260px; overflow-y: auto;
+    border-radius: 6px; border: 1px solid var(--border-strong);
     background: var(--surface-2);
-    border: 1px solid var(--border-strong);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 11px 12px;
-    font-size: 15px;
-    font-family: inherit;
-    box-sizing: border-box;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: none;
   }
-  .asset-picker-search input:focus { outline: none; border-color: var(--accent); }
-  .asset-picker-results {
-    margin-top: 10px;
-    max-height: 300px;
-    overflow-y: auto;
-  }
-  .asset-card {
-    display: block;
-    width: 100%;
-    text-align: left;
-    background: var(--surface-2);
-    border: 1px solid var(--border-strong);
-    border-radius: 8px;
-    padding: 12px 14px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    color: var(--text);
-  }
-  .asset-card:active { background: var(--accent-glow); }
-  .asset-card .aid { font-family: var(--mono); font-weight: 700; font-size: 14px; }
-  .asset-card .amodel { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
-  .asset-card .atype {
-    display: inline-block; margin-top: 6px; font-size: 10px; text-transform: uppercase;
-    letter-spacing: 0.04em; color: var(--text-faint); background: var(--surface);
-    border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;
-  }
-  .no-matches { font-size: 13px; color: var(--text-faint); font-style: italic; padding: 10px 2px; }
-  .asset-selected-box {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    background: var(--accent-glow); border: 1px solid var(--accent-deep);
-    border-radius: 8px; padding: 12px 14px;
-  }
-  .asset-selected-box .aid { font-family: var(--mono); font-weight: 700; font-size: 14px; color: var(--accent); }
-  .asset-selected-box .amodel { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
-  .change-btn {
-    background: none; border: 1px solid var(--border-strong); color: var(--text-dim);
-    border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; flex-shrink: 0;
-  }
-  .not-listed-btn {
-    background: none; border: none; color: var(--text-faint); font-size: 12px;
-    text-decoration: underline; cursor: pointer; padding: 8px 2px 0; display: inline-block;
-  }
+  .asset-results.visible { display: block; }
+  .asset-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .asset-row:last-child { border-bottom: none; }
+  .asset-row:hover { background: var(--surface); }
+  .asset-row .aid { font-family: var(--mono); font-size: 12px; font-weight: 700; min-width: 80px; }
+  .asset-row .amodel { font-size: 13px; color: var(--text-dim); flex: 1; }
+  .asset-row .atype { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; flex-shrink: 0; }
+  .no-results { padding: 14px 12px; font-size: 13px; color: var(--text-faint); font-style: italic; }
+
+  .asset-selected { display: flex; align-items: center; gap: 12px; justify-content: space-between; background: var(--accent-glow); border: 1px solid var(--accent-deep); border-radius: 8px; padding: 11px 14px; }
+  .asset-selected .aid { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--accent); }
+  .asset-selected .amodel { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .change-btn { background: none; border: 1px solid var(--border-strong); color: var(--text-dim); border-radius: 6px; padding: 5px 11px; font-size: 12px; cursor: pointer; flex-shrink: 0; font-family: inherit; }
+  .change-btn:hover { color: var(--text); border-color: var(--text-dim); }
+
+  /* Priority */
+  .priority-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .priority-btn { background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; padding: 11px 12px; cursor: pointer; text-align: left; transition: all 0.12s; font-family: inherit; width: 100%; }
+  .priority-btn .p-label { font-size: 13px; font-weight: 600; color: var(--text); display: block; margin-bottom: 2px; }
+  .priority-btn .p-desc { font-size: 10px; color: var(--text-faint); line-height: 1.4; display: block; }
+  .priority-btn[data-priority="LOW"].selected    { border-color: var(--blue);   background: rgba(88,166,255,0.08); }
+  .priority-btn[data-priority="LOW"].selected .p-label { color: var(--blue); }
+  .priority-btn[data-priority="MEDIUM"].selected { border-color: var(--accent); background: var(--accent-glow); }
+  .priority-btn[data-priority="MEDIUM"].selected .p-label { color: var(--accent); }
+  .priority-btn[data-priority="HIGH"].selected   { border-color: var(--orange); background: rgba(230,126,34,0.1); }
+  .priority-btn[data-priority="HIGH"].selected .p-label { color: var(--orange); }
+  .priority-btn[data-priority="URGENT"].selected { border-color: var(--red);    background: var(--red-dim); }
+  .priority-btn[data-priority="URGENT"].selected .p-label { color: var(--red); }
+
+  /* Photo */
+  .drop-zone { border: 2px dashed var(--border-strong); border-radius: 8px; padding: 22px 16px; text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; position: relative; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: var(--accent-glow); }
+  .drop-zone input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+  .drop-zone-icon { color: var(--text-faint); margin-bottom: 6px; }
+  .drop-zone-icon svg { width: 24px; height: 24px; }
+  .drop-zone-text { font-size: 13px; color: var(--text-dim); }
+  .drop-zone-sub { font-size: 11px; color: var(--text-faint); margin-top: 3px; }
+  .photo-preview { display: none; position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-strong); margin-bottom: 8px; }
+  .photo-preview img { width: 100%; max-height: 160px; object-fit: cover; display: block; }
+  .photo-remove { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; color: var(--text); display: flex; align-items: center; justify-content: center; }
+  .photo-remove svg { width: 14px; height: 14px; }
+
+  /* Reboot checkbox */
+  .reboot-wrap { display: flex; align-items: center; gap: 12px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; user-select: none; }
+  .reboot-box { width: 18px; height: 18px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.1s; }
+  .reboot-box.checked { background: var(--accent); border-color: var(--accent); }
+  .reboot-box svg { width: 11px; height: 11px; color: var(--accent-on); display: none; }
+  .reboot-box.checked svg { display: block; }
+  .reboot-question { font-size: 13px; color: var(--text-dim); line-height: 1.4; }
+  .reboot-question strong { color: var(--text); }
+
+  .error-msg { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .error-msg svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+  .submit-btn { width: 100%; padding: 13px; background: var(--accent); border: none; border-radius: 8px; color: var(--accent-on); font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity 0.15s; margin-top: 20px; }
+  .submit-btn:hover { opacity: 0.9; }
+
+  .confirm-box { background: var(--surface); border: 1px solid var(--green); border-radius: 10px; padding: 48px 32px; text-align: center; max-width: 480px; margin: 0 auto; }
+  .confirm-box .tick { width: 48px; height: 48px; border-radius: 50%; background: var(--green-dim); color: var(--green); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 24px; }
+  .confirm-box h2 { font-size: 18px; margin-bottom: 8px; }
+  .confirm-box p { color: var(--text-dim); font-size: 13px; line-height: 1.6; }
+  .confirm-box .ref { font-family: var(--mono); color: var(--accent); }
 </style>
 </head>
 <body>
 <div class="page">
-  <div class="brand"><div class="brand-mark"><img src="/static/inventory/img/giraffe-mark.png" style="width:18px;height:18px"></div>G.R.E.G</div>
+
+  <div class="brand">
+    <img src="{% static 'inventory/img/giraffe-mark.png' %}" alt="G.R.E.G">
+    G.R.E.G
+  </div>
 
   {% if submitted %}
-    <div class="confirm-box">
-      <div class="tick">&#10003;</div>
-      <h2>Ticket submitted</h2>
-      <p>Thanks {{ ticket.reporter_name }} - your report (<span class="ref">#{{ ticket.id }}</span>) has been logged and the team will follow up.</p>
-    </div>
+  <div class="confirm-box">
+    <div class="tick">&#10003;</div>
+    <h2>Ticket submitted</h2>
+    <p>Thanks {{ ticket.reporter_name }} - your report (<span class="ref">#{{ ticket.id }}</span>) has been logged and the team will follow up.</p>
+  </div>
+
   {% else %}
-    <h1>Report a fault</h1>
-    <p class="subhead">Spotted something broken or not working right? Let us know below.</p>
+  <div class="page-title">Report a fault</div>
+  <p class="page-sub">Spotted something broken or not working right? Let us know below.</p>
 
-    {% if error %}
-    <div class="error-msg">{{ error }}</div>
-    {% endif %}
+  {% if error %}
+  <div class="error-msg">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    {{ error }}
+  </div>
+  {% endif %}
 
-    <form method="post" class="form-section" id="report-form">
-      {% csrf_token %}
-      <div class="form-field">
-        <label for="f-name">Your name</label>
-        <input type="text" id="f-name" name="reporter_name" value="{{ reporter_name|default:'' }}" autofocus>
-      </div>
-      <div class="form-field">
-        <label for="f-contact">Email or phone <span style="color:var(--text-faint); font-weight:400;">(optional, in case we need to follow up)</span></label>
-        <input type="text" id="f-contact" name="reporter_contact" value="{{ reporter_contact|default:'' }}">
-      </div>
-      <div class="form-field">
-        <label>Which item? <span style="color:var(--text-faint); font-weight:400;">(optional if you're not sure)</span></label>
+  <form method="post" enctype="multipart/form-data" id="report-form">
+    {% csrf_token %}
+    <div class="form-layout">
 
-        <div id="asset-selected-view" style="display:none;">
-          <div class="asset-selected-box">
-            <div>
-              <div class="aid" id="selected-aid"></div>
-              <div class="amodel" id="selected-amodel"></div>
+      <!-- LEFT: About you + Which item + Priority -->
+      <div class="form-col">
+
+        <div class="section">
+          <div class="section-label">About you</div>
+          <div class="two-col">
+            <div class="field">
+              <label>Your name <span class="required-dot">*</span></label>
+              <input type="text" name="reporter_name" value="{{ reporter_name|default:'' }}" autofocus placeholder="">
             </div>
-            <button type="button" class="change-btn" id="change-asset-btn">Change</button>
+            <div class="field">
+              <label>Email or phone <span style="color:var(--text-faint)">(optional, for follow-up)</span></label>
+              <input type="text" name="reporter_contact" value="{{ reporter_contact|default:'' }}" placeholder="">
+            </div>
+          </div>
+        </div>
+		
+        <div class="section">
+          <div class="section-label">Priority <span class="required-dot">*</span></div>
+          <div class="priority-grid">
+            <button type="button" class="priority-btn" data-priority="LOW">
+              <span class="p-label">Low</span>
+              <span class="p-desc">Very minor issue</span>
+            </button>
+            <button type="button" class="priority-btn" data-priority="MEDIUM">
+              <span class="p-label">Medium</span>
+              <span class="p-desc">Can wait to be fixed</span>
+            </button>
+            <button type="button" class="priority-btn" data-priority="HIGH">
+              <span class="p-label">High</span>
+              <span class="p-desc">Needs fixing as soon as possible</span>
+            </button>
+            <button type="button" class="priority-btn" data-priority="URGENT">
+              <span class="p-label">Urgent</span>
+              <span class="p-desc">Blocking project progress</span>
+            </button>
+          </div>
+          <input type="hidden" name="priority" id="f-priority" value="{{ selected_priority|default:'MEDIUM' }}">
+        </div>
+		
+        <div class="section">
+          <div class="section-label">Photo or screenshot <span style="color:var(--text-faint);font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>
+          <div class="photo-preview" id="photo-preview">
+            <img id="photo-preview-img" src="" alt="Preview">
+            <button type="button" class="photo-remove" id="photo-remove-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="drop-zone" id="drop-zone">
+            <input type="file" name="photo" id="f-photo" accept="image/jpeg,image/png,image/webp">
+            <div class="drop-zone-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+            <div class="drop-zone-text">Drag and drop, or tap to browse</div>
+            <div class="drop-zone-sub">JPG, PNG or WebP up to 10MB</div>
           </div>
         </div>
 
-        <div id="asset-search-view">
-          <div class="asset-picker-search">
-            <input type="text" id="asset-search" placeholder="Type the equipment name or ID..." autocomplete="off">
+
+
+      </div>
+
+      <!-- RIGHT: Priority + Photo + Reboot -->
+      <div class="form-col">
+
+        <div class="section">
+          <div class="section-label">Which item? <span class="required-dot">*</span></div>
+          <div class="pills" id="type-pills">
+            <button type="button" class="pill active" data-type="">All</button>
+            {% for value, label in asset_types %}
+            <button type="button" class="pill" data-type="{{ value }}">{{ label }}</button>
+            {% endfor %}
           </div>
-          <div class="asset-picker-results" id="asset-results"></div>
+          <div id="asset-search-view">
+            <div class="asset-picker-wrap">
+              <div class="asset-search-wrap">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="asset-search" placeholder="Search by ID or name..." autocomplete="off">
+              </div>
+              <div class="asset-results" id="asset-results"></div>
+            </div>
+
+          </div>
+          <div id="asset-selected-view" style="display:none;">
+            <div class="asset-selected">
+              <div>
+                <div class="aid" id="selected-aid"></div>
+                <div class="amodel" id="selected-amodel"></div>
+              </div>
+              <button type="button" class="change-btn" id="change-asset-btn">Change</button>
+            </div>
+          </div>
+          <input type="hidden" name="asset" id="f-asset" value="{{ selected_asset_id|default:'' }}">
         </div>
 
-        <input type="hidden" name="asset" id="f-asset" value="{{ selected_asset_id|default:'' }}">
+        <div class="section">
+          <div class="section-label">What's wrong? <span class="required-dot">*</span></div>
+          <div class="field">
+            <textarea name="description" placeholder="Describe the fault or issue in as much detail as you can...">{{ description|default:'' }}</textarea>
+          </div>
+        </div>
+
+        <div class="reboot-wrap" id="reboot-wrap">
+          <div class="reboot-box" id="reboot-box">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 6 5 9 10 3"/></svg>
+          </div>
+          <div class="reboot-question" id="reboot-question">
+            <strong>Have you tried turning it off and on again?</strong>
+          </div>
+        </div>
+
       </div>
-      <div class="form-field">
-        <label for="f-description">What's wrong?</label>
-        <textarea id="f-description" name="description" placeholder="Describe the fault or issue...">{{ description|default:'' }}</textarea>
-      </div>
-      <button class="btn-primary" type="submit">Submit report</button>
-    </form>
+    </div>
+
+    <button type="submit" class="submit-btn">Submit report</button>
+  </form>
   {% endif %}
 </div>
 
@@ -225,69 +289,132 @@
   const byId = {};
   ALL.forEach(a => byId[a.id] = a);
 
-  const searchInput = document.getElementById("asset-search");
-  const resultsEl = document.getElementById("asset-results");
-  const hiddenInput = document.getElementById("f-asset");
+  const searchInput  = document.getElementById("asset-search");
+  const resultsEl    = document.getElementById("asset-results");
+  const hiddenInput  = document.getElementById("f-asset");
   const selectedView = document.getElementById("asset-selected-view");
-  const searchView = document.getElementById("asset-search-view");
-  const changeBtn = document.getElementById("change-asset-btn");
+  const searchView   = document.getElementById("asset-search-view");
+  const changeBtn    = document.getElementById("change-asset-btn");
+  let activeType = "";
 
   function showSelected(a) {
     document.getElementById("selected-aid").textContent = a.assetId;
-    document.getElementById("selected-amodel").textContent = a.makeModel ? `${a.makeModel} (${a.type})` : a.type;
+    document.getElementById("selected-amodel").textContent = a.makeModel ? `${a.makeModel} - ${a.type}` : a.type;
     selectedView.style.display = "block";
-    searchView.style.display = "none";
+    searchView.style.display   = "none";
     hiddenInput.value = a.id;
+    resultsEl.classList.remove("visible");
   }
 
   function renderResults() {
     const q = searchInput.value.toLowerCase().trim();
     resultsEl.innerHTML = "";
-    if (!q) return;
-    const matches = ALL.filter(a =>
-      a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q)
-    ).slice(0, 10);
+    if (!q && !activeType) { resultsEl.classList.remove("visible"); return; }
+    const matches = ALL.filter(a => {
+      const typeMatch = !activeType || a.assetType === activeType;
+      const textMatch = !q || a.assetId.toLowerCase().includes(q) || (a.makeModel || "").toLowerCase().includes(q);
+      return typeMatch && textMatch;
+    }).slice(0, 12);
     if (!matches.length) {
-      resultsEl.innerHTML = `<div class="no-matches">No matching equipment found. You can still submit without picking one.</div>`;
-      return;
+      resultsEl.innerHTML = `<div class="no-results">No matching equipment found.</div>`;
+    } else {
+      matches.forEach(a => {
+        const row = document.createElement("div");
+        row.className = "asset-row";
+        row.dataset.id = a.id;
+        row.innerHTML = `<span class="aid">${a.assetId}</span><span class="amodel">${a.makeModel || ""}</span><span class="atype">${a.type}</span>`;
+        resultsEl.appendChild(row);
+      });
     }
-    matches.forEach(a => {
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = "asset-card";
-      card.dataset.id = a.id;
-      card.innerHTML = `
-        <div class="aid">${a.assetId}</div>
-        ${a.makeModel ? `<div class="amodel">${a.makeModel}</div>` : ""}
-        <div class="atype">${a.type}</div>
-      `;
-      resultsEl.appendChild(card);
-    });
+    resultsEl.classList.add("visible");
   }
 
-  resultsEl.addEventListener("click", (e) => {
-    const card = e.target.closest(".asset-card");
-    if (!card) return;
-    const a = byId[parseInt(card.dataset.id, 10)];
+  resultsEl.addEventListener("click", e => {
+    const row = e.target.closest(".asset-row");
+    if (!row) return;
+    const a = byId[parseInt(row.dataset.id, 10)];
     if (a) showSelected(a);
   });
 
   changeBtn.addEventListener("click", () => {
     hiddenInput.value = "";
     selectedView.style.display = "none";
-    searchView.style.display = "block";
+    searchView.style.display   = "block";
     searchInput.value = "";
-    resultsEl.innerHTML = "";
+    resultsEl.classList.remove("visible");
     searchInput.focus();
   });
 
   searchInput.addEventListener("input", renderResults);
 
-  // Pre-select if the form re-rendered with a previously chosen asset (e.g. validation error)
+  document.querySelectorAll(".pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll(".pill").forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      activeType = pill.dataset.type;
+      renderResults();
+    });
+  });
+
+  document.addEventListener("click", e => {
+    const pickerArea = document.getElementById("asset-search-view");
+    if (pickerArea && !pickerArea.contains(e.target)) resultsEl.classList.remove("visible");
+  });
+
   const preselected = hiddenInput.value;
-  if (preselected && byId[parseInt(preselected, 10)]) {
-    showSelected(byId[parseInt(preselected, 10)]);
+  if (preselected && byId[parseInt(preselected, 10)]) showSelected(byId[parseInt(preselected, 10)]);
+
+  // Priority
+  const priorityInput = document.getElementById("f-priority");
+  function selectPriority(val) {
+    document.querySelectorAll(".priority-btn").forEach(b => b.classList.toggle("selected", b.dataset.priority === val));
+    priorityInput.value = val;
   }
+  document.querySelectorAll(".priority-btn").forEach(btn => btn.addEventListener("click", () => selectPriority(btn.dataset.priority)));
+  selectPriority(priorityInput.value || "MEDIUM");
+
+  // Photo
+  const dropZone   = document.getElementById("drop-zone");
+  const fileInput  = document.getElementById("f-photo");
+  const preview    = document.getElementById("photo-preview");
+  const previewImg = document.getElementById("photo-preview-img");
+  const removeBtn  = document.getElementById("photo-remove-btn");
+
+  function showPreview(file) {
+    if (!file || !file.type.startsWith("image/")) return;
+    if (file.size > 10 * 1024 * 1024) { alert("File too large - max 10MB."); return; }
+    const reader = new FileReader();
+    reader.onload = e => { previewImg.src = e.target.result; preview.style.display = "block"; dropZone.style.display = "none"; };
+    reader.readAsDataURL(file);
+  }
+  fileInput.addEventListener("change", () => { if (fileInput.files[0]) showPreview(fileInput.files[0]); });
+  dropZone.addEventListener("dragover",  e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault(); dropZone.classList.remove("dragover");
+    const file = e.dataTransfer.files[0];
+    if (file) { const dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files; showPreview(file); }
+  });
+  removeBtn.addEventListener("click", () => {
+    fileInput.value = ""; previewImg.src = ""; preview.style.display = "none"; dropZone.style.display = "block";
+  });
+
+  // Reboot
+  const rebootWrap     = document.getElementById("reboot-wrap");
+  const rebootBox      = document.getElementById("reboot-box");
+  const rebootQuestion = document.getElementById("reboot-question");
+  let rebootState = 0;
+  const rebootMessages = [
+    `<strong>Have you tried turning it off and on again?</strong>`,
+    `<strong>Are you sure...?</strong>`,
+    `<strong>Okaay... (this checkbox does nothing)</strong>`,
+  ];
+  rebootWrap.addEventListener("click", () => {
+    rebootState = (rebootState + 1) % 3;
+    rebootBox.classList.toggle("checked", rebootState === 2);
+    rebootQuestion.innerHTML = rebootMessages[rebootState];
+  });
+
 })();
 </script>
 {% endif %}
