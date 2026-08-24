@@ -21,7 +21,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-size: 14px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
-  .page { max-width: 1300px; margin: 0 auto; padding: 28px 24px 80px; }
+  .page { max-width: 900px; margin: 0 auto; padding: 28px 24px 80px; }
 
   .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; margin-bottom: 24px; }
   .brand img { width: 24px; height: 24px; }
@@ -37,7 +37,7 @@
   .required-dot { color: var(--red); margin-left: 2px; }
 
   .field { margin-bottom: 14px; }
-  .field:last-child { margin-bottom: 0;}
+  .field:last-child { margin-bottom: 0; }
   .field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
   .field input[type="text"], .field textarea {
     width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong);
@@ -46,7 +46,6 @@
   .field input:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
   .field textarea { resize: vertical; min-height: 140px; line-height: 1.5; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .field textarea[name="description"] { height: 245px;}
 
   /* Pills */
   .pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
@@ -76,6 +75,7 @@
   .asset-row .amodel { font-size: 13px; color: var(--text-dim); flex: 1; }
   .asset-row .atype { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; flex-shrink: 0; }
   .no-results { padding: 14px 12px; font-size: 13px; color: var(--text-faint); font-style: italic; }
+  .search-hint { font-size: 11px; color: var(--text-faint); margin-top: 6px; }
 
   .asset-selected { display: flex; align-items: center; gap: 12px; justify-content: space-between; background: var(--accent-glow); border: 1px solid var(--accent-deep); border-radius: 8px; padding: 11px 14px; }
   .asset-selected .aid { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--accent); }
@@ -122,7 +122,7 @@
   .error-msg { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
   .error-msg svg { width: 15px; height: 15px; flex-shrink: 0; }
 
-  .submit-btn { width: 100%; padding: 13px; background: var(--accent); border: none; border-radius: 8px; color: var(--accent-on); font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity 0.15s; margin-top: 20px; }
+  .submit-btn { width: 100%; padding: 13px; background: var(--accent); border: none; border-radius: 8px; color: var(--accent-on); font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; transition: opacity 0.15s; margin-top: 14px; }
   .submit-btn:hover { opacity: 0.9; }
 
   .confirm-box { background: var(--surface); border: 1px solid var(--green); border-radius: 10px; padding: 48px 32px; text-align: center; max-width: 480px; margin: 0 auto; }
@@ -144,7 +144,7 @@
   <div class="confirm-box">
     <div class="tick">&#10003;</div>
     <h2>Ticket submitted</h2>
-    <p>Thanks {{ ticket.reporter_name }} - your report (<span class="ref">#{{ ticket.id }}</span>) has been logged and the team will follow up.</p>
+    <p>Thanks {{ ticket.reporter_name }} - <span class="ref">#{{ ticket.id }}</span> {{ thanks_message }}</p>
   </div>
 
   {% else %}
@@ -170,62 +170,14 @@
           <div class="two-col">
             <div class="field">
               <label>Your name <span class="required-dot">*</span></label>
-              <input type="text" name="reporter_name" value="{{ reporter_name|default:'' }}" autofocus placeholder="">
+              <input type="text" name="reporter_name" value="{{ reporter_name|default:'' }}" autofocus placeholder="e.g. Alex Smith">
             </div>
             <div class="field">
-              <label>Email or phone <span style="color:var(--text-faint)">(optional, for follow-up)</span></label>
-              <input type="text" name="reporter_contact" value="{{ reporter_contact|default:'' }}" placeholder="">
+              <label>Email or phone <span style="color:var(--text-faint)">(optional)</span></label>
+              <input type="text" name="reporter_contact" value="{{ reporter_contact|default:'' }}" placeholder="For follow-up if needed">
             </div>
           </div>
         </div>
-		
-        <div class="section">
-          <div class="section-label">Priority <span class="required-dot">*</span></div>
-          <div class="priority-grid">
-            <button type="button" class="priority-btn" data-priority="LOW">
-              <span class="p-label">Low</span>
-              <span class="p-desc">Very minor issue</span>
-            </button>
-            <button type="button" class="priority-btn" data-priority="MEDIUM">
-              <span class="p-label">Medium</span>
-              <span class="p-desc">Can wait to be fixed</span>
-            </button>
-            <button type="button" class="priority-btn" data-priority="HIGH">
-              <span class="p-label">High</span>
-              <span class="p-desc">Needs fixing as soon as possible</span>
-            </button>
-            <button type="button" class="priority-btn" data-priority="URGENT">
-              <span class="p-label">Urgent</span>
-              <span class="p-desc">Blocking project progress</span>
-            </button>
-          </div>
-          <input type="hidden" name="priority" id="f-priority" value="{{ selected_priority|default:'MEDIUM' }}">
-        </div>
-		
-        <div class="section">
-          <div class="section-label">Photo or screenshot <span style="color:var(--text-faint);font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>
-          <div class="photo-preview" id="photo-preview">
-            <img id="photo-preview-img" src="" alt="Preview">
-            <button type="button" class="photo-remove" id="photo-remove-btn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-          <div class="drop-zone" id="drop-zone">
-            <input type="file" name="photo" id="f-photo" accept="image/jpeg,image/png,image/webp">
-            <div class="drop-zone-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            </div>
-            <div class="drop-zone-text">Drag and drop, or tap to browse</div>
-            <div class="drop-zone-sub">JPG, PNG or WebP up to 10MB</div>
-          </div>
-        </div>
-
-
-
-      </div>
-
-      <!-- RIGHT: Priority + Photo + Reboot -->
-      <div class="form-col">
 
         <div class="section">
           <div class="section-label">Which item? <span class="required-dot">*</span></div>
@@ -243,7 +195,7 @@
               </div>
               <div class="asset-results" id="asset-results"></div>
             </div>
-
+            <p class="search-hint">Filter by type above, then search by ID or name.</p>
           </div>
           <div id="asset-selected-view" style="display:none;">
             <div class="asset-selected">
@@ -264,6 +216,52 @@
           </div>
         </div>
 
+      </div>
+
+      <!-- RIGHT: Priority + Photo + Reboot -->
+      <div class="form-col">
+
+        <div class="section">
+          <div class="section-label">Priority <span class="required-dot">*</span></div>
+          <div class="priority-grid">
+            <button type="button" class="priority-btn" data-priority="LOW">
+              <span class="p-label">Low</span>
+              <span class="p-desc">Minor, doesn't affect operation</span>
+            </button>
+            <button type="button" class="priority-btn" data-priority="MEDIUM">
+              <span class="p-label">Medium</span>
+              <span class="p-desc">Has a workaround</span>
+            </button>
+            <button type="button" class="priority-btn" data-priority="HIGH">
+              <span class="p-label">High</span>
+              <span class="p-desc">Needs fixing soon</span>
+            </button>
+            <button type="button" class="priority-btn" data-priority="URGENT">
+              <span class="p-label">Urgent</span>
+              <span class="p-desc">Blocking a live event</span>
+            </button>
+          </div>
+          <input type="hidden" name="priority" id="f-priority" value="{{ selected_priority|default:'MEDIUM' }}">
+        </div>
+
+        <div class="section">
+          <div class="section-label">Photo or screenshot <span style="color:var(--text-faint);font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></div>
+          <div class="photo-preview" id="photo-preview">
+            <img id="photo-preview-img" src="" alt="Preview">
+            <button type="button" class="photo-remove" id="photo-remove-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="drop-zone" id="drop-zone">
+            <input type="file" name="photo" id="f-photo" accept="image/jpeg,image/png,image/webp">
+            <div class="drop-zone-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+            <div class="drop-zone-text">Drag and drop, or tap to browse</div>
+            <div class="drop-zone-sub">JPG, PNG or WebP up to 10MB</div>
+          </div>
+        </div>
+
         <div class="reboot-wrap" id="reboot-wrap">
           <div class="reboot-box" id="reboot-box">
             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 6 5 9 10 3"/></svg>
@@ -276,7 +274,7 @@
       </div>
     </div>
 
-    <button type="submit" class="submit-btn">Submit report</button>
+    <button type="submit" class="submit-btn">Submit fault report</button>
   </form>
   {% endif %}
 </div>
@@ -407,7 +405,7 @@
   const rebootMessages = [
     `<strong>Have you tried turning it off and on again?</strong>`,
     `<strong>Are you sure...?</strong>`,
-    `<strong>Okaay... (this checkbox does nothing)</strong>`,
+    `<strong>Fine. Ticket submitted anyway.</strong>`,
   ];
   rebootWrap.addEventListener("click", () => {
     rebootState = (rebootState + 1) % 3;

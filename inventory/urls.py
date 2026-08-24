@@ -46,12 +46,11 @@ urlpatterns = [
     path("settings/export/", views.export_csv_view, name="export_csv"),
     path("settings/tags/add/", views.settings_tag_add, name="settings_tag_add"),
     path("settings/tags/<int:tag_id>/delete/", views.settings_tag_delete, name="settings_tag_delete"),
+    path("settings/tags/<int:tag_id>/edit/", views.settings_tag_edit, name="settings_tag_edit"),
     path("settings/functionalities/add/", views.settings_functionality_add, name="settings_functionality_add"),
-    path(
-        "settings/functionalities/<int:func_id>/delete/",
-        views.settings_functionality_delete,
-        name="settings_functionality_delete",
-    ),
+    path("settings/functionalities/<int:func_id>/delete/", views.settings_functionality_delete, name="settings_functionality_delete"),
+    path("settings/functionalities/<int:func_id>/edit/", views.settings_functionality_edit, name="settings_functionality_edit"),
+    path("settings/set/", views.settings_key_value, name="settings_key_value"),
     path("api/kits/<int:kit_id>/", views.kit_detail_api, name="kit_detail_api"),
     path("api/jobs/<int:job_id>/", views.job_detail_api, name="job_detail_api"),
     path("api/jobs/<int:job_id>/delete/", views.delete_job, name="delete_job"),
@@ -81,4 +80,5 @@ urlpatterns = [
     path("stocktake/<int:session_id>/entries/<int:entry_id>/review/", views.stocktake_review_entry, name="stocktake_review_entry"),
     path("logout/", views.logout_view, name="logout"),
     path("login/", views.login_view, name="login"),
+    path("settings/change-password/", views.change_password_view, name="change_password"),
 ]

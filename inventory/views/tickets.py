@@ -74,7 +74,10 @@ def ticket_report_view(request):
             new_value=ticket.get_status_display(),
             note="Ticket submitted via public report form.",
         )
-        return render(request, "inventory/ticket_report.html", {"submitted": True, "ticket": ticket})
+        from django.core.cache import cache
+        raw_message = cache.get("greg_setting_ticket_thanks_message") or "Thanks {name} - your report {ref} has been logged and the team will follow up."
+        thanks_message = raw_message.replace("{name}", ticket.reporter_name or "there").replace("{ref}", f"#{ticket.id}")
+        return render(request, "inventory/ticket_report.html", {"submitted": True, "ticket": ticket, "thanks_message": thanks_message})
 
     ctx = {
         "assets_json": _public_asset_picker_json(),

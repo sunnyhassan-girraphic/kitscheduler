@@ -118,6 +118,17 @@
           <div class="detail-row"><span class="k">Asset</span><span class="v">{% if ticket.asset %}<a href="/assets/{{ ticket.asset.pk }}/edit/" style="color:var(--accent);text-decoration:none;">{{ ticket.asset.asset_id }}</a>{% if ticket.asset.make_model %} &middot; {{ ticket.asset.make_model }}{% endif %}{% else %}Not specified{% endif %}</span></div>
           <div class="detail-row"><span class="k">Reported by</span><span class="v">{{ ticket.reporter_name }}{% if ticket.reporter_contact %} ({{ ticket.reporter_contact }}){% endif %}</span></div>
           <div class="detail-row"><span class="k">Reported</span><span class="v">{{ ticket.created_at|date:"j M Y, g:ia" }}</span></div>
+          {% if ticket.photo %}
+          <div class="detail-row">
+            <span class="k">Attachment</span>
+            <span class="v">
+              <button type="button" onclick="showPhotoPopup()" style="background:none;border:none;padding:0;color:var(--accent);cursor:pointer;font-size:13px;font-family:inherit;display:inline-flex;align-items:center;gap:6px;text-decoration:underline;text-underline-offset:3px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                Photo / screenshot attached - click to view
+              </button>
+            </span>
+          </div>
+          {% endif %}
           <div class="detail-row"><span class="k">Description</span></div>
           <div class="description-block">{{ ticket.description }}</div>
         </div>
@@ -224,4 +235,18 @@ function toggleSection(id) {
   </div>
 
 </div>
+{% if ticket.photo %}
+<dialog id="photo-dialog" style="background:var(--surface-2);border:1px solid var(--border-strong);border-radius:12px;padding:0;max-width:90vw;max-height:90vh;overflow:hidden;color:var(--text);">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);">
+    <span style="font-size:13px;font-weight:600;">Attached photo</span>
+    <button onclick="document.getElementById('photo-dialog').close()" style="background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:20px;line-height:1;padding:0;">&times;</button>
+  </div>
+  <img src="{{ ticket.photo.url }}" alt="Attached photo" style="display:block;max-width:80vw;max-height:75vh;object-fit:contain;padding:12px;">
+</dialog>
+<script>
+function showPhotoPopup() { document.getElementById("photo-dialog").showModal(); }
+document.getElementById("photo-dialog").addEventListener("click", function(e) { if(e.target===this)this.close(); });
+</script>
+<style>#photo-dialog::backdrop{background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);}</style>
+{% endif %}
 {% endblock %}

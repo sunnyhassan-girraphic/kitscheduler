@@ -12,12 +12,21 @@ from django.views.decorators.http import require_POST
 from ..models import Asset, CategoryColour, Job, Kit, LicenseFunctionality, Tag
 
 
+def _is_admin(user):
+    return user.is_authenticated and (
+        user.is_superuser or user.groups.filter(name="Admin").exists()
+    )
+
+
 @login_required
 def settings_view(request):
     categories = Job.Category.choices
     colours = {cc.category: cc.colour for cc in CategoryColour.objects.all()}
+    is_admin = _is_admin(request.user)
 
     if request.method == "POST":
+        if not is_admin:
+            return redirect("/settings/")
         for value, _ in categories:
             colour = request.POST.get(f"colour_{value}", "").strip()
             if colour and re.fullmatch(r"#[0-9A-Fa-f]{6}", colour):
@@ -26,8 +35,17 @@ def settings_view(request):
                 )
         return redirect("/settings/")
 
+    from django.core.cache import cache
+    ticket_defaults = {
+        "default_priority": cache.get("greg_setting_default_ticket_priority", "MEDIUM"),
+        "require_photo": cache.get("greg_setting_ticket_require_photo", "") == "1",
+        "thanks_message": cache.get("greg_setting_ticket_thanks_message", ""),
+    }
+
     return render(request, "inventory/settings.html", {
         "categories": categories,
+        "is_admin": is_admin,
+        "ticket_defaults": ticket_defaults,
         "colours": colours,
         "tags": Tag.objects.all(),
         "functionalities": LicenseFunctionality.objects.all(),
@@ -121,3 +139,87 @@ from django.contrib.auth import logout as auth_logout
 def logout_view(request):
     auth_logout(request)
     return redirect("/login/")
+
+
+from django.contrib.auth import update_session_auth_hash
+
+@login_required
+@require_POST
+def change_password_view(request):
+    current  = request.POST.get("current_password", "")
+    new      = request.POST.get("new_password", "")
+    confirm  = request.POST.get("confirm_password", "")
+
+    def render_settings(error=None, success=None):
+        from ..models import CategoryColour, Tag, LicenseFunctionality, Job
+        categories = Job.Category.choices
+        colours = {cc.category: cc.colour for cc in CategoryColour.objects.all()}
+        return render(request, "inventory/settings.html", {
+            "categories": categories,
+            "colours": colours,
+            "tags": Tag.objects.all(),
+            "functionalities": LicenseFunctionality.objects.all(),
+            "is_admin": _is_admin(request.user),
+            "pw_error": error,
+            "pw_success": success,
+        })
+
+    if not request.user.check_password(current):
+        return render_settings(error="Current password is incorrect.")
+    if len(new) < 8:
+        return render_settings(error="New password must be at least 8 characters.")
+    if new != confirm:
+        return render_settings(error="New passwords don't match.")
+
+    request.user.set_password(new)
+    request.user.save()
+    update_session_auth_hash(request, request.user)
+    return render_settings(success="Password updated successfully.")
+
+
+@login_required
+@require_POST
+def settings_tag_edit(request, tag_id):
+    if not _is_admin(request.user):
+        return redirect("/settings/#inventory")
+    tag = Tag.objects.filter(pk=tag_id).first()
+    if tag:
+        name = request.POST.get("name", "").strip()
+        color = request.POST.get("color", tag.color)
+        if name:
+            tag.name = name
+            tag.color = color
+            tag.save()
+    return redirect("/settings/#inventory")
+
+
+@login_required
+@require_POST
+def settings_functionality_edit(request, func_id):
+    if not _is_admin(request.user):
+        return redirect("/settings/#inventory")
+    func = LicenseFunctionality.objects.filter(pk=func_id).first()
+    if func:
+        name = request.POST.get("name", "").strip()
+        if name:
+            func.name = name
+            func.save()
+    return redirect("/settings/#inventory")
+
+
+@login_required
+@require_POST
+def settings_key_value(request):
+    """Save a simple key/value app setting."""
+    if not _is_admin(request.user):
+        return redirect("/settings/#tickets")
+    from django.contrib.sites.shortcuts import get_current_site
+    key = request.POST.get("setting_key", "").strip()
+    value = request.POST.get("setting_value", "").strip()
+    allowed = {"default_ticket_priority", "ticket_require_photo", "ticket_thanks_message"}
+    if key in allowed:
+        from django.core.cache import cache
+        cache.set(f"greg_setting_{key}", value, timeout=None)
+    if key.startswith("ticket_"):
+        return redirect("/settings/#tickets")
+    return redirect("/settings/")

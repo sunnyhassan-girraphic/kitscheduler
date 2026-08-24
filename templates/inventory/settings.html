@@ -3,156 +3,658 @@
 {% block title %}G.R.E.G - Settings{% endblock %}
 {% block brand_sub %}Settings{% endblock %}
 {% block header_actions %}
-  <a class="btn" href="/admin/" target="_blank">Open Admin</a>
+  {% if is_admin %}<a class="btn" href="/admin/" target="_blank">Django admin</a>{% endif %}
 {% endblock %}
 {% block extra_style %}
-  .settings-grid {
-    max-width: 1200px; margin: 24px auto; padding: 0 24px;
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start;
+  .settings-shell { display: flex; min-height: calc(100vh - 90px); }
+
+  /* Sidebar */
+  .settings-sidebar {
+    width: 210px; flex-shrink: 0; border-right: 1px solid var(--border);
+    padding: 20px 0; position: sticky; top: 0;
+    height: calc(100vh - 90px); overflow-y: auto;
   }
-  @media (max-width: 1000px) { .settings-grid { grid-template-columns: 1fr 1fr; } }
-  @media (max-width: 700px) { .settings-grid { grid-template-columns: 1fr; } }
-  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; }
-  .settings-card-head { padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border); font-weight: 600; font-size: 13px; border-radius: 8px 8px 0 0; }
-  .settings-row { display:flex; align-items:center; gap:12px; padding:10px 16px; border-top:1px solid var(--border); font-size:13px; }
-  .settings-row:last-child, .export-row:last-child { border-radius: 0 0 8px 8px; }
-  .settings-row label { flex:1; color:var(--text-dim); }
-  .color-input { width:36px; height:30px; padding:2px; border:1px solid var(--border-strong); border-radius:4px; background:var(--surface-2); cursor:pointer; }
-  .color-hex { width:80px; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--text); border-radius:4px; padding:5px 8px; font-size:12px; font-family:var(--mono); }
-  .export-row { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; font-size:13px; gap: 12px; }
-  .export-row p { margin:0; color:var(--text-dim); font-size:12px; }
-  .export-row .btn { flex-shrink: 0; white-space: nowrap; }
-  .bank-list { padding: 6px 16px; }
-  .bank-chip {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: var(--surface-2); border: 1px solid var(--border-strong);
-    border-radius: 999px; padding: 4px 6px 4px 10px; font-size: 12px; margin: 4px 4px 4px 0;
+  .sidebar-section-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-faint);
+    padding: 14px 18px 5px; display: block;
   }
+  .sidebar-section-label:first-child { padding-top: 0; }
+  .sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 10px 18px; }
+  .sidebar-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 18px; font-size: 13px; color: var(--text-dim);
+    cursor: pointer; border: none; background: none; width: 100%;
+    text-align: left; font-family: inherit; transition: color 0.12s, background 0.12s;
+    text-decoration: none;
+  }
+  .sidebar-item svg { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.55; }
+  .sidebar-item:hover { color: var(--text); background: var(--surface); }
+  .sidebar-item.active { color: var(--accent); background: var(--accent-glow); }
+  .sidebar-item.active svg { opacity: 1; }
+
+  /* Main */
+  .settings-main { flex: 1; padding: 28px 36px; max-width: 740px; min-width: 0; }
+  .settings-panel { display: none; }
+  .settings-panel.active { display: block; }
+  .settings-panel-title { font-size: 18px; font-weight: 700; margin-bottom: 3px; }
+  .settings-panel-sub { font-size: 13px; color: var(--text-dim); margin-bottom: 24px; }
+
+  /* Cards */
+  .s-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+  .s-card-head { padding: 13px 18px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .s-card-head-sub { font-size: 11px; font-weight: 400; color: var(--text-faint); }
+  .s-card-desc { padding: 12px 18px; font-size: 12px; color: var(--text-dim); line-height: 1.5; border-bottom: 1px solid var(--border); }
+  .s-row { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--border); font-size: 13px; }
+  .s-row:first-child { border-top: none; }
+  .s-row-label { flex: 1; color: var(--text-dim); }
+  .s-action-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-top: 1px solid var(--border); gap: 16px; }
+  .s-action-row:first-child { border-top: none; }
+  .s-action-text strong { display: block; font-size: 13px; margin-bottom: 3px; }
+  .s-action-text p { margin: 0; color: var(--text-dim); font-size: 12px; line-height: 1.5; }
+  .s-action-row .btn { flex-shrink: 0; }
+
+  /* Password form */
+  .s-field { margin-bottom: 14px; }
+  .s-field:last-child { margin-bottom: 0; }
+  .s-field label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
+  .s-field input { width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px; padding: 10px 12px; font-size: 14px; font-family: inherit; }
+  .s-field input:focus { outline: none; border-color: var(--accent); }
+  .s-form-body { padding: 18px; }
+  .s-form-footer { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+  /* Profile */
+  .profile-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--accent-glow); border: 1px solid var(--accent-deep); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 17px; font-weight: 700; color: var(--accent); flex-shrink: 0; }
+  .profile-name { font-size: 15px; font-weight: 600; }
+  .profile-meta { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+  /* Category colour grid */
+  .cat-colour-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; padding: 16px 18px; }
+  .cat-colour-cell { display: flex; flex-direction: column; gap: 8px; }
+  .cat-colour-preview {
+    height: 48px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cat-colour-preview:hover { transform: scale(1.03); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+  .cat-colour-preview span { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.85); text-shadow: 0 1px 3px rgba(0,0,0,0.5); letter-spacing: 0.03em; }
+  .cat-colour-hex { font-family: var(--mono); font-size: 11px; color: var(--text-faint); text-align: center; }
+  .cat-colour-label { font-size: 12px; color: var(--text-dim); text-align: center; }
+
+  /* Colour picker modal */
+  .cp-backdrop { display: none; position: fixed; inset: 0; z-index: 8999; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); }
+  .cp-backdrop.open { display: flex; align-items: center; justify-content: center; }
+  .cp-modal { background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 12px; padding: 20px; width: 260px; box-shadow: 0 16px 48px rgba(0,0,0,0.7); }
+  .cp-modal-title { font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+  .cp-canvas-wrap { position: relative; width: 100%; height: 160px; border-radius: 8px; overflow: hidden; margin-bottom: 12px; cursor: crosshair; }
+  #cp-canvas { display: block; width: 100%; height: 100%; }
+  .cp-cursor { position: absolute; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.4); transform: translate(-50%,-50%); pointer-events: none; }
+  .cp-hue { width: 100%; height: 10px; border-radius: 5px; margin-bottom: 12px; cursor: pointer; position: relative; background: linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
+  .cp-hue-thumb { position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.4); transform: translate(-50%,-50%); pointer-events: none; }
+  .cp-hex-row { display: flex; gap: 8px; align-items: center; }
+  .cp-hex-input { flex: 1; background: var(--surface); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px; padding: 7px 10px; font-size: 13px; font-family: var(--mono); }
+  .cp-hex-input:focus { outline: none; border-color: var(--accent); }
+  .cp-preview-swatch { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border-strong); flex-shrink: 0; }
+  .cp-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+
+  /* Toggle switch */
+  .toggle-switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle-track { position: absolute; inset: 0; background: var(--border-strong); border-radius: 11px; cursor: pointer; transition: background 0.2s; }
+  .toggle-track::after { content: ""; position: absolute; width: 16px; height: 16px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: transform 0.2s; }
+  .toggle-switch input:checked + .toggle-track { background: var(--accent); }
+  .toggle-switch input:checked + .toggle-track::after { transform: translateX(18px); }
+
+  /* Chip banks */
+  .bank-list { padding: 12px 18px; display: flex; flex-wrap: wrap; gap: 6px; min-height: 44px; }
+  .bank-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 999px; padding: 4px 8px 4px 10px; font-size: 12px; }
   .bank-chip form { margin: 0; display: inline-flex; }
-  .bank-chip .chip-del {
-    background: none; border: none; color: var(--text-faint); cursor: pointer;
-    font-size: 14px; line-height: 1; padding: 0 2px;
-  }
-  .bank-chip .chip-del:hover { color: var(--red); }
-  .tag-swatch {
-    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
-    border: 1px solid rgba(255,255,255,0.25); flex-shrink: 0;
-  }
-  .bank-add-row { display: flex; gap: 8px; padding: 10px 16px 14px; }
-  .bank-add-row input[type="text"] {
-    flex: 1; background: var(--surface-2); border: 1px solid var(--border-strong);
-    color: var(--text); border-radius: 6px; padding: 7px 10px; font-size: 13px; font-family: inherit;
-  }
-  .bank-add-row input[type="color"] { width: 36px; height: 32px; padding: 2px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface-2); cursor: pointer; }
+  .chip-del { background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+  .chip-del:hover { color: var(--red); }
+  .chip-edit { background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 0 2px; display: flex; align-items: center; }
+  .chip-edit:hover { color: var(--accent); }
+  .chip-edit svg { width: 11px; height: 11px; }
+  .tag-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0; }
+  .bank-add-row { display: flex; gap: 8px; padding: 10px 18px 14px; border-top: 1px solid var(--border); }
+  .bank-add-row input[type="text"] { flex: 1; background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px; padding: 7px 10px; font-size: 13px; font-family: inherit; }
+  .bank-add-row input:focus { outline: none; border-color: var(--accent); }
+  .tag-colour-btn { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border-strong); cursor: pointer; flex-shrink: 0; }
+
+  /* Copy row */
+  .copy-row { display: flex; gap: 8px; align-items: center; padding: 0 18px 14px; }
+  .copy-url { flex: 1; background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text-dim); border-radius: 6px; padding: 8px 12px; font-size: 12px; font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Coming soon */
+  .coming-soon { padding: 36px 20px; text-align: center; color: var(--text-faint); font-size: 13px; }
+  .coming-soon svg { width: 26px; height: 26px; margin: 0 auto 10px; display: block; opacity: 0.3; }
+
+  /* Edit inline form */
+  .edit-chip-form { display: none; flex: 1; gap: 6px; align-items: center; padding: 8px 18px; border-top: 1px solid var(--border); background: var(--surface-2); }
+  .edit-chip-form.open { display: flex; }
+  .edit-chip-form input[type="text"] { flex: 1; background: var(--surface); border: 1px solid var(--border-strong); color: var(--text); border-radius: 5px; padding: 5px 9px; font-size: 12px; font-family: inherit; }
+  .edit-chip-form input:focus { outline: none; border-color: var(--accent); }
 {% endblock %}
 {% block content %}
-<div class="settings-grid">
+<div class="settings-shell">
 
-  <div>
-    <form method="post">
-      {% csrf_token %}
-      <div class="settings-card">
-        <div class="settings-card-head">Category colours</div>
-        {% for value, label in categories %}
-        <div class="settings-row">
-          <label>{{ label }}</label>
-          <input class="color-input" type="color" name="colour_{{ value }}" value="{{ colours|get_item:value|default:'#EAB308' }}"
-                 oninput="document.getElementById('hex_{{ value }}').value=this.value">
-          <input class="color-hex" type="text" id="hex_{{ value }}" value="{{ colours|get_item:value|default:'#EAB308' }}"
-                 oninput="document.querySelector('[name=colour_{{ value }}]').value=this.value" maxlength="7">
+  <!-- Sidebar -->
+  <aside class="settings-sidebar">
+    <span class="sidebar-section-label">Personal</span>
+    <button class="sidebar-item active" data-panel="account">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      My account
+    </button>
+    <button class="sidebar-item" data-panel="appearance">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+      Appearance
+    </button>
+    <button class="sidebar-item" data-panel="notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      Notifications
+    </button>
+
+    {% if is_admin %}
+    <hr class="sidebar-divider">
+    <span class="sidebar-section-label">App</span>
+    <button class="sidebar-item" data-panel="schedule">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Schedule
+    </button>
+    <button class="sidebar-item" data-panel="inventory">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+      Inventory
+    </button>
+    <button class="sidebar-item" data-panel="tickets">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/></svg>
+      Tickets
+    </button>
+    <button class="sidebar-item" data-panel="data">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      Data
+    </button>
+    {% endif %}
+  </aside>
+
+  <!-- Main content -->
+  <main class="settings-main">
+
+    <!-- My account -->
+    <div class="settings-panel active" id="panel-account">
+      <div class="settings-panel-title">My account</div>
+      <p class="settings-panel-sub">Your profile and security settings.</p>
+
+      <div class="s-card">
+        <div class="s-card-head">Profile</div>
+        <div class="s-row">
+          <div class="profile-avatar">{{ user.first_name|slice:":1"|default:user.username|slice:":1"|upper }}</div>
+          <div style="flex:1;">
+            <div class="profile-name">{% if user.first_name or user.last_name %}{{ user.first_name }} {{ user.last_name }}{% else %}{{ user.username }}{% endif %}</div>
+            <div class="profile-meta">@{{ user.username }} &nbsp;·&nbsp; {% if is_admin %}<span style="color:var(--accent);font-weight:600;">Admin</span>{% else %}Operator{% endif %}</div>
+          </div>
         </div>
-        {% endfor %}
+        <div class="s-row" style="color:var(--text-faint);font-size:12px;font-style:italic;border-top:1px solid var(--border);">
+          Name and username can only be changed by an Admin via Django admin.
+        </div>
       </div>
-      <div style="text-align:right;">
-        <button class="btn btn-primary" type="submit">Save colours</button>
-      </div>
-    </form>
-  </div>
 
-  <div>
-    <div class="settings-card">
-      <div class="settings-card-head">Kit tags</div>
-      <p style="margin:8px 16px; font-size:12px; color:var(--text-dim);">
-        Tags you can attach to an asset within a kit (e.g. "MAIN" engine) so people know what to use it for.
-      </p>
-      <div class="bank-list">
-        {% for tag in tags %}
-        <span class="bank-chip">
-          <span class="tag-swatch" style="background-color: {{ tag.color|default:'#EAB308' }};"></span>
-          {{ tag.name }}
-          <form method="post" action="/settings/tags/{{ tag.id }}/delete/" onsubmit="return new Promise(r=>showConfirm({title:'Remove tag?',message:'Any kit assets using this tag will lose it.',okLabel:'Remove',cancelLabel:'Cancel'}).then(ok=>{if(ok)this.submit();})) && false;">
+      <div class="s-card">
+        <div class="s-card-head">Change password</div>
+        <form method="post" action="/settings/change-password/">
+          {% csrf_token %}
+          <div class="s-form-body">
+            {% if pw_error %}<p style="color:var(--red);font-size:13px;margin:0 0 14px;padding:10px 12px;background:rgba(248,81,73,0.1);border-radius:6px;border:1px solid rgba(248,81,73,0.3);">{{ pw_error }}</p>{% endif %}
+            {% if pw_success %}<p style="color:var(--green);font-size:13px;margin:0 0 14px;padding:10px 12px;background:rgba(63,185,80,0.1);border-radius:6px;border:1px solid rgba(63,185,80,0.3);">{{ pw_success }}</p>{% endif %}
+            <div class="s-field">
+              <label>Current password</label>
+              <input type="password" name="current_password" autocomplete="current-password" required>
+            </div>
+            <div class="s-field">
+              <label>New password</label>
+              <input type="password" name="new_password" autocomplete="new-password" required>
+            </div>
+            <div class="s-field">
+              <label>Confirm new password</label>
+              <input type="password" name="confirm_password" autocomplete="new-password" required>
+            </div>
+          </div>
+          <div class="s-form-footer">
+            <span style="font-size:12px;color:var(--text-faint);">You'll stay logged in after changing.</span>
+            <button class="btn btn-primary" type="submit">Update password</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Appearance -->
+    <div class="settings-panel" id="panel-appearance">
+      <div class="settings-panel-title">Appearance</div>
+      <p class="settings-panel-sub">Personalise how G.R.E.G looks for you.</p>
+      <div class="s-card">
+        <div class="s-card-head">Theme</div>
+        <div class="s-row">
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:500;">Light mode</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">Switch between dark and light theme. Your preference is saved locally.</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="light-mode-toggle">
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+      </div>
+      <div class="s-card">
+        <div class="s-card-head">Dashboard widgets <span class="s-card-head-sub">Coming soon</span></div>
+        <div class="coming-soon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Customisable dashboard widgets are coming in a future update.
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="settings-panel" id="panel-notifications">
+      <div class="settings-panel-title">Notifications</div>
+      <p class="settings-panel-sub">Control how G.R.E.G notifies you.</p>
+      <div class="s-card">
+        <div class="s-card-head">In-app notifications <span class="s-card-head-sub">Coming soon</span></div>
+        <div class="coming-soon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          Real-time notifications are planned for a future update.
+        </div>
+      </div>
+    </div>
+
+    {% if is_admin %}
+
+    <!-- Schedule -->
+    <div class="settings-panel" id="panel-schedule">
+      <div class="settings-panel-title">Schedule</div>
+      <p class="settings-panel-sub">Configure schedule appearance and behaviour.</p>
+      <div class="s-card">
+        <div class="s-card-head">Job category colours</div>
+        <form method="post" id="colours-form">
+          {% csrf_token %}
+          <div class="cat-colour-grid">
+            {% for value, label in categories %}
+            <div class="cat-colour-cell">
+              <div class="cat-colour-preview"
+                   id="catprev_{{ value }}"
+                   style="background:{{ colours|get_item:value|default:'#EAB308' }};"
+                   data-key="{{ value }}"
+                   onclick="openColourPicker(this, '{{ colours|get_item:value|default:'#EAB308' }}', null)">
+                <span>{{ label }}</span>
+              </div>
+              <div class="cat-colour-hex" id="cathex_{{ value }}">{{ colours|get_item:value|default:'#EAB308' }}</div>
+              <input type="hidden" name="colour_{{ value }}" id="catinput_{{ value }}" value="{{ colours|get_item:value|default:'#EAB308' }}">
+            </div>
+            {% endfor %}
+          </div>
+          <div class="s-form-footer" style="border-top:1px solid var(--border);">
+            <span style="font-size:12px;color:var(--text-faint);">Click a colour to change it.</span>
+            <button class="btn btn-primary" type="submit">Save colours</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Inventory -->
+    <div class="settings-panel" id="panel-inventory">
+      <div class="settings-panel-title">Inventory</div>
+      <p class="settings-panel-sub">Manage kit tags and license functionalities.</p>
+
+      <div class="s-card">
+        <div class="s-card-head">Kit tags</div>
+        <div class="s-card-desc">Tags you can attach to an asset within a kit to describe its role, e.g. "MAIN" engine.</div>
+        <div class="bank-list" id="tag-list">
+          {% for tag in tags %}
+          <span class="bank-chip" id="tag-chip-{{ tag.id }}">
+            <span class="tag-swatch" style="background-color:{{ tag.color|default:'#EAB308' }};"></span>
+            {{ tag.name }}
+            <button class="chip-edit" type="button" onclick="openTagEdit({{ tag.id }}, '{{ tag.name|escapejs }}', '{{ tag.color|default:'#EAB308' }}')" title="Edit">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <form method="post" action="/settings/tags/{{ tag.id }}/delete/" style="margin:0;display:inline-flex;" onsubmit="return new Promise(r=>showConfirm({title:'Remove tag?',message:'Any kit assets using this tag will lose it.',okLabel:'Remove',cancelLabel:'Cancel'}).then(ok=>{if(ok)this.submit();})) && false;">
+              {% csrf_token %}
+              <button class="chip-del" type="submit" title="Delete">&times;</button>
+            </form>
+          </span>
+          {% empty %}
+          <span style="font-size:12px;color:var(--text-faint);font-style:italic;" id="tag-empty">No tags yet.</span>
+          {% endfor %}
+        </div>
+        <!-- Edit form (shown inline below list) -->
+        <div class="edit-chip-form" id="tag-edit-form">
+          <div class="tag-colour-btn" id="tag-edit-colour-btn" style="background:#EAB308;" onclick="openColourPicker(this,'#EAB308','tag-edit-colour-val')"></div>
+          <input type="hidden" id="tag-edit-colour-val" value="#EAB308">
+          <input type="text" id="tag-edit-name" placeholder="Tag name">
+          <input type="hidden" id="tag-edit-id">
+          <button class="btn btn-primary" type="button" onclick="submitTagEdit()">Save</button>
+          <button class="btn" type="button" onclick="closeTagEdit()">Cancel</button>
+        </div>
+        <form method="post" action="/settings/tags/add/" class="bank-add-row">
+          {% csrf_token %}
+          <div class="tag-colour-btn" id="tag-new-colour-btn" style="background:#EAB308;" onclick="openColourPicker(this,'#EAB308','tag-new-colour-val')"></div>
+          <input type="hidden" name="color" id="tag-new-colour-val" value="#EAB308">
+          <input type="text" name="name" placeholder="New tag name, e.g. MAIN" maxlength="40" required>
+          <button class="btn" type="submit">Add</button>
+        </form>
+      </div>
+
+      <div class="s-card">
+        <div class="s-card-head">License functionalities</div>
+        <div class="s-card-desc">Tickable features shown when editing a license, e.g. SDI Out, Unreal Render Blade, Viz.</div>
+        <div class="bank-list">
+          {% for f in functionalities %}
+          <span class="bank-chip" id="func-chip-{{ f.id }}">
+            {{ f.name }}
+            <button class="chip-edit" type="button" onclick="openFuncEdit({{ f.id }}, '{{ f.name|escapejs }}')" title="Edit">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <form method="post" action="/settings/functionalities/{{ f.id }}/delete/" style="margin:0;display:inline-flex;" onsubmit="return new Promise(r=>showConfirm({title:'Remove functionality?',message:'This will be unticked from any licenses that had it.',okLabel:'Remove',cancelLabel:'Cancel'}).then(ok=>{if(ok)this.submit();})) && false;">
+              {% csrf_token %}
+              <button class="chip-del" type="submit" title="Delete">&times;</button>
+            </form>
+          </span>
+          {% empty %}
+          <span style="font-size:12px;color:var(--text-faint);font-style:italic;">No functionalities yet.</span>
+          {% endfor %}
+        </div>
+        <div class="edit-chip-form" id="func-edit-form">
+          <input type="text" id="func-edit-name" placeholder="Functionality name">
+          <input type="hidden" id="func-edit-id">
+          <button class="btn btn-primary" type="button" onclick="submitFuncEdit()">Save</button>
+          <button class="btn" type="button" onclick="closeFuncEdit()">Cancel</button>
+        </div>
+        <form method="post" action="/settings/functionalities/add/" class="bank-add-row">
+          {% csrf_token %}
+          <input type="text" name="name" placeholder="New functionality, e.g. Viz" maxlength="80" required>
+          <button class="btn" type="submit">Add</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tickets -->
+    <div class="settings-panel" id="panel-tickets">
+      <div class="settings-panel-title">Tickets</div>
+      <p class="settings-panel-sub">Configure fault reporting defaults and behaviour.</p>
+
+      <div class="s-card">
+        <div class="s-card-head">Fault report form</div>
+        <div class="s-action-row">
+          <div class="s-action-text">
+            <strong>Share link</strong>
+            <p>Anyone with this link can submit a fault report. No login required.</p>
+          </div>
+        </div>
+        <div class="copy-row">
+          <div class="copy-url" id="report-url">{{ request.scheme }}://{{ request.get_host }}/report-issue/</div>
+          <button class="btn" onclick="copyReportUrl(this)">Copy</button>
+          <a class="btn" href="/report-issue/" target="_blank">Open</a>
+        </div>
+      </div>
+
+      <div class="s-card">
+        <div class="s-card-head">Submission defaults</div>
+        <div class="s-row">
+          <span class="s-row-label">Default priority</span>
+          <form method="post" action="/settings/set/" id="default-priority-form" style="display:flex;align-items:center;gap:8px;">
             {% csrf_token %}
-            <button class="chip-del" type="submit" title="Remove tag">&times;</button>
+            <input type="hidden" name="setting_key" value="default_ticket_priority">
+            <select name="setting_value" onchange="this.form.submit()" style="background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;">
+              <option value="LOW"    {% if ticket_defaults.default_priority == 'LOW' %}selected{% endif %}>Low</option>
+              <option value="MEDIUM" {% if ticket_defaults.default_priority == 'MEDIUM' or not ticket_defaults.default_priority %}selected{% endif %}>Medium</option>
+              <option value="HIGH"   {% if ticket_defaults.default_priority == 'HIGH' %}selected{% endif %}>High</option>
+              <option value="URGENT" {% if ticket_defaults.default_priority == 'URGENT' %}selected{% endif %}>Urgent</option>
+            </select>
           </form>
-        </span>
-        {% empty %}
-        <span style="font-size:12px; color:var(--text-faint); font-style:italic;">No tags yet.</span>
-        {% endfor %}
-      </div>
-      <form method="post" action="/settings/tags/add/" class="bank-add-row">
-        {% csrf_token %}
-        <input type="text" name="name" placeholder="New tag, e.g. MAIN" maxlength="40" required>
-        <input type="color" name="color" value="#EAB308" title="Optional color">
-        <button class="btn" type="submit">Add</button>
-      </form>
-    </div>
-
-    <div class="settings-card">
-      <div class="settings-card-head">License functionalities</div>
-      <p style="margin:8px 16px; font-size:12px; color:var(--text-dim);">
-        The bank of tickable functionalities available when editing a license (e.g. SDI Out, Unreal Render Blade, Viz).
-      </p>
-      <div class="bank-list">
-        {% for f in functionalities %}
-        <span class="bank-chip">
-          {{ f.name }}
-          <form method="post" action="/settings/functionalities/{{ f.id }}/delete/" onsubmit="return new Promise(r=>showConfirm({title:'Remove functionality?',message:'This will be unticked from any licenses that had it.',okLabel:'Remove',cancelLabel:'Cancel'}).then(ok=>{if(ok)this.submit();})) && false;">
+        </div>
+        <div class="s-row" style="border-top:1px solid var(--border);">
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:500;">Require photo</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">Force submitters to attach a photo or screenshot.</div>
+          </div>
+          <form method="post" action="/settings/set/" style="display:flex;">
             {% csrf_token %}
-            <button class="chip-del" type="submit" title="Remove functionality">&times;</button>
+            <input type="hidden" name="setting_key" value="ticket_require_photo">
+            <label class="toggle-switch">
+              <input type="checkbox" name="setting_value" value="1" {% if ticket_defaults.require_photo %}checked{% endif %} onchange="this.form.submit()">
+              <div class="toggle-track"></div>
+            </label>
           </form>
-        </span>
-        {% empty %}
-        <span style="font-size:12px; color:var(--text-faint); font-style:italic;">No functionalities yet.</span>
-        {% endfor %}
-      </div>
-      <form method="post" action="/settings/functionalities/add/" class="bank-add-row">
-        {% csrf_token %}
-        <input type="text" name="name" placeholder="New functionality, e.g. Viz" maxlength="80" required>
-        <button class="btn" type="submit">Add</button>
-      </form>
-    </div>
-  </div>
-
-  <div>
-    <div class="settings-card">
-      <div class="settings-card-head">Ticketing</div>
-      <div class="export-row">
-        <div>
-          <strong>Public fault report form</strong>
-          <p>Share this link with anyone who needs to report broken or faulty equipment. No login required.</p>
         </div>
-        <a class="btn" href="/report-issue/" target="_blank">Open form</a>
-      </div>
-      <div class="export-row" style="border-top:1px solid var(--border);">
-        <div>
-          <strong>Manage tickets</strong>
-          <p>View and update fault reports (admin only).</p>
+        <div class="s-row" style="border-top:1px solid var(--border);">
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:500;">Submission confirmation message</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">Shown on the form after a successful submission.</div>
+          </div>
         </div>
-        <a class="btn" href="/tickets/">View tickets</a>
+        <form method="post" action="/settings/set/" style="padding:0 18px 6px;display:flex;gap:8px;">
+          {% csrf_token %}
+          <input type="hidden" name="setting_key" value="ticket_thanks_message">
+          <input type="text" name="setting_value" value="{{ ticket_defaults.thanks_message|default:'Thanks {name} - your report {ref} has been logged and the team will follow up.' }}"
+                 style="flex:1;background:var(--surface-2);border:1px solid var(--border-strong);color:var(--text);border-radius:6px;padding:8px 12px;font-size:13px;font-family:inherit;">
+          <button class="btn" type="submit">Save</button>
+        </form>
+        <div style="padding:0 18px 16px;font-size:11px;color:var(--text-faint);line-height:1.7;">
+          Available placeholders:
+          <span style="font-family:var(--mono);background:var(--surface);border:1px solid var(--border-strong);border-radius:3px;padding:1px 5px;">{name}</span> submitter's name &nbsp;
+          <span style="font-family:var(--mono);background:var(--surface);border:1px solid var(--border-strong);border-radius:3px;padding:1px 5px;">{ref}</span> ticket reference number
+        </div>
       </div>
     </div>
 
-    <div class="settings-card">
-      <div class="settings-card-head">Export</div>
-      <div class="export-row">
-        <div>
-          <strong>Download all data as CSV</strong>
-          <p>Assets, kits, and jobs exported as a zip of CSVs.</p>
+    <!-- Data -->
+    <div class="settings-panel" id="panel-data">
+      <div class="settings-panel-title">Data</div>
+      <p class="settings-panel-sub">Export, backup, and manage your G.R.E.G data.</p>
+
+      <div class="s-card">
+        <div class="s-card-head">Export</div>
+        <div class="s-action-row">
+          <div class="s-action-text">
+            <strong>Export all data as CSV</strong>
+            <p>Assets, kits, and jobs exported as a zip of CSVs. Good for backups or spreadsheet analysis.</p>
+          </div>
+          <a class="btn" href="/settings/export/">Download zip</a>
         </div>
-        <a class="btn" href="/settings/export/">Download zip</a>
+      </div>
+
+      <div class="s-card">
+        <div class="s-card-head">Import <span class="s-card-head-sub">Coming soon</span></div>
+        <div class="coming-soon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          CSV import for bulk asset creation is coming in a future update.
+        </div>
       </div>
     </div>
-  </div>
 
+    {% endif %}
+  </main>
 </div>
+
+<!-- Colour picker modal -->
+<div class="cp-backdrop" id="cp-backdrop">
+  <div class="cp-modal" id="cp-modal">
+    <div class="cp-modal-title" id="cp-title">Pick a colour</div>
+    <div class="cp-canvas-wrap" id="cp-wrap">
+      <canvas id="cp-canvas"></canvas>
+      <div class="cp-cursor" id="cp-cursor"></div>
+    </div>
+    <div class="cp-hue" id="cp-hue">
+      <div class="cp-hue-thumb" id="cp-hue-thumb"></div>
+    </div>
+    <div class="cp-hex-row">
+      <input class="cp-hex-input" type="text" id="cp-hex" maxlength="7" placeholder="#EAB308">
+      <div class="cp-preview-swatch" id="cp-preview"></div>
+    </div>
+    <div class="cp-actions">
+      <button class="btn" type="button" id="cp-cancel">Cancel</button>
+      <button class="btn btn-primary" type="button" id="cp-apply">Apply</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Sidebar nav ─────────────────────────────────────────────────────────────
+(function() {
+  const items  = document.querySelectorAll(".sidebar-item[data-panel]");
+  const panels = document.querySelectorAll(".settings-panel");
+  function activate(panelId) {
+    items.forEach(i => i.classList.toggle("active", i.dataset.panel === panelId));
+    panels.forEach(p => p.classList.toggle("active", p.id === "panel-" + panelId));
+    history.replaceState(null, "", "#" + panelId);
+  }
+  items.forEach(item => item.addEventListener("click", () => activate(item.dataset.panel)));
+  const hash = location.hash.replace("#", "");
+  if (hash && document.getElementById("panel-" + hash)) activate(hash);
+  {% if pw_error or pw_success %}activate("account");{% endif %}
+})();
+
+// ── Light mode toggle ───────────────────────────────────────────────────────
+(function() {
+  const toggle = document.getElementById("light-mode-toggle");
+  const LIGHT_KEY = "greg_light_mode";
+  function applyTheme(light) {
+    document.documentElement.classList.toggle("light-mode", light);
+    if (toggle) toggle.checked = light;
+  }
+  applyTheme(localStorage.getItem(LIGHT_KEY) === "1");
+  if (toggle) toggle.addEventListener("change", () => {
+    const on = toggle.checked;
+    localStorage.setItem(LIGHT_KEY, on ? "1" : "0");
+    applyTheme(on);
+  });
+})();
+
+// ── Copy report URL ─────────────────────────────────────────────────────────
+function copyReportUrl(btn) {
+  navigator.clipboard.writeText(document.getElementById("report-url").textContent.trim()).then(() => {
+    const orig = btn.textContent; btn.textContent = "Copied!";
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+
+// ── Colour picker ───────────────────────────────────────────────────────────
+(function() {
+  const backdrop = document.getElementById("cp-backdrop");
+  const canvas   = document.getElementById("cp-canvas");
+  const ctx      = canvas.getContext("2d");
+  const cursor   = document.getElementById("cp-cursor");
+  const hueBar   = document.getElementById("cp-hue");
+  const hueThumb = document.getElementById("cp-hue-thumb");
+  const hexInput = document.getElementById("cp-hex");
+  const preview  = document.getElementById("cp-preview");
+  const applyBtn = document.getElementById("cp-apply");
+  const cancelBtn= document.getElementById("cp-cancel");
+  let currentHue = 45, cursorX = 0.8, cursorY = 0.2;
+  let onApply = null;
+
+  function drawCanvas() {
+    const w = canvas.width  = canvas.offsetWidth;
+    const h = canvas.height = canvas.offsetHeight;
+    const gH = ctx.createLinearGradient(0,0,w,0);
+    gH.addColorStop(0, "white"); gH.addColorStop(1, `hsl(${currentHue},100%,50%)`);
+    ctx.fillStyle = gH; ctx.fillRect(0,0,w,h);
+    const gV = ctx.createLinearGradient(0,0,0,h);
+    gV.addColorStop(0,"rgba(0,0,0,0)"); gV.addColorStop(1,"rgba(0,0,0,1)");
+    ctx.fillStyle = gV; ctx.fillRect(0,0,w,h);
+    cursor.style.left = (cursorX*w)+"px"; cursor.style.top = (cursorY*h)+"px";
+    updatePreview();
+  }
+  function sampleColour() {
+    const w=canvas.width,h=canvas.height;
+    const px=Math.min(Math.max(Math.round(cursorX*w),0),w-1);
+    const py=Math.min(Math.max(Math.round(cursorY*h),0),h-1);
+    const d=ctx.getImageData(px,py,1,1).data;
+    return `#${d[0].toString(16).padStart(2,"0")}${d[1].toString(16).padStart(2,"0")}${d[2].toString(16).padStart(2,"0")}`;
+  }
+  function updatePreview() { const h=sampleColour(); preview.style.background=h; hexInput.value=h.toUpperCase(); }
+  function setHue(h) { currentHue=Math.max(0,Math.min(360,h)); hueThumb.style.left=((currentHue/360)*100)+"%"; drawCanvas(); }
+
+  let draggingCanvas=false, draggingHue=false;
+  canvas.addEventListener("mousedown",e=>{draggingCanvas=true;moveCursor(e);});
+  document.addEventListener("mousemove",e=>{if(draggingCanvas)moveCursor(e);if(draggingHue)moveHue(e);});
+  document.addEventListener("mouseup",()=>{draggingCanvas=false;draggingHue=false;});
+  function moveCursor(e){const r=canvas.getBoundingClientRect();cursorX=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));cursorY=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));drawCanvas();}
+  hueBar.addEventListener("mousedown",e=>{draggingHue=true;moveHue(e);});
+  function moveHue(e){const r=hueBar.getBoundingClientRect();setHue(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*360);}
+
+  hexInput.addEventListener("input",()=>{ if(/^#[0-9A-Fa-f]{6}$/.test(hexInput.value)) preview.style.background=hexInput.value; });
+
+  applyBtn.addEventListener("click",()=>{
+    const hex=/^#[0-9A-Fa-f]{6}$/.test(hexInput.value)?hexInput.value.toUpperCase():sampleColour().toUpperCase();
+    if(onApply)onApply(hex);
+    backdrop.classList.remove("open");
+  });
+  cancelBtn.addEventListener("click",()=>backdrop.classList.remove("open"));
+  backdrop.addEventListener("mousedown",e=>{ if(e.target===backdrop) backdrop.classList.remove("open"); });
+
+  window.openColourPicker = function(triggerEl, currentHex, hiddenId, onApplyFn) {
+    backdrop.classList.add("open");
+    hexInput.value=(currentHex||"#EAB308").toUpperCase();
+    preview.style.background=currentHex||"#EAB308";
+    // Parse hex to hue
+    const hex=currentHex||"#EAB308";
+    const r2=parseInt(hex.slice(1,3),16)/255,g2=parseInt(hex.slice(3,5),16)/255,b2=parseInt(hex.slice(5,7),16)/255;
+    const max=Math.max(r2,g2,b2),min=Math.min(r2,g2,b2),d=max-min;
+    if(d>0){let h=0;if(max===r2)h=((g2-b2)/d)%6;else if(max===g2)h=(b2-r2)/d+2;else h=(r2-g2)/d+4;currentHue=((h*60)+360)%360;}
+    hueThumb.style.left=((currentHue/360)*100)+"%"; cursorX=0.8; cursorY=0.2;
+    setTimeout(drawCanvas,10);
+
+    onApply = onApplyFn || function(hex) {
+      if(triggerEl){ triggerEl.style.background=hex; }
+      if(hiddenId){ document.getElementById(hiddenId).value=hex; }
+      // category colour update
+      const key=triggerEl?.dataset?.key;
+      if(key){
+        const disp=document.getElementById("cathex_"+key);
+        const inp=document.getElementById("catinput_"+key);
+        if(disp)disp.textContent=hex;
+        if(inp)inp.value=hex;
+      }
+    };
+  };
+})();
+
+// ── Tag edit ────────────────────────────────────────────────────────────────
+function openTagEdit(id, name, color) {
+  const form = document.getElementById("tag-edit-form");
+  document.getElementById("tag-edit-id").value   = id;
+  document.getElementById("tag-edit-name").value = name;
+  document.getElementById("tag-edit-colour-val").value = color;
+  document.getElementById("tag-edit-colour-btn").style.background = color;
+  form.classList.add("open");
+  document.getElementById("tag-edit-name").focus();
+}
+function closeTagEdit() { document.getElementById("tag-edit-form").classList.remove("open"); }
+function submitTagEdit() {
+  const id    = document.getElementById("tag-edit-id").value;
+  const name  = document.getElementById("tag-edit-name").value.trim();
+  const color = document.getElementById("tag-edit-colour-val").value;
+  if (!name) return;
+  const form = document.createElement("form");
+  form.method = "post"; form.action = `/settings/tags/${id}/edit/`;
+  form.innerHTML = `{% csrf_token %}<input name="name" value="${name}"><input name="color" value="${color}">`;
+  document.body.appendChild(form); form.submit();
+}
+
+// ── Func edit ────────────────────────────────────────────────────────────────
+function openFuncEdit(id, name) {
+  const form = document.getElementById("func-edit-form");
+  document.getElementById("func-edit-id").value   = id;
+  document.getElementById("func-edit-name").value = name;
+  form.classList.add("open");
+  document.getElementById("func-edit-name").focus();
+}
+function closeFuncEdit() { document.getElementById("func-edit-form").classList.remove("open"); }
+function submitFuncEdit() {
+  const id   = document.getElementById("func-edit-id").value;
+  const name = document.getElementById("func-edit-name").value.trim();
+  if (!name) return;
+  const form = document.createElement("form");
+  form.method = "post"; form.action = `/settings/functionalities/${id}/edit/`;
+  form.innerHTML = `{% csrf_token %}<input name="name" value="${name}">`;
+  document.body.appendChild(form); form.submit();
+}
+</script>
 {% endblock %}

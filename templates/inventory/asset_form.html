@@ -170,7 +170,7 @@
           </div>
           <div class="form-field">
             <label for="f-serial">Serial</label>
-            <input type="text" id="f-serial" name="serial" value="{{ serial|default:'' }}">
+            <input type="text" id="f-serial" name="serial" value="{{ serial|default:'' }}" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
           </div>
           <div class="form-field">
             <label for="f-qty">Quantity</label>

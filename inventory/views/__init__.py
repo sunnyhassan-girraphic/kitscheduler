@@ -72,10 +72,14 @@ from .settings import (
     settings_view,
     settings_tag_add,
     settings_tag_delete,
+    settings_tag_edit,
     settings_functionality_add,
     settings_functionality_delete,
+    settings_functionality_edit,
+    settings_key_value,
     export_csv_view,
     logout_view,
+    change_password_view,
 )
 
 from .tickets import (
