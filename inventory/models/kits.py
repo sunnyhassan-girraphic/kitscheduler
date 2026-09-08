@@ -162,8 +162,12 @@ class Kit(models.Model):
             "do not need to be added here separately."
         ),
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+    archived_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Set automatically when the kit status is changed to Archived.",
+    )
 
     class Meta:
         ordering = ["name"]
@@ -214,10 +218,14 @@ class KitAssetTag(models.Model):
             "assets (Engines, Components, etc.) are always 1."
         ),
     )
+    sort_order = models.PositiveIntegerField(
+        default=0,
+        help_text="Manual display order within this kit. Lower values appear first.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["kit", "created_at"]
+        ordering = ["kit", "sort_order", "created_at"]
         constraints = [
             models.UniqueConstraint(fields=["kit", "asset"], name="unique_asset_per_kit"),
         ]

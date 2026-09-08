@@ -3,31 +3,45 @@
 {% block title %}G.R.E.G - Kits{% endblock %}
 {% block brand_sub %}{{ total_kits }} kit{{ total_kits|pluralize }}{% endblock %}
 {% block header_actions %}
+  <a class="btn" href="/kits/archive/">Archive</a>
   <a class="btn btn-primary" href="/kits/new/">+ New kit</a>
 {% endblock %}
 {% block extra_style %}
   .kit-grid {
-    column-count: 2; column-gap: 16px;
+    display: flex;
+    gap: 16px;
     padding: 16px 24px;
+    align-items: flex-start;
   }
-  @media (max-width: 900px) { .kit-grid { column-count: 1; } }
+  .kit-col {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  @media (max-width: 900px) { .kit-grid { flex-direction: column; } .kit-col { width: 100%; } }
   .kit-card {
-    break-inside: avoid;
     border: 1px solid var(--border); border-radius: 8px;
-    margin: 0 0 16px 0; background: var(--surface);
+    background: var(--surface);
     display: flex; flex-direction: column;
     min-height: 52px; overflow: visible;
   }
   .kit-head {
-    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
     background: var(--surface-2); border-bottom: 1px solid var(--border);
     border-radius: 8px 8px 0 0; position: relative; overflow: visible;
+    height: 44px; box-sizing: border-box;
   }
-  .kit-head .name { font-weight: 600; font-size: 14px; }
+  .kit-head .name { font-weight: 600; font-size: 14px; flex-shrink: 0; }
   .kit-head .name a { color: var(--text); text-decoration: none; }
   .kit-head .name a:hover { color: var(--accent); }
-  .kit-head .meta { font-size: 12px; color: var(--text-dim); font-family: var(--mono); }
-  .kit-head .meta-spacer { flex: 1; min-width: 4px; }
+  .kit-head .meta { visibility: hidden; flex: 1; min-width: 0; overflow: hidden; }
+  .kit-head .meta-spacer { display: none; }
+  /* Summary strip - sits between header and member rows */
+  .kit-summary-strip {
+    padding: 4px 14px;
+    font-size: 11px; color: var(--text-faint); font-family: var(--mono);
+    background: var(--surface-2); border-bottom: 1px solid var(--border);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 
   /* Job badge — name only, expands on hover to show dates */
   .kit-job-badge {
@@ -89,7 +103,7 @@
   .kit-card-btn.pin-btn.pinned { color: var(--accent); }
   .kit-card-btn svg { width: 15px; height: 15px; }
   .kit-card-btn.close-btn:hover { color: var(--red); }
-  .kit-card.pinned { order: -1; border-color: var(--accent-deep); }
+  .kit-card.pinned { border-color: var(--accent-deep); }
 
   /* Status pill */
   .kit-status-pill {
@@ -143,10 +157,8 @@
 <div class="filter-bar">
   <div class="filter-bar-left">
     <a href="?tab=all{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'all' %}btn-active{% endif %}">All kits</a>
-    <a href="?tab=engines{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'engines' %}btn-active{% endif %}">Has Engine</a>
-    <a href="?tab=licenses{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'licenses' %}btn-active{% endif %}">Has License</a>
-    <a href="?tab=booked{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'booked' %}btn-active{% endif %}">Booked today</a>
-    <a href="?tab=empty{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'empty' %}btn-active{% endif %}">Empty</a>
+    <a href="?tab=booked{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'booked' %}btn-active{% endif %}">Booked</a>
+    <a href="?tab=available{% if query %}&q={{ query }}{% endif %}" class="btn {% if tab == 'available' %}btn-active{% endif %}">Available</a>
   </div>
   <form method="get" class="filter-bar-right">
     <input type="hidden" name="tab" value="{{ tab }}">
@@ -156,7 +168,7 @@
   </form>
 </div>
 {% if rows %}
-<div class="kit-grid">
+<div class="kit-grid" id="kitGrid">
   {% for row in rows %}
   <div class="kit-card" data-kit-id="{{ row.kit.id }}">
     <div class="kit-head">
@@ -167,14 +179,13 @@
            style="--job-color:{{ row.job_color }};"
            title="{{ row.current_booking.job.name }} - {{ row.current_booking.start_date|date:'j M Y' }} to {{ row.current_booking.end_date|date:'j M Y' }}">
           <span class="kit-job-badge-name">{{ row.current_booking.job.name }}</span>
-          <span class="kit-job-badge-dates">{{ row.current_booking.start_date|date:"j M Y" }} to {{ row.current_booking.end_date|date:"j M Y" }} ↗</span>
+          <span class="kit-job-badge-dates">{{ row.current_booking.start_date|date:"j M Y" }} to {{ row.current_booking.end_date|date:"j M Y" }} &#8599;</span>
         </a>
       {% endif %}
       {% if row.kit.status == "FAULTY" and not row.current_booking %}
         <span class="badge badge-needs_repair">Faulty</span>
       {% endif %}
       <span class="meta">{% kit_member_summary row.members %}</span>
-      <div class="meta-spacer"></div>
       <div class="kit-status-pill kit-status-{{ row.kit.status|lower }}"
            data-kit-id="{{ row.kit.id }}"
            data-status="{{ row.kit.status }}"
@@ -198,6 +209,7 @@
         </button>
       </div>
     </div>
+    <div class="kit-summary-strip">{% kit_member_summary row.members %}</div>
     {% for member in row.members %}
       {% if member.asset_type == "ENGINE" or member.asset_type == "IO_DEVICE" %}
         {% with comp_count=member.nested_assets.count wrap_id=row.kit.id|stringformat:"s"|add:"-"|add:member.asset_id %}
@@ -262,6 +274,28 @@
 </div>
 {% endif %}
 <script>
+// ── Two-column layout: distribute cards into columns once on load ─────────────
+(function() {
+  const grid  = document.getElementById("kitGrid");
+  if (!grid) return;
+  const cards = Array.from(grid.querySelectorAll(":scope > .kit-card"));
+  if (!cards.length) return;
+
+  const colA = document.createElement("div");
+  const colB = document.createElement("div");
+  colA.className = colB.className = "kit-col";
+
+  // Distribute: odd-indexed cards to left, even to right (0-based)
+  cards.forEach((card, i) => {
+    grid.removeChild(card);
+    (i % 2 === 0 ? colA : colB).appendChild(card);
+  });
+
+  grid.appendChild(colA);
+  grid.appendChild(colB);
+})();
+</script>
+<script>
 function toggleNested(wrapId, headerEl) {
   const wrap = document.getElementById("nested-" + wrapId);
   if (!wrap) return;
@@ -294,26 +328,20 @@ function toggleNested(wrapId, headerEl) {
   });
 
   window.togglePin = function(btn, kitId) {
+    const card = btn.closest(".kit-card");
     if (pinned.has(kitId)) {
       pinned.delete(kitId);
-      btn.closest(".kit-card").classList.remove("pinned");
+      card.classList.remove("pinned");
       btn.classList.remove("pinned");
     } else {
       pinned.add(kitId);
-      btn.closest(".kit-card").classList.add("pinned");
+      card.classList.add("pinned");
       btn.classList.add("pinned");
+      // Move to top of its column
+      const col = card.closest(".kit-col");
+      if (col) col.prepend(card);
     }
     savePinned(pinned);
-    // Re-sort: pinned cards first
-    const grid = document.querySelector(".kit-grid");
-    if (!grid) return;
-    const cards = Array.from(grid.querySelectorAll(".kit-card"));
-    cards.sort((a, b) => {
-      const ap = a.classList.contains("pinned") ? 0 : 1;
-      const bp = b.classList.contains("pinned") ? 0 : 1;
-      return ap - bp;
-    });
-    cards.forEach(c => grid.appendChild(c));
   };
 
   // ── Kit status custom menu ────────────────────────────────────────────────────
@@ -451,6 +479,8 @@ function toggleNested(wrapId, headerEl) {
     }
   };
 })();
+
+
 </script>
 
 {% endblock %}

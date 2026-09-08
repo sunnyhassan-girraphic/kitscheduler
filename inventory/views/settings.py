@@ -9,7 +9,9 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
-from ..models import Asset, CategoryColour, Job, Kit, LicenseFunctionality, Tag
+import json
+
+from ..models import Asset, CategoryColour, DashboardWidget, Job, Kit, LicenseFunctionality, Tag
 
 
 def _is_admin(user):
@@ -42,14 +44,21 @@ def settings_view(request):
         "thanks_message": cache.get("greg_setting_ticket_thanks_message", ""),
     }
 
+    widget_qs   = DashboardWidget.for_user(request.user)
+    widget_meta = [
+        {"id": w.widget_id, "label": w.get_widget_id_display(), "visible": w.visible, "position": w.position, "column": w.column}
+        for w in widget_qs
+    ]
+
     return render(request, "inventory/settings.html", {
-        "categories": categories,
-        "is_admin": is_admin,
-        "ticket_defaults": ticket_defaults,
-        "colours": colours,
-        "tags": Tag.objects.all(),
-        "functionalities": LicenseFunctionality.objects.all(),
-        "active_nav": "settings",
+        "categories":       categories,
+        "is_admin":         is_admin,
+        "ticket_defaults":  ticket_defaults,
+        "colours":          colours,
+        "tags":             Tag.objects.all(),
+        "functionalities":  LicenseFunctionality.objects.all(),
+        "widget_meta_json": json.dumps(widget_meta),
+        "active_nav":       "settings",
     })
 
 

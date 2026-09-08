@@ -13,7 +13,7 @@ re-exported here so existing code (`from inventory.models import Asset`,
     vans.py      -> Vehicle, VanLog, VAN_CHECKLIST_ITEMS
 """
 
-from .staff import StaffMember
+from .staff import StaffMember, DashboardWidget
 from .assets import Asset, Tag, LicenseFunctionality, AssetHistory
 from .kits import Kit, KitAssetTag, KitHistory
 from .jobs import Job, CategoryColour, KitBooking, AssetBooking, StaffBooking, JobHistory, JOB_HISTORY_SCALAR_FIELDS
@@ -23,6 +23,7 @@ from .stocktake import StockTakeSession, StockTakeEntry
 
 __all__ = [
     "StaffMember",
+    "DashboardWidget",
     "Asset",
     "Tag",
     "LicenseFunctionality",

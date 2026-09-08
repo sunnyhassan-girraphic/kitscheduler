@@ -18,7 +18,7 @@ def kit_list_view(request):
 
     kits = Kit.objects.prefetch_related(
         "assets__nested_assets", "bookings__job", "kit_asset_tags__tag"
-    )
+    ).exclude(status=Kit.Status.ARCHIVED)
     if query:
         kits = kits.filter(name__icontains=query)
     kits = list(kits.order_by("name"))
@@ -29,8 +29,8 @@ def kit_list_view(request):
         kits = [k for k in kits if k.assets.filter(asset_type=Asset.AssetType.LICENSE).exists()]
     elif tab == "booked":
         kits = [k for k in kits if any(b.start_date <= today <= b.end_date for b in k.bookings.all())]
-    elif tab == "empty":
-        kits = [k for k in kits if not k.assets.exists()]
+    elif tab == "available":
+        kits = [k for k in kits if not any(b.start_date <= today <= b.end_date for b in k.bookings.all())]
 
     rows = []
     for kit in kits:
@@ -259,7 +259,7 @@ def _apply_kit_tag_selection(kit, selected_ids, tag_by_asset_id, qty_by_asset_id
         existing[asset_id].delete()
 
     after_qty = {}
-    for asset_id in selected_ids:
+    for position, asset_id in enumerate(selected_ids):
         asset = assets_by_id.get(asset_id)
         is_engine = asset and asset.asset_type == Asset.AssetType.ENGINE
         tag_id = tag_by_asset_id.get(asset_id) if is_engine else None
@@ -289,12 +289,16 @@ def _apply_kit_tag_selection(kit, selected_ids, tag_by_asset_id, qty_by_asset_id
             if row.quantity != quantity:
                 row.quantity = quantity
                 changed.append("quantity")
+            if row.sort_order != position:
+                row.sort_order = position
+                changed.append("sort_order")
             if changed:
                 row.save(update_fields=changed)
         else:
             KitAssetTag.objects.create(
                 kit=kit, asset_id=asset_id,
                 tag_id=tag_id, tag_2_id=tag_2_id, quantity=quantity,
+                sort_order=position,
             )
 
     return before_ids, selected_ids, before_qty, after_qty
@@ -480,6 +484,11 @@ def kit_edit_view(request, kit_id):
         kit.name = name
         kit.notes = notes
         kit.status = new_status
+        import django.utils.timezone as _tz
+        if new_status == Kit.Status.ARCHIVED and before_status != Kit.Status.ARCHIVED:
+            kit.archived_at = _tz.now()
+        elif new_status != Kit.Status.ARCHIVED and kit.archived_at:
+            kit.archived_at = None
         kit.save()
 
         changed_by = StaffMember.for_user(request.user)
@@ -543,7 +552,7 @@ def kit_edit_view(request, kit_id):
     # Build current booking context for the form
     current_booking = kit.bookings.select_related("job").order_by("start_date").first()
 
-    kit_asset_tags = list(kit.kit_asset_tags.order_by("created_at"))
+    kit_asset_tags = list(kit.kit_asset_tags.order_by("sort_order", "created_at"))
     selected_tags_json = {kat.asset_id: kat.tag_id for kat in kit_asset_tags if kat.tag_id}
     selected_tags2_json = {kat.asset_id: kat.tag_2_id for kat in kit_asset_tags if kat.tag_2_id}
     selected_qty_json = {kat.asset_id: kat.quantity for kat in kit_asset_tags}
@@ -600,7 +609,13 @@ def kit_set_status_view(request, kit_id):
         return JsonResponse({"error": f"Invalid status '{new_status}'."}, status=400)
     old_status = kit.status
     kit.status = new_status
-    kit.save(update_fields=["status"])
+    # Track when a kit is archived / unarchived
+    import django.utils.timezone as _tz
+    if new_status == Kit.Status.ARCHIVED and old_status != Kit.Status.ARCHIVED:
+        kit.archived_at = _tz.now()
+    elif new_status != Kit.Status.ARCHIVED and kit.archived_at:
+        kit.archived_at = None
+    kit.save(update_fields=["status", "archived_at"])
     changed_by = StaffMember.for_user(request.user)
     KitHistory.objects.create(
         kit=kit, changed_by=changed_by, field_changed="status",
@@ -684,3 +699,33 @@ def kit_pdf_view(request, kit_id):
     return response
 
 
+
+@login_required
+def kit_archive_view(request):
+    """Archive page - shows all ARCHIVED kits sorted by archived_at desc,
+    with their last booking job and date for context."""
+    archived_kits = list(
+        Kit.objects.filter(status=Kit.Status.ARCHIVED)
+        .prefetch_related("bookings__job", "assets__nested_assets", "kit_asset_tags__tag")
+        .order_by("-archived_at", "name")
+    )
+
+    rows = []
+    for kit in archived_kits:
+        last_booking = kit.bookings.order_by("-end_date").first()
+        members = list(kit.assets.all().order_by("asset_type", "asset_id"))
+        rows.append({
+            "kit":         kit,
+            "members":     members,
+            "last_job":    last_booking.job if last_booking else None,
+            "last_used":   last_booking.end_date if last_booking else None,
+            "archived_at": kit.archived_at,
+        })
+
+    archived_count = len(rows)
+    context = {
+        "rows":           rows,
+        "archived_count": archived_count,
+        "active_nav":     "kits",
+    }
+    return render(request, "inventory/kit_archive.html", context)

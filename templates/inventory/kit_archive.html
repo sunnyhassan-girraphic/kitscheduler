@@ -1,0 +1,248 @@
+{% extends "inventory/base.html" %}
+{% load inventory_extras %}
+{% block title %}G.R.E.G - Kit Archive{% endblock %}
+{% block brand_sub %}{{ archived_count }} archived kit{{ archived_count|pluralize }}{% endblock %}
+{% block header_actions %}
+  <a class="btn" href="/kits/">Active kits</a>
+{% endblock %}
+{% block extra_style %}
+  .arch-wrap { padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
+  .arch-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .arch-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; background: var(--surface);
+    border-bottom: 1px solid var(--border); position: relative; overflow: visible;
+  }
+  .arch-name { font-weight: 600; font-size: 14px; flex-shrink: 0; }
+  .arch-archived-at { font-size: 11px; color: var(--text-faint); white-space: nowrap; flex-shrink: 0; }
+  .arch-job-badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    background: var(--surface-2); border: 1px solid var(--border-strong);
+    color: var(--text-dim); text-decoration: none; white-space: nowrap; flex-shrink: 0;
+  }
+  .arch-job-badge:hover { color: var(--accent); border-color: var(--accent-deep); }
+  .arch-spacer { flex: 1; }
+  .arch-head-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  /* Match kit-card-btn exactly from kit_list */
+  .kit-card-btn {
+    width: 28px; height: 28px; border-radius: 6px; background: transparent; border: none;
+    color: var(--text-dim); cursor: pointer; text-decoration: none;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .kit-card-btn:hover { background: var(--surface-2); color: var(--accent); }
+  .kit-card-btn svg { width: 15px; height: 15px; }
+  /* Members */
+  .arch-members { padding: 0; }
+  .arch-member {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 16px; font-size: 12px; border-bottom: 1px solid var(--border);
+  }
+  .arch-member:last-child { border-bottom: none; }
+  .arch-member-id { font-family: var(--mono); font-size: 11px; color: var(--text); min-width: 100px; flex-shrink: 0; }
+  .arch-member-model { color: var(--text-dim); flex: 1; }
+  .arch-member-nested {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 16px 4px 36px; font-size: 11px; border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.15);
+  }
+  .arch-member-nested:last-child { border-bottom: none; }
+  .arch-empty-members { padding: 10px 16px; font-size: 12px; color: var(--text-faint); font-style: italic; }
+  .empty-arch {
+    padding: 48px 24px; text-align: center; color: var(--text-faint); font-size: 13px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+  }
+  /* Reuse kit status pill styles from base - they come from kit_list but we need them here */
+  .kit-status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px 3px 6px; border-radius: 12px; cursor: pointer;
+    font-size: 12px; font-weight: 500; user-select: none;
+    background: var(--surface); border: 1px solid var(--border-strong);
+    color: var(--text-dim); position: relative; flex-shrink: 0;
+  }
+  .kit-status-pill.open { border-color: var(--accent-deep); color: var(--text); }
+  .kit-status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--text-faint); }
+  .kit-status-archived .kit-status-dot { background: #65625a; }
+  .kit-status-caret { width: 8px; height: 8px; color: var(--text-faint); }
+  .kit-status-menu {
+    position: absolute; top: calc(100% + 4px); right: 0; z-index: 9999;
+    background: var(--surface-2); border: 1px solid var(--border-strong);
+    border-radius: 8px; padding: 4px; min-width: 170px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .kit-status-menu-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 5px; font-size: 12px;
+    cursor: pointer; color: var(--text-dim);
+  }
+  .kit-status-menu-item:hover { background: var(--surface); color: var(--text); }
+  .kit-status-menu-item.active { color: var(--text); font-weight: 600; }
+  .kit-status-menu-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+{% endblock %}
+
+{% block content %}
+<div class="arch-wrap">
+  {% if rows %}
+    {% for row in rows %}
+    <div class="arch-card" id="arch-kit-{{ row.kit.id }}">
+      <div class="arch-head">
+        <span class="arch-name">{{ row.kit.name }}</span>
+        <div class="arch-spacer"></div>
+        <div class="arch-head-right">
+          {% if row.archived_at %}
+            <span class="arch-archived-at">Archived {{ row.archived_at|date:"j M Y" }}</span>
+          {% endif %}
+          {% if row.last_job %}
+            <a class="arch-job-badge" href="/jobs/{{ row.last_job.id }}/edit/" title="Last booked on this job">
+              {{ row.last_job.name }}{% if row.last_used %} &middot; {{ row.last_used|date:"j M Y" }}{% endif %}
+            </a>
+          {% endif %}
+          <div class="kit-status-pill kit-status-archived"
+               data-kit-id="{{ row.kit.id }}"
+               data-status="ARCHIVED"
+               tabindex="0" role="button"
+               aria-label="Kit status: Archived"
+               onclick="openStatusMenu(this)"
+               onkeydown="if(event.key==='Enter'||event.key===' ')openStatusMenu(this)">
+            <span class="kit-status-dot"></span>
+            <span class="kit-status-label">Archived</span>
+            <svg class="kit-status-caret" viewBox="0 0 10 6" fill="none"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <a class="kit-card-btn" href="/kits/{{ row.kit.id }}/edit/" title="Edit" aria-label="Edit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </a>
+        </div>
+      </div>
+      <div class="arch-members">
+        {% for member in row.members %}
+          <div class="arch-member">
+            <span class="arch-member-id">{{ member.asset_id }}</span>
+            <span class="arch-member-model">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
+            <span class="badge badge-{{ member.status|lower }}" style="font-size:10px; flex-shrink:0;">{{ member.get_status_display }}</span>
+          </div>
+          {% for comp in member.nested_assets.all %}
+          <div class="arch-member-nested">
+            <span style="font-family:var(--mono); font-size:11px; color:var(--text-dim); min-width:100px; flex-shrink:0;">{{ comp.asset_id }}</span>
+            <span style="color:var(--text-faint); flex:1;">{{ comp.get_asset_type_display }}{% if comp.make_model %} &middot; {{ comp.make_model }}{% endif %}</span>
+            <span class="badge badge-{{ comp.status|lower }}" style="font-size:10px; flex-shrink:0;">{{ comp.get_status_display }}</span>
+          </div>
+          {% endfor %}
+        {% empty %}
+          <div class="arch-empty-members">No assets in this kit.</div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-arch">No archived kits yet. When a kit is set to Archived it will appear here.</div>
+  {% endif %}
+</div>
+
+<form id="csrf-holder" style="display:none;">{% csrf_token %}</form>
+
+<!-- Reuse the status pill JS and dialog from kit_list - same endpoint, same behaviour -->
+<dialog id="kit-status-dialog" style="background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;padding:20px 24px;max-width:400px;color:var(--text);margin:auto;">
+  <h2 style="font-size:15px;margin:0 0 8px;font-weight:600;">Kit is currently booked</h2>
+  <p id="kit-status-dialog-msg" style="font-size:13px;color:var(--text-dim);margin:0 0 14px;line-height:1.5;"></p>
+  <div id="kit-status-remove-line" style="display:flex;flex-direction:column;gap:6px;margin-bottom:18px;"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <button id="kit-status-dialog-cancel" class="btn" type="button">Cancel</button>
+    <button id="kit-status-dialog-confirm" class="btn btn-primary" type="button">Confirm</button>
+  </div>
+</dialog>
+
+<script>
+const STATUS_OPTIONS = [
+  { value: "READY",    label: "Ready",             dot: "#3fb950" },
+  { value: "PREP",     label: "Prep / in progress", dot: "#eab308" },
+  { value: "FAULTY",   label: "Faulty",             dot: "#f85149" },
+  { value: "ARCHIVED", label: "Archived",           dot: "#65625a" },
+];
+
+let activeMenu = null, activePill = null;
+
+function closeMenu() {
+  if (activeMenu) { activeMenu.remove(); activeMenu = null; }
+  if (activePill) { activePill.classList.remove("open"); activePill = null; }
+}
+
+document.addEventListener("mousedown", e => {
+  if (activeMenu && !activePill.contains(e.target)) closeMenu();
+});
+
+window.openStatusMenu = function(pill) {
+  if (activePill === pill) { closeMenu(); return; }
+  closeMenu();
+  const kitId   = pill.dataset.kitId;
+  const current = pill.dataset.status;
+  const menu    = document.createElement("div");
+  menu.className = "kit-status-menu";
+  STATUS_OPTIONS.forEach(opt => {
+    const item = document.createElement("div");
+    item.className = "kit-status-menu-item" + (opt.value === current ? " active" : "");
+    item.innerHTML = `<span class="kit-status-menu-dot" style="background:${opt.dot}"></span>${opt.label}`;
+    item.addEventListener("mousedown", e => {
+      e.preventDefault(); e.stopPropagation();
+      applyStatus(kitId, opt, pill);
+      closeMenu();
+    });
+    menu.appendChild(item);
+  });
+  pill.appendChild(menu);
+  activeMenu = menu; activePill = pill;
+  pill.classList.add("open");
+};
+
+async function applyStatus(kitId, opt, pill) {
+  if (opt.value !== "READY") {
+    let bookingInfo = null;
+    try { const r = await fetch(`/kits/${kitId}/booking-info/`); if (r.ok) bookingInfo = await r.json(); } catch {}
+    if (bookingInfo && bookingInfo.hasBooking) {
+      const dialog = document.getElementById("kit-status-dialog");
+      document.getElementById("kit-status-dialog-msg").textContent =
+        `This kit is booked on "${bookingInfo.jobName}" (${bookingInfo.startDate} - ${bookingInfo.endDate}).`;
+      document.getElementById("kit-status-remove-line").innerHTML = `
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+          <input type="radio" name="booking-action" value="keep" checked> Set to ${opt.label} - keep the booking
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px;">
+          <input type="radio" name="booking-action" value="remove"> Set to ${opt.label} - remove from job
+        </label>`;
+      dialog.dataset.kitId = kitId; dialog._pill = pill; dialog._opt = opt;
+      dialog.showModal(); return;
+    }
+  }
+  await commitStatus(kitId, opt, pill, false);
+}
+
+async function commitStatus(kitId, opt, pill, removeBooking) {
+  const csrf = document.querySelector("[name=csrfmiddlewaretoken]")?.value || "";
+  pill.dataset.status = opt.value;
+  pill.className = `kit-status-pill kit-status-${opt.value.toLowerCase()}`;
+  pill.querySelector(".kit-status-label").textContent = opt.label;
+  pill.querySelector(".kit-status-dot").style.background = opt.dot;
+  try {
+    const body = `status=${encodeURIComponent(opt.value)}${removeBooking ? "&remove_booking=1" : ""}`;
+    const resp = await fetch(`/kits/${kitId}/set-status/`, {
+      method: "POST",
+      headers: { "X-CSRFToken": csrf, "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    if (!resp.ok) { location.reload(); return; }
+    // If no longer archived, fade card and reload
+    if (opt.value !== "ARCHIVED") {
+      const card = document.getElementById(`arch-kit-${kitId}`);
+      if (card) { card.style.transition = "opacity 0.4s"; card.style.opacity = "0.2"; }
+      setTimeout(() => location.reload(), 500);
+    }
+  } catch { location.reload(); }
+}
+
+const statusDialog = document.getElementById("kit-status-dialog");
+document.getElementById("kit-status-dialog-confirm").addEventListener("click", async () => {
+  const removeBooking = statusDialog.querySelector("[name=booking-action]:checked")?.value === "remove";
+  statusDialog.close();
+  await commitStatus(statusDialog.dataset.kitId, statusDialog._opt, statusDialog._pill, removeBooking);
+});
+document.getElementById("kit-status-dialog-cancel").addEventListener("click", () => statusDialog.close());
+</script>
+{% endblock %}

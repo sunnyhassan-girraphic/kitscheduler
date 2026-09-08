@@ -75,11 +75,11 @@
     .form-section-body {
     padding: 16px;
     overflow: hidden;
-    max-height: 1200px;
+    max-height: none;
     transition: max-height 0.6s ease;
   }
   .form-section.collapsed .form-section-body {
-    max-height: 0;
+    max-height: 0 !important;
     padding-top: 0;
     padding-bottom: 0;
     transition: max-height 0.6s ease, padding-top 0.6s ease, padding-bottom 0.6s ease;
@@ -211,6 +211,15 @@
     font-size: 16px; line-height: 1; padding: 2px 4px; flex-shrink: 0;
   }
   .picker-remove-btn:hover { color: var(--red); }
+  .drag-handle {
+    display: none; flex-shrink: 0; cursor: grab; color: var(--text-faint);
+    padding: 2px 4px; align-items: center; user-select: none;
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .drag-handle svg { width: 14px; height: 14px; }
+  .sort-manual .drag-handle { display: flex; }
+  .picker-item.drag-over > .picker-row { border-color: var(--accent); background: var(--accent-glow); }
+  .picker-item.dragging { opacity: 0.4; }
   .picker-add-btn {
     background: var(--accent-glow); border: 1px solid var(--accent-deep); color: var(--accent);
     cursor: pointer; font-size: 12px; padding: 3px 10px; border-radius: 5px; flex-shrink: 0;
@@ -391,6 +400,8 @@
             <button type="button" class="asset-sort-btn" data-sort="added" style="background:transparent;border:none;padding:4px 10px;font-size:11px;color:var(--text-dim);cursor:pointer;font-family:inherit;">Last added</button>
             <span style="width:1px;background:var(--border-strong);align-self:stretch;"></span>
             <button type="button" class="asset-sort-btn" data-sort="az" style="background:transparent;border:none;padding:4px 10px;font-size:11px;color:var(--text-dim);cursor:pointer;font-family:inherit;">A-Z</button>
+            <span style="width:1px;background:var(--border-strong);align-self:stretch;"></span>
+            <button type="button" class="asset-sort-btn" data-sort="manual" style="background:transparent;border:none;padding:4px 10px;font-size:11px;color:var(--text-dim);cursor:pointer;font-family:inherit;" title="Drag to reorder">Manual</button>
           </div>
           <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
         </div>
@@ -710,7 +721,8 @@ function downloadKitPdf(kitId) {
   const pluralEl = document.getElementById("selected-plural");
 
   let selected = new Set([{{ selected_ids|join:"," }}]);
-  let assetSortMode = "added"; // "added" | "az"
+  let manualOrder = null; // null = use Set order; array of ids when in manual mode
+  let assetSortMode = "added"; // "added" | "az" | "manual"
   const initialTags = {{ selected_tags_json|default:"{}"|safe }};
   const initialTags2 = {{ selected_tags2_json|default:"{}"|safe }};
   const initialQty = {{ selected_qty_json|default:"{}"|safe }};
@@ -767,22 +779,33 @@ function downloadKitPdf(kitId) {
     `;
   }
 
+  // Drag-to-sort state
+  let dragSrcItem = null;
+
   function renderSelected() {
     selectedContainer.innerHTML = "";
-    let ids = Array.from(selected).filter(id => byId[id]);
-
-    if (assetSortMode === "az") {
-      ids.sort((a, b) => (byId[a].assetId || "").localeCompare(byId[b].assetId || ""));
+    let ids;
+    if (assetSortMode === "manual" && manualOrder !== null) {
+      ids = manualOrder.filter(id => selected.has(id) && byId[id]);
+    } else {
+      ids = Array.from(selected).filter(id => byId[id]);
+      if (assetSortMode === "az") {
+        ids.sort((a, b) => (byId[a].assetId || "").localeCompare(byId[b].assetId || ""));
+      }
     }
     // "added" = insertion order, which is already the Set iteration order
+
+    selectedContainer.classList.toggle("sort-manual", assetSortMode === "manual");
 
     ids.forEach(id => {
       const a = byId[id];
       if (a.isBulk && !assetQty[id]) assetQty[id] = 1;
       const item = document.createElement("div");
       item.className = "picker-item";
+      item.dataset.id = id;
       item.innerHTML = `
         <div class="picker-row">
+          <span class="drag-handle" title="Drag to reorder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="5" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="5" r="1" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="9" cy="19" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="19" r="1" fill="currentColor" stroke="none"/></svg></span>
           <span class="aid">${a.assetId}</span>
           <span class="amodel">${a.makeModel || ""}</span>
           <span class="atype">${a.type}</span>
@@ -798,6 +821,46 @@ function downloadKitPdf(kitId) {
         ${nestedHtml(a)}
       `;
       selectedContainer.appendChild(item);
+
+      // Wire up drag-to-sort on the handle
+      const handle = item.querySelector(".drag-handle");
+      handle.addEventListener("mousedown", () => { item.draggable = true; });
+      handle.addEventListener("mouseup", () => { item.draggable = false; });
+      item.addEventListener("dragstart", (e) => {
+        dragSrcItem = item;
+        e.dataTransfer.effectAllowed = "move";
+        setTimeout(() => item.classList.add("dragging"), 0);
+      });
+      item.addEventListener("dragend", () => {
+        item.classList.remove("dragging");
+        item.draggable = false;
+        selectedContainer.querySelectorAll(".picker-item").forEach(el => el.classList.remove("drag-over"));
+      });
+      item.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (dragSrcItem && dragSrcItem !== item) {
+          selectedContainer.querySelectorAll(".picker-item").forEach(el => el.classList.remove("drag-over"));
+          item.classList.add("drag-over");
+        }
+      });
+      item.addEventListener("dragleave", () => item.classList.remove("drag-over"));
+      item.addEventListener("drop", (e) => {
+        e.preventDefault();
+        item.classList.remove("drag-over");
+        if (!dragSrcItem || dragSrcItem === item) return;
+        const items = Array.from(selectedContainer.querySelectorAll(".picker-item"));
+        const srcIdx = items.indexOf(dragSrcItem);
+        const tgtIdx = items.indexOf(item);
+        if (srcIdx < tgtIdx) {
+          item.after(dragSrcItem);
+        } else {
+          item.before(dragSrcItem);
+        }
+        // Rebuild manualOrder from DOM order
+        manualOrder = Array.from(selectedContainer.querySelectorAll(".picker-item")).map(el => parseInt(el.dataset.id, 10));
+        dragSrcItem = null;
+      });
     });
     emptyMsg.style.display = ids.length ? "none" : "block";
     countEl.textContent = ids.length;
@@ -865,6 +928,7 @@ function downloadKitPdf(kitId) {
     const id = parseInt(btn.dataset.id, 10);
     selected.delete(id);
     delete assetQty[id];
+    if (manualOrder) manualOrder = manualOrder.filter(mid => mid !== id);
     renderSelected();
     renderResults();
   });
@@ -908,7 +972,9 @@ function downloadKitPdf(kitId) {
   resultsContainer.addEventListener("click", (e) => {
     const btn = e.target.closest(".picker-add-btn");
     if (!btn || btn.disabled) return;
-    selected.add(parseInt(btn.dataset.id, 10));
+    const id = parseInt(btn.dataset.id, 10);
+    selected.add(id);
+    if (manualOrder && !manualOrder.includes(id)) manualOrder.push(id);
     searchInput.value = "";
     renderSelected();
     renderResults();
@@ -920,22 +986,33 @@ function downloadKitPdf(kitId) {
   renderSelected();
 
   // ── Asset sort buttons ────────────────────────────────────────────────────
+  function updateSortBtnStyles() {
+    document.querySelectorAll(".asset-sort-btn").forEach(b => {
+      const isActive = b.dataset.sort === assetSortMode;
+      b.style.color = isActive ? "var(--accent)" : "var(--text-dim)";
+      b.style.background = isActive ? "var(--accent-glow)" : "transparent";
+    });
+  }
+
   document.querySelectorAll(".asset-sort-btn").forEach(btn => {
     btn.addEventListener("click", () => {
+      const prev = assetSortMode;
       assetSortMode = btn.dataset.sort;
-      document.querySelectorAll(".asset-sort-btn").forEach(b => {
-        const isActive = b.dataset.sort === assetSortMode;
-        b.style.color = isActive ? "var(--accent)" : "var(--text-dim)";
-        b.style.background = isActive ? "var(--accent-glow)" : "transparent";
-      });
+      if (assetSortMode === "manual") {
+        // Seed manualOrder from current displayed order (or insertion order if first time)
+        if (!manualOrder) {
+          manualOrder = Array.from(selected).filter(id => byId[id]);
+          if (prev === "az") {
+            manualOrder.sort((a, b) => (byId[a].assetId || "").localeCompare(byId[b].assetId || ""));
+          }
+        }
+      }
+      updateSortBtnStyles();
       renderSelected();
     });
   });
   // Set initial active state
-  document.querySelectorAll(".asset-sort-btn").forEach(b => {
-    b.style.color = b.dataset.sort === assetSortMode ? "var(--accent)" : "var(--text-dim)";
-    b.style.background = b.dataset.sort === assetSortMode ? "var(--accent-glow)" : "transparent";
-  });
+  updateSortBtnStyles();
 
   // --- Unsaved changes warning ---
 

@@ -5,161 +5,763 @@
   <button type="button" class="btn btn-primary" onclick="document.getElementById('newJobDialog').showModal()">+ New job</button>
 {% endblock %}
 {% block extra_style %}
-  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 20px 24px; }
-  @media (max-width: 800px) { .dash-grid { grid-template-columns: 1fr; } }
-  .dash-card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface-2); }
-  .dash-card-head {
-    display: flex; align-items: center; gap: 8px; padding: 12px 16px;
-    background: var(--surface); font-weight: 600; font-size: 11px;
-    text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent);
+  /* ── Layout ──────────────────────────────────────────── */
+  .dash-wrap  { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+  .dash-cols  { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+  .dash-left  { display: flex; flex-direction: column; gap: 16px; }
+  .dash-right { display: flex; flex-direction: column; gap: 16px; }
+  @media (max-width: 900px) { .dash-cols { grid-template-columns: 1fr; } }
+
+  /* ── Widget shell ────────────────────────────────────── */
+  .widget          { border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); overflow: hidden; transition: opacity 0.2s; }
+  .widget.hidden   { display: none; }
+  .widget-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 14px; background: var(--surface);
     border-bottom: 1px solid var(--border);
+    font-size: 11px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.02em;
+    user-select: none;
   }
-  .dash-card-head a.see-all { margin-left: auto; font-size: 12px; color: var(--accent); font-weight: 400; text-decoration: none; text-transform: none; letter-spacing: 0; }
-  .dash-row { display: flex; align-items: center; gap: 10px; padding: 9px 16px; font-size: 13px; border-top: 1px solid var(--border); }
-  .dash-row .primary-text { flex: 1; }
-  .dash-row .secondary-text { color: var(--text-dim); font-size: 12px; }
-  .dash-empty { padding: 14px 16px; color: var(--text-faint); font-size: 12px; font-style: italic; }
-  .avail-pair { display: flex; gap: 16px; padding: 14px 16px; }
-  .avail-stat .num { font-size: 24px; font-weight: 600; font-family: var(--mono); }
-  .avail-stat .label { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-  .attention-card .dash-card-head { color: var(--red); }
-  .attention-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+  .widget-title { flex: 1; }
+  .widget-see-all { font-size: 11px; color: var(--text-faint); font-weight: 400; text-decoration: none; }
+  .widget-see-all:hover { color: var(--accent); }
+
+  /* ── Stats strip ─────────────────────────────────────── */
+  .stats-strip { display: grid; grid-template-columns: repeat(4, 1fr); overflow: hidden; }
+  .stat-cell {
+    padding: 14px 18px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 2px;
+    text-decoration: none; color: inherit; transition: background 0.12s;
+  }
+  .stat-cell:last-child { border-right: none; }
+  a.stat-cell:hover { background: var(--surface); }
+  .stat-num   { font-size: 26px; font-weight: 700; line-height: 1; font-family: var(--mono); color: var(--accent); }
+  .stat-denom { font-size: 13px; font-weight: 400; color: var(--text-faint); }
+  .stat-num.red { color: var(--red); }
+  .stat-label { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .stat-sub   { font-size: 11px; color: var(--text-faint); }
+  .stat-sub.red { color: var(--red); }
+  @media (max-width: 580px) {
+    .stats-strip { grid-template-columns: 1fr 1fr; }
+    .stat-cell:nth-child(2) { border-right: none; }
+    .stat-cell:nth-child(1), .stat-cell:nth-child(2) { border-bottom: 1px solid var(--border); }
+  }
+
+  /* ── Timeline strip ──────────────────────────────────── */
+  .timeline-header { display: grid; border-bottom: 1px solid var(--border); }
+  .tl-day-label { padding: 5px 0; text-align: center; border-right: 1px solid var(--border); font-size: 10px; color: var(--text-faint); font-family: var(--mono); }
+  .tl-day-label:last-child { border-right: none; }
+  .tl-day-label.today { color: var(--accent); font-weight: 700; }
+  .tl-day-label.weekend { opacity: 0.4; }
+  .tl-rows { display: flex; flex-direction: column; }
+  .tl-job-row { display: grid; position: relative; min-height: 26px; border-bottom: 1px solid var(--border); }
+  .tl-job-row:last-child { border-bottom: none; }
+  .tl-cell { border-right: 1px solid var(--border); }
+  .tl-cell:last-child { border-right: none; }
+  .tl-cell.today-col { background: rgba(234,179,8,0.04); }
+  .tl-cell.weekend-col { background: rgba(255,255,255,0.01); }
+  .tl-bar {
+    position: absolute; top: 3px; bottom: 3px; border-radius: 3px;
+    display: flex; align-items: center; padding: 0 6px;
+    font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; cursor: pointer; z-index: 2;
+    color: rgba(0,0,0,0.85); transition: filter 0.12s;
+  }
+  .tl-bar:hover { filter: brightness(1.15); }
+  .tl-empty { padding: 10px 14px; font-size: 11px; color: var(--text-faint); font-style: italic; }
+
+  /* ── Active jobs ─────────────────────────────────────── */
+  .active-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 14px; border-top: 1px solid var(--border); font-size: 12px;
+  }
+  .active-row:first-child { border-top: none; }
+  .active-pip { width: 4px; border-radius: 2px; flex-shrink: 0; align-self: stretch; min-height: 20px; }
+  .active-body { flex: 1; min-width: 0; }
+  .active-name { font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .active-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .active-chip { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); color: var(--text-dim); white-space: nowrap; }
+  .active-days { font-size: 11px; color: var(--text-faint); flex-shrink: 0; white-space: nowrap; }
+
+  /* ── Active kits ─────────────────────────────────────── */
+  .kit-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-top: 1px solid var(--border); font-size: 12px;
+    text-decoration: none; color: inherit; transition: background 0.12s;
+  }
+  .kit-row:first-child { border-top: none; }
+  .kit-row:hover { background: var(--surface); }
+  .kit-pip { width: 4px; height: 22px; border-radius: 2px; flex-shrink: 0; }
+  .kit-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kit-job  { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100px; }
+  .kit-days { font-size: 11px; color: var(--text-faint); flex-shrink: 0; }
+
+  /* ── Upcoming jobs ───────────────────────────────────── */
+  .upcoming-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-top: 1px solid var(--border);
+    text-decoration: none; color: inherit; font-size: 12px;
+    transition: background 0.12s; cursor: pointer;
+  }
+  .upcoming-row:first-child { border-top: none; }
+  .upcoming-row:hover { background: var(--surface); }
+  .upcoming-pip  { width: 4px; height: 22px; border-radius: 2px; flex-shrink: 0; }
+  .upcoming-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upcoming-date { font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+
+  /* ── Attention ───────────────────────────────────────── */
+  .attn-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-top: 1px solid var(--border);
+    font-size: 12px; text-decoration: none; color: inherit; transition: background 0.12s;
+  }
+  .attn-row:first-child { border-top: none; }
+  .attn-row:hover { background: var(--surface); }
+  .attn-dot   { width: 6px; height: 6px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+  .attn-id    { font-family: var(--mono); font-size: 11px; flex-shrink: 0; }
+  .attn-model { flex: 1; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Empty state ─────────────────────────────────────── */
+  .dash-empty { padding: 12px 14px; color: var(--text-faint); font-size: 12px; font-style: italic; }
 {% endblock %}
+
 {% block content %}
+<div class="dash-wrap" id="dashWrap">
 
-<div style="padding: 20px 24px;">
-
-  <div class="dash-card" style="margin-bottom:16px;">
-    <div class="dash-card-head" style="font-size:13px; text-transform:none; letter-spacing:0; font-weight:600;">
-      THIS WEEK'S AVAILABILITY
-      <a class="see-all" href="/timeline/">Timeline &rarr;</a>
-    </div>
-    <div class="dash-card-body" style="display:flex; flex-wrap:wrap;">
-      <div class="avail-pair">
-        <div class="avail-stat">
-          <div class="num">{{ kits_fully_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_kits }}</span></div>
-          <div class="label">kits free all week</div>
-        </div>
-        <div class="avail-stat">
-          <div class="num">{{ kits_partially_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_kits }}</span></div>
-          <div class="label">kits free 1+ day</div>
-        </div>
-      </div>
-      <div class="avail-pair">
-        <div class="avail-stat">
-          <div class="num">{{ staff_fully_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_staff }}</span></div>
-          <div class="label">staff free all week</div>
-        </div>
-        <div class="avail-stat">
-          <div class="num">{{ staff_partially_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_staff }}</span></div>
-          <div class="label">staff free 1+ day</div>
-        </div>
-      </div>
-      <div class="avail-pair">
-        <div class="avail-stat">
-          <div class="num">{{ licenses_fully_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_licenses }}</span></div>
-          <div class="label">licenses free all week</div>
-        </div>
-        <div class="avail-stat">
-          <div class="num">{{ licenses_partially_free }}<span style="font-size:13px; color:var(--text-faint); font-weight:400;"> / {{ total_licenses }}</span></div>
-          <div class="label">licenses free 1+ day</div>
-        </div>
-      </div>
-      <div class="avail-pair" style="border-left:1px solid var(--border); margin-left:4px; padding-left:20px;">
-        <a class="avail-stat" href="/timeline/" style="text-decoration:none; color:inherit;">
-          <div class="num">{{ jobs_this_week }}</div>
-          <div class="label">jobs this week</div>
-        </a>
-        <a class="avail-stat" href="/tickets/?status=OPEN" style="text-decoration:none; color:inherit;">
-          <div class="num" style="{% if urgent_ticket_count %}color:var(--red);{% endif %}">{{ open_ticket_count }}{% if urgent_ticket_count %}<span style="font-size:13px; color:var(--red); font-weight:400;"> ({{ urgent_ticket_count }} urgent)</span>{% endif %}</div>
-          <div class="label">open tickets</div>
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <div class="dash-card" style="margin-bottom:16px;">
-    <div class="dash-card-head" style="font-size:13px; text-transform:none; letter-spacing:0; font-weight:600;">
-      AGENDA
-      <span style="font-weight:400; font-size:11px; color:var(--text-dim); text-transform:none; letter-spacing:0;">{{ agenda_date|date:"l, j F Y" }}</span>
-      <div style="margin-left:auto; display:flex; gap:6px; align-items:center;">
-        <a class="btn" href="?date={{ prev_date|date:'Y-m-d' }}">&larr;</a>
-        <a class="btn {% if is_today %}btn-active{% endif %}" href="/">Today</a>
-        <a class="btn" href="?date={{ next_date|date:'Y-m-d' }}">&rarr;</a>
-        <form method="get" style="display:inline-flex; align-items:center;">
-          <input class="filter" type="date" name="date" value="{{ agenda_date|date:'Y-m-d' }}" onchange="this.form.submit()" style="font-size:12px; padding:4px 8px;">
-        </form>
-      </div>
-    </div>
-    <div class="dash-card-body" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:0; border-top:1px solid var(--border);">
-      {% for row in agenda_rows %}
-      <div style="border-right:1px solid var(--border); border-bottom:1px solid var(--border); padding:12px 14px;">
-        <div style="font-weight:600; font-size:13px; margin-bottom:6px; color:var(--text);">{{ row.person.name }}</div>
-        {% for booking in row.bookings %}
-          <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; font-size:12px;">
-            <span style="flex:1; color:var(--text);">{{ booking.job.name }}</span>
-            <span class="badge" style="background:{{ booking.job.resolve_color }}33; color:{{ booking.job.resolve_color }}; font-size:10px;">{{ booking.job.get_category_display }}</span>
+  <!-- Full-width widgets -->
+  {% for w in full_widgets %}
+    {% if w.widget_id == "stats" %}
+      <div class="widget{% if not widget_visible.stats %} hidden{% endif %}" data-widget="stats" id="widget-stats">
+        <div class="widget-head"><span class="widget-title">At a glance</span></div>
+        <div class="stats-strip">
+          <div class="stat-cell">
+            <div class="stat-num">{{ jobs_today_count }}</div>
+            <div class="stat-label">jobs active today</div>
+            <div class="stat-sub">{{ jobs_this_week }} this week</div>
           </div>
-        {% empty %}
-          <div style="font-size:11px; color:var(--text-faint); font-style:italic;">Free</div>
-        {% endfor %}
+          <div class="stat-cell">
+            <div class="stat-num">{{ kits_booked_count }}<span class="stat-denom">/{{ total_kits }}</span></div>
+            <div class="stat-label">kits booked this week</div>
+          </div>
+          <a class="stat-cell" href="/licenses/?status=ACTIVE" style="text-decoration:none; color:inherit;">
+            <div class="stat-num {% if licenses_expired %}red{% elif licenses_expiring %}{% endif %}">
+              {% if licenses_expired %}{{ licenses_expired }}{% else %}{{ licenses_expiring }}{% endif %}
+            </div>
+            <div class="stat-label">
+              {% if licenses_expired %}license{{ licenses_expired|pluralize }} expired{% else %}license{{ licenses_expiring|pluralize }} expiring{% endif %}
+            </div>
+            <div class="stat-sub">
+              {% if licenses_expired %}action needed{% elif licenses_expiring %}within 30 days{% else %}all current{% endif %}
+            </div>
+          </a>
+          <a class="stat-cell" href="/tickets/?status=OPEN" style="text-decoration:none; color:inherit;">
+            <div class="stat-num {% if urgent_ticket_count %}red{% endif %}">{{ open_ticket_count }}</div>
+            <div class="stat-label">open tickets</div>
+            {% if urgent_ticket_count %}<div class="stat-sub red">{{ urgent_ticket_count }} urgent</div>
+            {% else %}<div class="stat-sub">none urgent</div>{% endif %}
+          </a>
+        </div>
       </div>
-      {% empty %}
-        <div class="dash-empty">No staff yet.</div>
-      {% endfor %}
-    </div>
-  </div>
+    {% endif %}
+    {% if w.widget_id != "stats" %}
 
-  <div class="dash-grid" style="padding:0;">
-    <div class="dash-card">
-      <div class="dash-card-head">
-        Upcoming jobs
-        <a class="see-all" href="/admin/inventory/job/">All jobs &rarr;</a>
+      {% if w.widget_id == "timeline" %}
+      <div class="widget{% if not widget_visible.timeline %} hidden{% endif %}" data-widget="timeline" data-col="full" id="widget-timeline">
+        <div class="widget-head">
+          <span class="widget-title">This week - kits</span>
+          <a class="widget-see-all" href="/timeline/">Full timeline &rarr;</a>
+        </div>
+        <div id="tlStrip"></div>
       </div>
-      <div class="dash-card-body">
+      {% endif %}
+
+      {% if w.widget_id == "upcoming" %}
+      <div class="widget{% if not widget_visible.upcoming %} hidden{% endif %}" data-widget="upcoming" data-col="full" id="widget-upcoming">
+        <div class="widget-head">
+          <span class="widget-title">Coming up</span>
+          <a class="widget-see-all" href="/jobs/">All jobs &rarr;</a>
+        </div>
         {% for job in upcoming_jobs %}
-          <a class="dash-row" style="text-decoration:none; color:inherit; cursor:pointer;" onclick="openDashJobDetail({{ job.id }}); return false;" href="/jobs/{{ job.id }}/edit/">
-            <span class="primary-text">{{ job.name }}</span>
-            <span class="badge badge-type">{{ job.get_category_display }}</span>
-            <span class="secondary-text">
-              {% if job.start_date == job.end_date %}{{ job.start_date|date:"j M" }}
-              {% else %}{{ job.start_date|date:"j M" }} - {{ job.end_date|date:"j M" }}{% endif %}
-            </span>
+          <a class="upcoming-row" onclick="openDashJobDetail({{ job.id }}); return false;" href="/jobs/{{ job.id }}/edit/">
+            <span class="upcoming-pip" style="background:{{ job.resolve_color }};"></span>
+            <span class="upcoming-name">{{ job.name }}</span>
+            <span class="badge badge-type" style="flex-shrink:0;">{{ job.get_category_display }}</span>
+            <span class="upcoming-date">{% if job.start_date == job.end_date %}{{ job.start_date|date:"j M" }}{% else %}{{ job.start_date|date:"j M" }} - {{ job.end_date|date:"j M" }}{% endif %}</span>
           </a>
         {% empty %}
           <div class="dash-empty">Nothing scheduled yet. <a href="#" onclick="document.getElementById('newJobDialog').showModal(); return false;" style="color:var(--accent);">Add a job</a>.</div>
         {% endfor %}
       </div>
-    </div>
+      {% endif %}
 
-    <div class="dash-card attention-card">
-      <div class="dash-card-head">
-        Needs attention
-        <a class="see-all" href="/assets/?status=NEEDS_REPAIR" style="color:var(--text-dim);">All assets &rarr;</a>
-      </div>
-      <div class="dash-card-body">
+      {% if w.widget_id == "attention" %}
+      <div class="widget{% if not widget_visible.attention %} hidden{% endif %}" data-widget="attention" data-col="full" id="widget-attention">
+        <div class="widget-head">
+          <span class="widget-title" {% if attention_count %}style="color:var(--red);"{% endif %}>Needs attention{% if attention_count %} ({{ attention_count }}){% endif %}</span>
+          {% if attention_count %}<a class="widget-see-all" href="/assets/?status=NEEDS_REPAIR">All &rarr;</a>{% endif %}
+        </div>
         {% for asset in attention_assets %}
-          <a class="dash-row" style="text-decoration:none; color:inherit;" href="/assets/?q={{ asset.asset_id|urlencode }}">
-            <span class="attention-dot"></span>
-            <span class="primary-text">{{ asset.asset_id }}</span>
-            <span class="secondary-text">{{ asset.make_model|default:"" }}</span>
-            <span class="badge badge-{{ asset.status|lower }}">{{ asset.get_status_display }}</span>
+          <a class="attn-row" href="/assets/?q={{ asset.asset_id|urlencode }}">
+            <span class="attn-dot"></span>
+            <span class="attn-id">{{ asset.asset_id }}</span>
+            <span class="attn-model">{{ asset.make_model|default:"" }}</span>
+            <span class="badge badge-{{ asset.status|lower }}" style="flex-shrink:0; font-size:10px;">{{ asset.get_status_display }}</span>
           </a>
         {% empty %}
-          <div class="dash-empty">Nothing flagged. Everything's in good shape.</div>
+          <div class="dash-empty">All assets in good shape.</div>
         {% endfor %}
-        {% if attention_count > attention_assets|length %}
-          <div class="dash-row" style="color:var(--text-faint); font-size:12px;">
-            + {{ attention_count|add:"-12" }} more - <a href="/assets/" style="color:var(--accent);">view all</a>
+      </div>
+      {% endif %}
+
+      {% if w.widget_id == "active_kits" %}
+      <div class="widget{% if not widget_visible.active_kits %} hidden{% endif %}" data-widget="active_kits" data-col="full" id="widget-active_kits">
+        <div class="widget-head">
+          <span class="widget-title">Active kits</span>
+          <a class="widget-see-all" href="/kits/">All kits &rarr;</a>
+        </div>
+        {% for row in active_kit_rows %}
+          <a class="kit-row" href="/kits/{{ row.kit.id }}/edit/">
+            <span class="kit-pip" style="background:{{ row.job.resolve_color }};"></span>
+            <span class="kit-name">{{ row.kit.name }}</span>
+            <span class="kit-job" title="{{ row.job.name }}">{{ row.job.name }}</span>
+            <span class="kit-days">{% if row.days_left == 0 %}today{% elif row.days_left == 1 %}1d left{% else %}{{ row.days_left }}d{% endif %}</span>
+          </a>
+        {% empty %}
+          <div class="dash-empty">No kits out this week.</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if w.widget_id == "stocktake" %}
+      <div class="widget{% if not widget_visible.stocktake %} hidden{% endif %}" data-widget="stocktake" data-col="full" id="widget-stocktake">
+        <div class="widget-head">
+          <span class="widget-title">Stock take health</span>
+          <a class="widget-see-all" href="/stocktake/">All sessions &rarr;</a>
+        </div>
+        {% if stocktake_data %}
+          <div style="padding:12px 14px; border-bottom:1px solid var(--border);">
+            <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+              <span style="font-size:12px; color:var(--text); font-weight:600;">{{ stocktake_data.session.display_label }}</span>
+              <span style="font-size:11px; color:var(--text-faint);">{{ stocktake_data.pct }}% reviewed</span>
+            </div>
+            <div style="height:4px; background:var(--border); border-radius:2px; overflow:hidden;">
+              <div style="height:100%; width:{{ stocktake_data.pct }}%; background:{% if stocktake_data.complete %}var(--green){% else %}var(--accent){% endif %}; border-radius:2px;"></div>
+            </div>
           </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid var(--border);">
+            <div style="padding:10px 14px; border-right:1px solid var(--border); text-align:center;">
+              <div style="font-size:20px; font-weight:700; font-family:var(--mono); color:var(--text);">{{ stocktake_data.reviewed }}</div>
+              <div style="font-size:10px; color:var(--text-dim); margin-top:2px;">reviewed</div>
+            </div>
+            <div style="padding:10px 14px; text-align:center;">
+              <div style="font-size:20px; font-weight:700; font-family:var(--mono); color:{% if stocktake_data.flagged %}var(--red){% else %}var(--text-faint){% endif %};">{{ stocktake_data.flagged }}</div>
+              <div style="font-size:10px; color:var(--text-dim); margin-top:2px;">flagged</div>
+            </div>
+          </div>
+          <div style="padding:8px 14px; display:flex; justify-content:space-between;">
+            <span style="font-size:11px; color:var(--text-faint);">{% if stocktake_data.complete %}Session complete{% else %}{{ stocktake_data.pending }} items pending{% endif %}</span>
+            <a href="/stocktake/{{ stocktake_data.session.id }}/" style="font-size:11px; color:var(--accent); text-decoration:none;">Open &rarr;</a>
+          </div>
+        {% else %}
+          <div class="dash-empty">No stock take sessions yet. <a href="/stocktake/" style="color:var(--accent);">Start one</a>.</div>
         {% endif %}
       </div>
-    </div>
-  </div>
-</div>
+      {% endif %}
+
+      {% if w.widget_id == "license_expiry" %}
+      <div class="widget{% if not widget_visible.license_expiry %} hidden{% endif %}" data-widget="license_expiry" data-col="full" id="widget-license_expiry">
+        <div class="widget-head">
+          <span class="widget-title">License expiry</span>
+          <a class="widget-see-all" href="/licenses/">All licenses &rarr;</a>
+        </div>
+        {% if expired_licenses %}
+          <div style="padding:4px 0; border-bottom:1px solid var(--border);">
+            {% for lic in expired_licenses %}
+            <a class="attn-row" href="/licenses/{{ lic.lic.id }}/edit/">
+              <span class="attn-dot" style="background:var(--red);"></span>
+              <span class="attn-id">{{ lic.lic.asset_id }}</span>
+              <span class="attn-model">{{ lic.lic.make_model|default:"" }}</span>
+              <span style="font-size:10px; color:var(--red); flex-shrink:0;">{{ lic.days_ago }}d ago</span>
+            </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if expiring_licenses %}
+          <div style="padding:4px 0;">
+            {% for lic in expiring_licenses %}
+            <a class="attn-row" href="/licenses/{{ lic.lic.id }}/edit/">
+              <span class="attn-dot" style="background:{% if lic.days_left <= 7 %}var(--red){% elif lic.days_left <= 14 %}var(--accent){% else %}var(--green){% endif %};"></span>
+              <span class="attn-id">{{ lic.lic.asset_id }}</span>
+              <span class="attn-model">{{ lic.lic.make_model|default:"" }}</span>
+              <span style="font-size:10px; color:{% if lic.days_left <= 7 %}var(--red){% else %}var(--text-dim){% endif %}; flex-shrink:0; white-space:nowrap;">{{ lic.days_left }} day{{ lic.days_left|pluralize }} left</span>
+            </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+        {% if not expired_licenses and not expiring_licenses %}
+          <div class="dash-empty">No licenses expiring in the next 60 days.</div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if w.widget_id == "activity" %}
+      <div class="widget{% if not widget_visible.activity %} hidden{% endif %}" data-widget="activity" data-col="full" id="widget-activity">
+        <div class="widget-head"><span class="widget-title">Recent activity</span></div>
+        {% for item in activity_feed %}
+          {% if item.type == "asset" %}
+            <a class="attn-row" href="/assets/{{ item.obj.asset.id }}/edit/" style="gap:10px;">
+              <span style="font-family:var(--mono); font-size:10px; color:var(--text-dim); flex-shrink:0; min-width:80px;">{{ item.obj.asset.asset_id }}</span>
+              <span style="flex:1; font-size:11px; color:var(--text);">{{ item.obj.field_label }}</span>
+              {% if item.obj.changed_by %}<span style="font-size:10px; color:var(--text-faint); flex-shrink:0;">{{ item.obj.changed_by.name }}</span>{% endif %}
+              <span style="font-size:10px; color:var(--text-faint); flex-shrink:0; white-space:nowrap;">{{ item.ts|timesince }} ago</span>
+            </a>
+          {% else %}
+            <a class="attn-row" href="/kits/{{ item.obj.kit.id }}/edit/" style="gap:10px;">
+              <span style="font-size:10px; color:var(--text-dim); flex-shrink:0; min-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ item.obj.kit.name }}</span>
+              <span style="flex:1; font-size:11px; color:var(--text);">{{ item.obj.field_label }}</span>
+              {% if item.obj.changed_by %}<span style="font-size:10px; color:var(--text-faint); flex-shrink:0;">{{ item.obj.changed_by.name }}</span>{% endif %}
+              <span style="font-size:10px; color:var(--text-faint); flex-shrink:0; white-space:nowrap;">{{ item.ts|timesince }} ago</span>
+            </a>
+          {% endif %}
+        {% empty %}
+          <div class="dash-empty">No recent activity.</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    {% endif %}
+  {% endfor %}
+
+  <div class="dash-cols" id="dashCols">
+    <div class="dash-left" id="dashLeft">
+
+      {% for w in left_widgets %}
+
+        {% if w.widget_id == "stats" %}
+      <div class="widget{% if not widget_visible.stats %} hidden{% endif %}" data-widget="stats" id="widget-stats">
+        <div class="widget-head"><span class="widget-title">At a glance</span></div>
+        <div class="stats-strip">
+          <div class="stat-cell">
+            <div class="stat-num">{{ jobs_today_count }}</div>
+            <div class="stat-label">jobs active today</div>
+            <div class="stat-sub">{{ jobs_this_week }} this week</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-num">{{ kits_booked_count }}<span class="stat-denom">/{{ total_kits }}</span></div>
+            <div class="stat-label">kits booked this week</div>
+          </div>
+          <a class="stat-cell" href="/licenses/?status=ACTIVE" style="text-decoration:none; color:inherit;">
+            <div class="stat-num {% if licenses_expired %}red{% elif licenses_expiring %}{% endif %}">
+              {% if licenses_expired %}{{ licenses_expired }}{% else %}{{ licenses_expiring }}{% endif %}
+            </div>
+            <div class="stat-label">
+              {% if licenses_expired %}license{{ licenses_expired|pluralize }} expired{% else %}license{{ licenses_expiring|pluralize }} expiring{% endif %}
+            </div>
+            <div class="stat-sub">
+              {% if licenses_expired %}action needed{% elif licenses_expiring %}within 30 days{% else %}all current{% endif %}
+            </div>
+          </a>
+          <a class="stat-cell" href="/tickets/?status=OPEN" style="text-decoration:none; color:inherit;">
+            <div class="stat-num {% if urgent_ticket_count %}red{% endif %}">{{ open_ticket_count }}</div>
+            <div class="stat-label">open tickets</div>
+            {% if urgent_ticket_count %}<div class="stat-sub red">{{ urgent_ticket_count }} urgent</div>
+            {% else %}<div class="stat-sub">none urgent</div>{% endif %}
+          </a>
+        </div>
+      </div>
+        {% endif %}
+
+        {% if w.widget_id == "timeline" %}
+        <div class="widget{% if not widget_visible.timeline %} hidden{% endif %}" data-widget="timeline" data-col="left" id="widget-timeline">
+          <div class="widget-head">
+            <span class="widget-title">This week - kits</span>
+            <a class="widget-see-all" href="/timeline/">Full timeline &rarr;</a>
+          </div>
+          <div id="tlStrip"></div>
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "upcoming" %}
+        <div class="widget{% if not widget_visible.upcoming %} hidden{% endif %}" data-widget="upcoming" data-col="left" id="widget-upcoming">
+          <div class="widget-head">
+            <span class="widget-title">Coming up</span>
+            <a class="widget-see-all" href="/jobs/">All jobs &rarr;</a>
+          </div>
+          {% for job in upcoming_jobs %}
+            <a class="upcoming-row" onclick="openDashJobDetail({{ job.id }}); return false;" href="/jobs/{{ job.id }}/edit/">
+              <span class="upcoming-pip" style="background:{{ job.resolve_color }};"></span>
+              <span class="upcoming-name">{{ job.name }}</span>
+              <span class="badge badge-type" style="flex-shrink:0;">{{ job.get_category_display }}</span>
+              <span class="upcoming-date">
+                {% if job.start_date == job.end_date %}{{ job.start_date|date:"j M" }}
+                {% else %}{{ job.start_date|date:"j M" }} - {{ job.end_date|date:"j M" }}{% endif %}
+              </span>
+            </a>
+          {% empty %}
+            <div class="dash-empty">Nothing scheduled yet. <a href="#" onclick="document.getElementById('newJobDialog').showModal(); return false;" style="color:var(--accent);">Add a job</a>.</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "attention" %}
+        <div class="widget{% if not widget_visible.attention %} hidden{% endif %}" data-widget="attention" data-col="left" id="widget-attention">
+          <div class="widget-head">
+            <span class="widget-title" {% if attention_count %}style="color:var(--red);"{% endif %}>
+              Needs attention{% if attention_count %} ({{ attention_count }}){% endif %}
+            </span>
+            {% if attention_count %}<a class="widget-see-all" href="/assets/?status=NEEDS_REPAIR">All &rarr;</a>{% endif %}
+          </div>
+          {% for asset in attention_assets %}
+            <a class="attn-row" href="/assets/?q={{ asset.asset_id|urlencode }}">
+              <span class="attn-dot"></span>
+              <span class="attn-id">{{ asset.asset_id }}</span>
+              <span class="attn-model">{{ asset.make_model|default:"" }}</span>
+              <span class="badge badge-{{ asset.status|lower }}" style="flex-shrink:0; font-size:10px;">{{ asset.get_status_display }}</span>
+            </a>
+          {% empty %}
+            <div class="dash-empty">All assets in good shape.</div>
+          {% endfor %}
+          {% if attention_count > attention_assets|length %}
+            <div class="attn-row" style="color:var(--text-faint); justify-content:center; font-size:11px;">
+              + {{ attention_count|add:"-12" }} more - <a href="/assets/" style="color:var(--accent); margin-left:4px;">view all</a>
+            </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "active_kits" %}
+        <div class="widget{% if not widget_visible.active_kits %} hidden{% endif %}" data-widget="active_kits" data-col="left" id="widget-active_kits">
+          <div class="widget-head">
+            <span class="widget-title">Active kits</span>
+            <a class="widget-see-all" href="/kits/">All kits &rarr;</a>
+          </div>
+          {% for row in active_kit_rows %}
+            <a class="kit-row" href="/kits/{{ row.kit.id }}/edit/">
+              <span class="kit-pip" style="background:{{ row.job.resolve_color }};"></span>
+              <span class="kit-name">{{ row.kit.name }}</span>
+              <span class="kit-job" title="{{ row.job.name }}">{{ row.job.name }}</span>
+              <span class="kit-days">{% if row.days_left == 0 %}today{% elif row.days_left == 1 %}1d left{% else %}{{ row.days_left }}d{% endif %}</span>
+            </a>
+          {% empty %}
+            <div class="dash-empty">No kits out this week.</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "stocktake" %}
+        <div class="widget{% if not widget_visible.stocktake %} hidden{% endif %}" data-widget="stocktake" data-col="left" id="widget-stocktake">
+          <div class="widget-head">
+            <span class="widget-title">Stock take health</span>
+            <a class="widget-see-all" href="/stocktake/">All sessions &rarr;</a>
+          </div>
+          {% if stocktake_data %}
+            <div style="padding:12px 14px; border-bottom:1px solid var(--border);">
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+                <span style="font-size:12px; color:var(--text); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:160px;" title="{{ stocktake_data.session.display_label }}">{{ stocktake_data.session.display_label }}</span>
+                <span style="font-size:11px; color:var(--text-faint); flex-shrink:0; margin-left:8px;">{{ stocktake_data.pct }}% reviewed</span>
+              </div>
+              <div style="height:4px; background:var(--border); border-radius:2px; overflow:hidden;">
+                <div style="height:100%; width:{{ stocktake_data.pct }}%; background:{% if stocktake_data.complete %}var(--green){% else %}var(--accent){% endif %}; border-radius:2px;"></div>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid var(--border);">
+              <div style="padding:10px 14px; border-right:1px solid var(--border); text-align:center;">
+                <div style="font-size:20px; font-weight:700; font-family:var(--mono); color:var(--text);">{{ stocktake_data.reviewed }}</div>
+                <div style="font-size:10px; color:var(--text-dim); margin-top:2px;">reviewed</div>
+              </div>
+              <div style="padding:10px 14px; text-align:center;">
+                <div style="font-size:20px; font-weight:700; font-family:var(--mono); color:{% if stocktake_data.flagged %}var(--red){% else %}var(--text-faint){% endif %};">{{ stocktake_data.flagged }}</div>
+                <div style="font-size:10px; color:var(--text-dim); margin-top:2px;">flagged</div>
+              </div>
+            </div>
+            <div style="padding:8px 14px; display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11px; color:var(--text-faint);">{% if stocktake_data.complete %}Session complete{% else %}{{ stocktake_data.pending }} items pending{% endif %}</span>
+              <a href="/stocktake/{{ stocktake_data.session.id }}/" style="font-size:11px; color:var(--accent); text-decoration:none;">Open &rarr;</a>
+            </div>
+          {% else %}
+            <div class="dash-empty">No stock take sessions yet. <a href="/stocktake/" style="color:var(--accent);">Start one</a>.</div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "license_expiry" %}
+        <div class="widget{% if not widget_visible.license_expiry %} hidden{% endif %}" data-widget="license_expiry" data-col="left" id="widget-license_expiry">
+          <div class="widget-head">
+            <span class="widget-title">License expiry</span>
+            <a class="widget-see-all" href="/licenses/">All licenses &rarr;</a>
+          </div>
+          {% if expired_licenses %}
+            <div style="padding:4px 0; border-bottom:1px solid var(--border);">
+              {% for lic in expired_licenses %}
+              <a class="attn-row" href="/licenses/{{ lic.lic.id }}/edit/">
+              <span class="attn-dot" style="background:var(--red);"></span>
+              <span class="attn-id">{{ lic.lic.asset_id }}</span>
+              <span class="attn-model">{{ lic.lic.make_model|default:"" }}</span>
+              <span style="font-size:10px; color:var(--red); flex-shrink:0;">{{ lic.days_ago }}d ago</span>
+            </a>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% if expiring_licenses %}
+            <div style="padding:4px 0;">
+              {% for lic in expiring_licenses %}
+              <a class="attn-row" href="/licenses/{{ lic.lic.id }}/edit/">
+              <span class="attn-dot" style="background:{% if lic.days_left <= 7 %}var(--red){% elif lic.days_left <= 14 %}var(--accent){% else %}var(--green){% endif %};"></span>
+              <span class="attn-id">{{ lic.lic.asset_id }}</span>
+              <span class="attn-model">{{ lic.lic.make_model|default:"" }}</span>
+              <span style="font-size:10px; color:{% if lic.days_left <= 7 %}var(--red){% else %}var(--text-dim){% endif %}; flex-shrink:0; white-space:nowrap;">{{ lic.days_left }} day{{ lic.days_left|pluralize }} left</span>
+            </a>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% if not expired_licenses and not expiring_licenses %}
+            <div class="dash-empty">No licenses expiring in the next 60 days.</div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "activity" %}
+        <div class="widget{% if not widget_visible.activity %} hidden{% endif %}" data-widget="activity" data-col="left" id="widget-activity">
+          <div class="widget-head"><span class="widget-title">Recent activity</span></div>
+          {% for item in activity_feed %}
+            {% if item.type == "asset" %}
+              <a class="attn-row" href="/assets/{{ item.obj.asset.id }}/edit/" style="gap:10px;">
+                <span style="font-family:var(--mono); font-size:10px; color:var(--text-dim); flex-shrink:0; min-width:80px;">{{ item.obj.asset.asset_id }}</span>
+                <span style="flex:1; font-size:11px; color:var(--text);">{{ item.obj.field_label }}</span>
+                {% if item.obj.changed_by %}<span style="font-size:10px; color:var(--text-faint); flex-shrink:0;">{{ item.obj.changed_by.name }}</span>{% endif %}
+                <span style="font-size:10px; color:var(--text-faint); flex-shrink:0; white-space:nowrap;">{{ item.ts|timesince }} ago</span>
+              </a>
+            {% else %}
+              <a class="attn-row" href="/kits/{{ item.obj.kit.id }}/edit/" style="gap:10px;">
+                <span style="font-size:10px; color:var(--text-dim); flex-shrink:0; min-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ item.obj.kit.name }}</span>
+                <span style="flex:1; font-size:11px; color:var(--text);">{{ item.obj.field_label }}</span>
+                {% if item.obj.changed_by %}<span style="font-size:10px; color:var(--text-faint); flex-shrink:0;">{{ item.obj.changed_by.name }}</span>{% endif %}
+                <span style="font-size:10px; color:var(--text-faint); flex-shrink:0; white-space:nowrap;">{{ item.ts|timesince }} ago</span>
+              </a>
+            {% endif %}
+          {% empty %}
+            <div class="dash-empty">No recent activity.</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+      {% endfor %}
+
+    </div><!-- /dash-left -->
+
+    <div class="dash-right" id="dashRight">
+
+      {% for w in right_widgets %}
+
+        {% if w.widget_id == "stats" %}
+      <div class="widget{% if not widget_visible.stats %} hidden{% endif %}" data-widget="stats" id="widget-stats">
+        <div class="widget-head"><span class="widget-title">At a glance</span></div>
+        <div class="stats-strip">
+          <div class="stat-cell">
+            <div class="stat-num">{{ jobs_today_count }}</div>
+            <div class="stat-label">jobs active today</div>
+            <div class="stat-sub">{{ jobs_this_week }} this week</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-num">{{ kits_booked_count }}<span class="stat-denom">/{{ total_kits }}</span></div>
+            <div class="stat-label">kits booked this week</div>
+          </div>
+          <a class="stat-cell" href="/licenses/?status=ACTIVE" style="text-decoration:none; color:inherit;">
+            <div class="stat-num {% if licenses_expired %}red{% elif licenses_expiring %}{% endif %}">
+              {% if licenses_expired %}{{ licenses_expired }}{% else %}{{ licenses_expiring }}{% endif %}
+            </div>
+            <div class="stat-label">
+              {% if licenses_expired %}license{{ licenses_expired|pluralize }} expired{% else %}license{{ licenses_expiring|pluralize }} expiring{% endif %}
+            </div>
+            <div class="stat-sub">
+              {% if licenses_expired %}action needed{% elif licenses_expiring %}within 30 days{% else %}all current{% endif %}
+            </div>
+          </a>
+          <a class="stat-cell" href="/tickets/?status=OPEN" style="text-decoration:none; color:inherit;">
+            <div class="stat-num {% if urgent_ticket_count %}red{% endif %}">{{ open_ticket_count }}</div>
+            <div class="stat-label">open tickets</div>
+            {% if urgent_ticket_count %}<div class="stat-sub red">{{ urgent_ticket_count }} urgent</div>
+            {% else %}<div class="stat-sub">none urgent</div>{% endif %}
+          </a>
+        </div>
+      </div>
+        {% endif %}
+
+        {% if w.widget_id == "timeline" %}
+        <div class="widget{% if not widget_visible.timeline %} hidden{% endif %}" data-widget="timeline" data-col="right" id="widget-timeline">
+          <div class="widget-head">
+            <span class="widget-title">This week - kits</span>
+            <a class="widget-see-all" href="/timeline/">Full timeline &rarr;</a>
+          </div>
+          <div id="tlStrip"></div>
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "upcoming" %}
+        <div class="widget{% if not widget_visible.upcoming %} hidden{% endif %}" data-widget="upcoming" data-col="right" id="widget-upcoming">
+          <div class="widget-head">
+            <span class="widget-title">Coming up</span>
+            <a class="widget-see-all" href="/jobs/">All jobs &rarr;</a>
+          </div>
+          {% for job in upcoming_jobs %}
+            <a class="upcoming-row" onclick="openDashJobDetail({{ job.id }}); return false;" href="/jobs/{{ job.id }}/edit/">
+              <span class="upcoming-pip" style="background:{{ job.resolve_color }};"></span>
+              <span class="upcoming-name">{{ job.name }}</span>
+              <span class="badge badge-type" style="flex-shrink:0;">{{ job.get_category_display }}</span>
+              <span class="upcoming-date">{% if job.start_date == job.end_date %}{{ job.start_date|date:"j M" }}{% else %}{{ job.start_date|date:"j M" }} - {{ job.end_date|date:"j M" }}{% endif %}</span>
+            </a>
+          {% empty %}
+            <div class="dash-empty">Nothing scheduled yet. <a href="#" onclick="document.getElementById('newJobDialog').showModal(); return false;" style="color:var(--accent);">Add a job</a>.</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "attention" %}
+        <div class="widget{% if not widget_visible.attention %} hidden{% endif %}" data-widget="attention" data-col="right" id="widget-attention">
+          <div class="widget-head">
+            <span class="widget-title" {% if attention_count %}style="color:var(--red);"{% endif %}>Needs attention{% if attention_count %} ({{ attention_count }}){% endif %}</span>
+            {% if attention_count %}<a class="widget-see-all" href="/assets/?status=NEEDS_REPAIR">All &rarr;</a>{% endif %}
+          </div>
+          {% for asset in attention_assets %}
+            <a class="attn-row" href="/assets/?q={{ asset.asset_id|urlencode }}">
+              <span class="attn-dot"></span>
+              <span class="attn-id">{{ asset.asset_id }}</span>
+              <span class="attn-model">{{ asset.make_model|default:"" }}</span>
+              <span class="badge badge-{{ asset.status|lower }}" style="flex-shrink:0; font-size:10px;">{{ asset.get_status_display }}</span>
+            </a>
+          {% empty %}
+            <div class="dash-empty">All assets in good shape.</div>
+          {% endfor %}
+          {% if attention_count > attention_assets|length %}
+            <div class="attn-row" style="color:var(--text-faint); justify-content:center; font-size:11px;">+ {{ attention_count|add:"-12" }} more - <a href="/assets/" style="color:var(--accent); margin-left:4px;">view all</a></div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "active_kits" %}
+        <div class="widget{% if not widget_visible.active_kits %} hidden{% endif %}" data-widget="active_kits" data-col="right" id="widget-active_kits">
+          <div class="widget-head">
+            <span class="widget-title">Active kits</span>
+            <a class="widget-see-all" href="/kits/">All kits &rarr;</a>
+          </div>
+          {% for row in active_kit_rows %}
+            <a class="kit-row" href="/kits/{{ row.kit.id }}/edit/">
+              <span class="kit-pip" style="background:{{ row.job.resolve_color }};"></span>
+              <span class="kit-name">{{ row.kit.name }}</span>
+              <span class="kit-job" title="{{ row.job.name }}">{{ row.job.name }}</span>
+              <span class="kit-days">{% if row.days_left == 0 %}today{% elif row.days_left == 1 %}1d left{% else %}{{ row.days_left }}d{% endif %}</span>
+            </a>
+          {% empty %}
+            <div class="dash-empty">No kits out this week.</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "stocktake" %}
+        <div class="widget{% if not widget_visible.stocktake %} hidden{% endif %}" data-widget="stocktake" data-col="right" id="widget-stocktake">
+          <div class="widget-head">
+            <span class="widget-title">Stock take health</span>
+            <a class="widget-see-all" href="/stocktake/">All sessions &rarr;</a>
+          </div>
+          {% if stocktake_data %}
+            <div style="padding:12px 14px; border-bottom:1px solid var(--border);">
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+                <span style="font-size:12px; color:var(--text); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:160px;" title="{{ stocktake_data.session.display_label }}">{{ stocktake_data.session.display_label }}</span>
+                <span style="font-size:11px; color:var(--text-faint); flex-shrink:0; margin-left:8px;">{{ stocktake_data.pct }}% reviewed</span>
+              </div>
+              <div style="height:4px; background:var(--border); border-radius:2px; overflow:hidden;">
+                <div style="height:100%; width:{{ stocktake_data.pct }}%; background:{% if stocktake_data.complete %}var(--green){% else %}var(--accent){% endif %}; border-radius:2px;"></div>
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; border-bottom:1px solid var(--border);">
+              <div style="padding:10px 14px; border-right:1px solid var(--border); text-align:center;">
+                <div style="font-size:20px; font-weight:700; font-family:var(--mono); color:var(--text);">{{ stocktake_data.reviewed }}</div>
+                <div style="font-size:10px; color:var(--text-dim); margin-top:2px;">reviewed</div>
+              </div>
+              <div style="padding:10px 14px; text-align:center;">
+                <div style="font-size:20px; font-weight:700; font-family:var(--mono); color:{% if stocktake_data.flagged %}var(--red){% else %}var(--text-faint){% endif %};">{{ stocktake_data.flagged }}</div>
+                <div style="font-size:10px; color:var(--text-dim); margin-top:2px;">flagged</div>
+              </div>
+            </div>
+            <div style="padding:8px 14px; display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11px; color:var(--text-faint);">{% if stocktake_data.complete %}Session complete{% else %}{{ stocktake_data.pending }} items pending{% endif %}</span>
+              <a href="/stocktake/{{ stocktake_data.session.id }}/" style="font-size:11px; color:var(--accent); text-decoration:none;">Open &rarr;</a>
+            </div>
+          {% else %}
+            <div class="dash-empty">No stock take sessions yet. <a href="/stocktake/" style="color:var(--accent);">Start one</a>.</div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "license_expiry" %}
+        <div class="widget{% if not widget_visible.license_expiry %} hidden{% endif %}" data-widget="license_expiry" data-col="right" id="widget-license_expiry">
+          <div class="widget-head">
+            <span class="widget-title">License expiry</span>
+            <a class="widget-see-all" href="/licenses/">All licenses &rarr;</a>
+          </div>
+          {% if expired_licenses %}
+            <div style="padding:4px 0; border-bottom:1px solid var(--border);">
+              {% for lic in expired_licenses %}
+              <a class="attn-row" href="/licenses/{{ lic.lic.id }}/edit/">
+              <span class="attn-dot" style="background:var(--red);"></span>
+              <span class="attn-id">{{ lic.lic.asset_id }}</span>
+              <span class="attn-model">{{ lic.lic.make_model|default:"" }}</span>
+              <span style="font-size:10px; color:var(--red); flex-shrink:0;">{{ lic.days_ago }}d ago</span>
+            </a>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% if expiring_licenses %}
+            <div style="padding:4px 0;">
+              {% for lic in expiring_licenses %}
+              <a class="attn-row" href="/licenses/{{ lic.lic.id }}/edit/">
+              <span class="attn-dot" style="background:{% if lic.days_left <= 7 %}var(--red){% elif lic.days_left <= 14 %}var(--accent){% else %}var(--green){% endif %};"></span>
+              <span class="attn-id">{{ lic.lic.asset_id }}</span>
+              <span class="attn-model">{{ lic.lic.make_model|default:"" }}</span>
+              <span style="font-size:10px; color:{% if lic.days_left <= 7 %}var(--red){% else %}var(--text-dim){% endif %}; flex-shrink:0; white-space:nowrap;">{{ lic.days_left }} day{{ lic.days_left|pluralize }} left</span>
+            </a>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% if not expired_licenses and not expiring_licenses %}
+            <div class="dash-empty">No licenses expiring in the next 60 days.</div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if w.widget_id == "activity" %}
+        <div class="widget{% if not widget_visible.activity %} hidden{% endif %}" data-widget="activity" data-col="right" id="widget-activity">
+          <div class="widget-head"><span class="widget-title">Recent activity</span></div>
+          {% for item in activity_feed %}
+            {% if item.type == "asset" %}
+              <a class="attn-row" href="/assets/{{ item.obj.asset.id }}/edit/" style="gap:10px;">
+                <span style="font-family:var(--mono); font-size:10px; color:var(--text-dim); flex-shrink:0; min-width:80px;">{{ item.obj.asset.asset_id }}</span>
+                <span style="flex:1; font-size:11px; color:var(--text);">{{ item.obj.field_label }}</span>
+                {% if item.obj.changed_by %}<span style="font-size:10px; color:var(--text-faint); flex-shrink:0;">{{ item.obj.changed_by.name }}</span>{% endif %}
+                <span style="font-size:10px; color:var(--text-faint); flex-shrink:0; white-space:nowrap;">{{ item.ts|timesince }} ago</span>
+              </a>
+            {% else %}
+              <a class="attn-row" href="/kits/{{ item.obj.kit.id }}/edit/" style="gap:10px;">
+                <span style="font-size:10px; color:var(--text-dim); flex-shrink:0; min-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ item.obj.kit.name }}</span>
+                <span style="flex:1; font-size:11px; color:var(--text);">{{ item.obj.field_label }}</span>
+                {% if item.obj.changed_by %}<span style="font-size:10px; color:var(--text-faint); flex-shrink:0;">{{ item.obj.changed_by.name }}</span>{% endif %}
+                <span style="font-size:10px; color:var(--text-faint); flex-shrink:0; white-space:nowrap;">{{ item.ts|timesince }} ago</span>
+              </a>
+            {% endif %}
+          {% empty %}
+            <div class="dash-empty">No recent activity.</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+      {% endfor %}
+
+    </div><!-- /dash-right -->
+  </div><!-- /dash-cols -->
+</div><!-- /dash-wrap -->
 
 <!-- Job Detail Dialog -->
-<dialog id="jobDetailDialog" style="background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 10px; padding: 0; width: 420px; max-width: 90vw;">
+<dialog id="jobDetailDialog" style="background:var(--surface); color:var(--text); border:1px solid var(--border-strong); border-radius:10px; padding:0; width:420px; max-width:90vw;">
   <a class="dialog-edit-icon" id="jdEditLink" href="#" title="Edit" aria-label="Edit job">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
   </a>
@@ -179,8 +781,8 @@
   </div>
   <div style="display:flex; gap:8px; padding:14px 16px; border-top:1px solid var(--border);">
     <span style="flex:1;"></span>
-    <button class="btn" id="jdCloneBtn" onclick="dashCloneJob()">Duplicate</button>
-    <button class="btn" id="jdDeleteBtn" style="color:var(--red);" onclick="dashDeleteJob()">Delete job</button>
+    <button class="btn" onclick="dashCloneJob()">Duplicate</button>
+    <button class="btn" style="color:var(--red);" onclick="dashDeleteJob()">Delete job</button>
   </div>
 </dialog>
 
@@ -192,22 +794,18 @@
     {% csrf_token %}
     <label for="nj_name">Job name</label>
     <input type="text" id="nj_name" autofocus>
-
     <label for="nj_category">Category</label>
     <select id="nj_category">
       {% for value, label in job_categories %}
         <option value="{{ value }}">{{ label }}</option>
       {% endfor %}
     </select>
-
     <label for="nj_start">Start date</label>
     <input type="date" id="nj_start">
     <label for="nj_end">End date</label>
     <input type="date" id="nj_end">
-
     <label for="nj_notes">Notes (optional)</label>
     <input type="text" id="nj_notes">
-
     <div class="color-override-row">
       <input class="color-swatch-input" type="color" id="nj_color" value="#EAB308" disabled>
       <label class="color-override-label" for="nj_color_override">
@@ -215,7 +813,6 @@
         Custom color
       </label>
     </div>
-
     <div class="dialog-hint">This creates the job on its own. Book kits, staff, or licenses onto it from the Timeline afterwards.</div>
     <div class="dialog-error" id="newJobError"></div>
     <div class="dialog-actions">
@@ -225,42 +822,133 @@
 </dialog>
 
 <script>
+// ── Timeline strip renderer ──────────────────────────────────────────────────
+(function() {
+  const data   = {{ strip_data_json|safe }};
+  const strip  = document.getElementById("tlStrip");
+  const N      = data.days.length;
+  if (!N) return;
+
+  const header = document.createElement("div");
+  header.className = "timeline-header";
+  header.style.gridTemplateColumns = `repeat(${N}, 1fr)`;
+  data.days.forEach(iso => {
+    const d   = new Date(iso + "T00:00:00");
+    const dow = d.getDay();
+    const el  = document.createElement("div");
+    el.className = "tl-day-label";
+    if (iso === data.today) el.classList.add("today");
+    if (dow === 0 || dow === 6) el.classList.add("weekend");
+    el.innerHTML = `${d.toLocaleDateString("en-GB",{weekday:"short"}).slice(0,2)} ${d.getDate()}`;
+    header.appendChild(el);
+  });
+  strip.appendChild(header);
+
+  if (!data.jobs.length) {
+    const empty = document.createElement("div");
+    empty.className = "tl-empty";
+    empty.textContent = "No kit bookings this week.";
+    strip.appendChild(empty);
+    return;
+  }
+
+  const rows = document.createElement("div");
+  rows.className = "tl-rows";
+  data.jobs.forEach(job => {
+    const row = document.createElement("div");
+    row.className = "tl-job-row";
+    row.style.gridTemplateColumns = `repeat(${N}, 1fr)`;
+    data.days.forEach(iso => {
+      const cell = document.createElement("div");
+      cell.className = "tl-cell";
+      const dow = new Date(iso + "T00:00:00").getDay();
+      if (iso === data.today) cell.classList.add("today-col");
+      if (dow === 0 || dow === 6) cell.classList.add("weekend-col");
+      row.appendChild(cell);
+    });
+    const s = job.start < data.days[0] ? data.days[0] : job.start;
+    const e = job.end   > data.days[N-1] ? data.days[N-1] : job.end;
+    const si = data.days.indexOf(s), ei = data.days.indexOf(e);
+    if (si !== -1 && ei !== -1) {
+      const bar = document.createElement("div");
+      bar.className = "tl-bar";
+      bar.style.background = job.color;
+      bar.style.left  = `calc(${si/N*100}% + 3px)`;
+      bar.style.width = `calc(${(ei-si+1)/N*100}% - 6px)`;
+      bar.textContent = job.name;
+      bar.title = `${job.name} (${job.category})`;
+      bar.onclick = () => openDashJobDetail(job.id);
+      row.appendChild(bar);
+    }
+    rows.appendChild(row);
+  });
+  strip.appendChild(rows);
+})();
+
+
+// ── Save widget preferences to server ────────────────────────────────────────
+let saveTimer = null;
+function saveWidgetPrefs() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    const left  = document.getElementById("dashLeft");
+    const right = document.getElementById("dashRight");
+    const stats = document.getElementById("widget-stats");
+    const leftW  = Array.from(left.querySelectorAll(":scope > .widget[data-widget]"));
+    const rightW = Array.from(right.querySelectorAll(":scope > .widget[data-widget]"));
+    const all = [
+      ...(stats ? [{ el: stats, col: "full" }] : []),
+      ...leftW.map(el  => ({ el, col: "left" })),
+      ...rightW.map(el => ({ el, col: "right" })),
+    ];
+    const payload = all.map((item, i) => ({
+      id:       item.el.dataset.widget,
+      position: i,
+      visible:  !item.el.classList.contains("hidden"),
+      column:   item.col,
+    }));
+    await fetch("/api/dashboard/widgets/save/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]")?.value || "",
+      },
+      body: JSON.stringify({ widgets: payload }),
+    });
+  }, 600);
+}
+
+// ── New job form ─────────────────────────────────────────────────────────────
 async function submitNewJob() {
-  const name = document.getElementById("nj_name").value.trim();
-  const category = document.getElementById("nj_category").value;
+  const name      = document.getElementById("nj_name").value.trim();
+  const category  = document.getElementById("nj_category").value;
   const startDate = document.getElementById("nj_start").value;
-  const endDate = document.getElementById("nj_end").value;
-  const notes = document.getElementById("nj_notes").value.trim();
-  const colorOverride = document.getElementById("nj_color_override").checked;
-  const color = colorOverride ? document.getElementById("nj_color").value : "";
-
-  const errorEl = document.getElementById("newJobError");
+  const endDate   = document.getElementById("nj_end").value;
+  const notes     = document.getElementById("nj_notes").value.trim();
+  const colorOvr  = document.getElementById("nj_color_override").checked;
+  const color     = colorOvr ? document.getElementById("nj_color").value : "";
+  const errorEl   = document.getElementById("newJobError");
   errorEl.style.display = "none";
-
-  if (!name) { errorEl.textContent = "Enter a job name."; errorEl.style.display = "block"; return; }
-  if (!startDate || !endDate) { errorEl.textContent = "Pick a start and end date."; errorEl.style.display = "block"; return; }
-
-  const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  if (!name)                { errorEl.textContent = "Enter a job name.";              errorEl.style.display = "block"; return; }
+  if (!startDate || !endDate) { errorEl.textContent = "Pick a start and end date.";  errorEl.style.display = "block"; return; }
+  const csrf   = document.querySelector("[name=csrfmiddlewaretoken]").value;
   const params = { name, category, start_date: startDate, end_date: endDate };
   if (notes) params.notes = notes;
   if (color) params.custom_color = color;
-
   try {
     const resp = await fetch("/api/jobs/create/", {
-      method: "POST", headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
+      method: "POST",
+      headers: { "X-CSRFToken": csrf, "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams(params).toString(),
     });
     const data = await resp.json();
     if (!resp.ok) { errorEl.textContent = data.error || "Something went wrong."; errorEl.style.display = "block"; return; }
     document.getElementById("newJobDialog").close();
     location.reload();
-  } catch (err) {
-    errorEl.textContent = "Network error. Please try again."; errorEl.style.display = "block";
-  }
+  } catch { errorEl.textContent = "Network error. Please try again."; errorEl.style.display = "block"; }
 }
-</script>
 
-<script>
+// ── Job detail dialog ─────────────────────────────────────────────────────────
 const dashJobDialog = document.getElementById("jobDetailDialog");
 let dashActiveJobId = null;
 
@@ -268,19 +956,20 @@ async function openDashJobDetail(jobId) {
   dashActiveJobId = jobId;
   try {
     const resp = await fetch(`/api/jobs/${jobId}/`);
-    const job = await resp.json();
-    document.getElementById("jdTitle").textContent = job.name;
+    const job  = await resp.json();
+    document.getElementById("jdTitle").textContent    = job.name;
     document.getElementById("jdCategory").textContent = job.category_display;
     document.getElementById("jdColorBar").style.background = job.color;
-    const start = new Date(job.start_date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-    const end = new Date(job.end_date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-    document.getElementById("jdDates").textContent = start === end ? start : `${start} - ${end}`;
-    if (job.kits.length) { document.getElementById("jdKits").textContent = job.kits.join(", "); document.getElementById("jdKitsRow").style.display = "flex"; }
-    else document.getElementById("jdKitsRow").style.display = "none";
-    if (job.staff.length) { document.getElementById("jdStaff").textContent = job.staff.join(", "); document.getElementById("jdStaffRow").style.display = "flex"; }
-    else document.getElementById("jdStaffRow").style.display = "none";
-    if (job.notes) { document.getElementById("jdNotes").textContent = job.notes; document.getElementById("jdNotesRow").style.display = "flex"; }
-    else document.getElementById("jdNotesRow").style.display = "none";
+    const fmt = d => new Date(d + "T00:00:00").toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" });
+    document.getElementById("jdDates").textContent = job.start_date === job.end_date ? fmt(job.start_date) : `${fmt(job.start_date)} - ${fmt(job.end_date)}`;
+    const setRow = (rowId, valId, arr) => {
+      document.getElementById(rowId).style.display = arr.length ? "flex" : "none";
+      if (arr.length) document.getElementById(valId).textContent = arr.join(", ");
+    };
+    setRow("jdKitsRow",  "jdKits",  job.kits  || []);
+    setRow("jdStaffRow", "jdStaff", job.staff  || []);
+    document.getElementById("jdNotesRow").style.display = job.notes ? "flex" : "none";
+    if (job.notes) document.getElementById("jdNotes").textContent = job.notes;
     document.getElementById("jdEditLink").href = `/jobs/${jobId}/edit/`;
     dashJobDialog.showModal();
   } catch (e) { console.error(e); }
@@ -288,12 +977,8 @@ async function openDashJobDetail(jobId) {
 
 async function dashDeleteJob() {
   if (!dashActiveJobId) return;
-  const okDashDel = await showConfirm({
-    title: "Delete entire job?",
-    message: "This will permanently delete the job and all its bookings. This cannot be undone.",
-    okLabel: "Delete", cancelLabel: "Cancel"
-  });
-  if (!okDashDel) return;
+  const ok = await showConfirm({ title: "Delete entire job?", message: "This will permanently delete the job and all its bookings. This cannot be undone.", okLabel: "Delete", cancelLabel: "Cancel" });
+  if (!ok) return;
   const csrf = document.querySelector("[name=csrfmiddlewaretoken]")?.value || "{{ csrf_token }}";
   await fetch(`/api/jobs/${dashActiveJobId}/delete/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
   dashJobDialog.close();

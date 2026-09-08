@@ -243,12 +243,148 @@
         </div>
       </div>
       <div class="s-card">
-        <div class="s-card-head">Dashboard widgets <span class="s-card-head-sub">Coming soon</span></div>
-        <div class="coming-soon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-          Customisable dashboard widgets are coming in a future update.
+        <div class="s-card-head">Dashboard widgets</div>
+        <div style="padding:12px 14px; border-top:1px solid var(--border); font-size:11px; color:var(--text-faint);">
+          Drag widgets between zones to change their position on the dashboard. Toggle to show or hide.
+        </div>
+        <!-- Full-width zone -->
+        <div style="padding:0 14px 6px;">
+          <div style="font-size:10px; font-weight:600; letter-spacing:0.06em; color:var(--text-faint); text-transform:uppercase; padding:8px 0 4px;">Full width</div>
+          <div id="wZoneFull" style="min-height:44px; border:1px dashed var(--border-strong); border-radius:6px; padding:4px;"></div>
+        </div>
+        <!-- Two columns -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:6px 14px 14px;">
+          <div>
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.06em; color:var(--text-faint); text-transform:uppercase; padding:4px 0;">Left column</div>
+            <div id="wZoneLeft" style="min-height:80px; border:1px dashed var(--border-strong); border-radius:6px; padding:4px;"></div>
+          </div>
+          <div>
+            <div style="font-size:10px; font-weight:600; letter-spacing:0.06em; color:var(--text-faint); text-transform:uppercase; padding:4px 0;">Right column</div>
+            <div id="wZoneRight" style="min-height:80px; border:1px dashed var(--border-strong); border-radius:6px; padding:4px;"></div>
+          </div>
         </div>
       </div>
+      <script>
+      (function() {
+        const meta      = {{ widget_meta_json|safe }};
+        const zoneFull  = document.getElementById("wZoneFull");
+        const zoneLeft  = document.getElementById("wZoneLeft");
+        const zoneRight = document.getElementById("wZoneRight");
+        let dragSrc = null;
+
+        function zoneFor(col) {
+          if (col === "full")  return zoneFull;
+          if (col === "right") return zoneRight;
+          return zoneLeft;
+        }
+
+        function makeRow(w) {
+          const row = document.createElement("div");
+          row.dataset.id  = w.id;
+          row.dataset.col = w.column || "left";
+          row.style.cssText = "display:flex; align-items:center; gap:8px; padding:7px 10px; background:var(--surface-2); border:1px solid var(--border); border-radius:5px; margin-bottom:4px; font-size:12px;";
+          row.innerHTML = `
+            <span class="w-handle" style="cursor:grab; color:var(--text-faint); display:flex; align-items:center; flex-shrink:0;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+            </span>
+            <span style="flex:1; color:var(--text);">${w.label}</span>
+            <label class="toggle-switch" style="flex-shrink:0;">
+              <input type="checkbox" ${w.visible ? "checked" : ""}>
+              <div class="toggle-track"></div>
+            </label>
+          `;
+
+          row.querySelector("input").addEventListener("change", function() {
+            w.visible = this.checked;
+            saveWidgetSettings();
+          });
+
+          const handle = row.querySelector(".w-handle");
+          handle.addEventListener("mousedown", () => { row.draggable = true; });
+          handle.addEventListener("mouseup",   () => { row.draggable = false; });
+
+          row.addEventListener("dragstart", e => {
+            dragSrc = row;
+            e.dataTransfer.effectAllowed = "move";
+            setTimeout(() => { row.style.opacity = "0.4"; }, 0);
+          });
+          row.addEventListener("dragend", () => {
+            row.style.opacity = "";
+            row.draggable = false;
+            document.querySelectorAll(".w-zone").forEach(z => z.style.background = "");
+            saveWidgetSettings();
+          });
+          row.addEventListener("dragover", e => {
+            e.preventDefault();
+            if (dragSrc && dragSrc !== row) {
+              document.querySelectorAll("[data-id]").forEach(r => r.style.background = "");
+              row.style.background = "var(--accent-glow)";
+            }
+          });
+          row.addEventListener("dragleave", () => { row.style.background = ""; });
+          row.addEventListener("drop", e => {
+            e.preventDefault();
+            row.style.background = "";
+            if (!dragSrc || dragSrc === row) return;
+            const tgt = row.parentNode;
+            const rows = Array.from(tgt.querySelectorAll("[data-id]"));
+            const si = rows.indexOf(dragSrc), ti = rows.indexOf(row);
+            if (dragSrc.parentNode === tgt) {
+              if (si < ti) row.after(dragSrc);
+              else row.before(dragSrc);
+            } else {
+              row.before(dragSrc);
+            }
+            // Update col on the moved item
+            dragSrc.dataset.col = colForZone(tgt);
+            dragSrc = null;
+          });
+
+          return row;
+        }
+
+        function colForZone(zone) {
+          if (zone === zoneFull)  return "full";
+          if (zone === zoneRight) return "right";
+          return "left";
+        }
+
+        // Allow dropping onto empty zone space
+        [zoneFull, zoneLeft, zoneRight].forEach(zone => {
+          zone.addEventListener("dragover", e => { e.preventDefault(); zone.style.background = "var(--accent-glow)"; });
+          zone.addEventListener("dragleave", () => { zone.style.background = ""; });
+          zone.addEventListener("drop", e => {
+            e.preventDefault();
+            zone.style.background = "";
+            if (!dragSrc || e.target.closest("[data-id]")) return;
+            zone.appendChild(dragSrc);
+            dragSrc.dataset.col = colForZone(zone);
+            dragSrc = null;
+            saveWidgetSettings();
+          });
+        });
+
+        // Initial render - place each widget in its correct zone
+        meta.forEach(w => zoneFor(w.column || "left").appendChild(makeRow(w)));
+
+        async function saveWidgetSettings() {
+          const allRows = [
+            ...Array.from(zoneFull.querySelectorAll("[data-id]")).map((r, i) => ({ r, col: "full",  i })),
+            ...Array.from(zoneLeft.querySelectorAll("[data-id]")).map((r, i) => ({ r, col: "left",  i })),
+            ...Array.from(zoneRight.querySelectorAll("[data-id]")).map((r, i) => ({ r, col: "right", i })),
+          ];
+          const payload = allRows.map(({ r, col }, pos) => {
+            const m = meta.find(m => m.id === r.dataset.id);
+            return { id: r.dataset.id, position: pos, column: col, visible: m ? m.visible : true };
+          });
+          await fetch("/api/dashboard/widgets/save/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]")?.value || "" },
+            body: JSON.stringify({ widgets: payload }),
+          });
+        }
+      })();
+      </script>
     </div>
 
     <!-- Notifications -->

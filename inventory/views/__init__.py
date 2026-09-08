@@ -16,7 +16,7 @@ had to change.
     vans.py       -> van/vehicle CRUD + usage/maintenance/checklist logs
 """
 
-from .dashboard import dashboard_view
+from .dashboard import dashboard_view, dashboard_widgets_save
 
 from .timeline import (
     timeline_view,
@@ -55,6 +55,7 @@ from .kits import (
     kit_set_status_view,
     kit_booking_info_view,
     kit_pdf_view,
+    kit_archive_view,
 )
 
 from .jobs import (

@@ -1,13 +1,16 @@
 import datetime
+import json
 
 from django.contrib.auth.decorators import login_required
 from django.db import models
 from django.db.models import Count, Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from ..models import Asset, StaffMember, Tag, AssetHistory
+from ..models import Asset, AssetBooking, KitBooking, StaffMember, Tag, AssetHistory
 from ..models.assets import ASSET_HISTORY_SHARED_FIELDS
+from .common import _date_range
 
 CONTAINER_KIND_META = {
     Asset.AssetType.ENGINE: {
@@ -63,6 +66,73 @@ def asset_list_view(request):
     )
     total_active = Asset.objects.filter(archived=False).count()
 
+    # ── Stats strip ───────────────────────────────────────────────────────────
+    today = datetime.date.today()
+    strip_from_raw = request.GET.get("strip_from", "")
+    strip_to_raw   = request.GET.get("strip_to", "")
+    try:
+        range_start = datetime.date.fromisoformat(strip_from_raw) if strip_from_raw else None
+        range_end   = datetime.date.fromisoformat(strip_to_raw)   if strip_to_raw   else None
+    except ValueError:
+        range_start = range_end = None
+
+    # Default to this week (Mon-Sun)
+    if not range_start or not range_end or range_end < range_start:
+        week_start  = today - datetime.timedelta(days=today.weekday())
+        range_start = week_start
+        range_end   = week_start + datetime.timedelta(days=6)
+
+    # Prev/next week anchors for nav buttons
+    prev_week_start = range_start - datetime.timedelta(days=7)
+    next_week_start = range_start + datetime.timedelta(days=7)
+    today = datetime.date.today()
+    this_week_start = today - datetime.timedelta(days=today.weekday())
+    is_this_week = (range_start == this_week_start)
+
+    def _asset_availability(qs):
+        asset_list = list(qs.filter(archived=False))
+        asset_ids  = [a.id for a in asset_list]
+        booked_ids = set(
+            AssetBooking.objects.filter(
+                asset_id__in=asset_ids,
+                start_date__lte=range_end,
+                end_date__gte=range_start,
+            ).values_list("asset_id", flat=True)
+        )
+        free   = [a for a in asset_list if a.id not in booked_ids]
+        booked = [a for a in asset_list if a.id in booked_ids]
+        return len(free), len(asset_list), free, booked
+
+    engines_qs = Asset.objects.filter(asset_type=Asset.AssetType.ENGINE)
+    iocards_qs = Asset.objects.filter(asset_id__startswith="UK-IOC")
+    gpu_qs     = Asset.objects.filter(asset_type=Asset.AssetType.COMPONENT, asset_id__startswith="UK-GPU")
+
+    eng_free, eng_total, eng_free_list, eng_booked_list = _asset_availability(engines_qs)
+    ioc_free, ioc_total, ioc_free_list, ioc_booked_list = _asset_availability(iocards_qs)
+    gpu_free, gpu_total, gpu_free_list, gpu_booked_list = _asset_availability(gpu_qs)
+
+    def _serialise_assets(asset_list):
+        return [{"id": a.id, "asset_id": a.asset_id, "make_model": a.make_model or ""} for a in asset_list]
+
+    strip_popup_data = json.dumps({
+        "engines": {"free": _serialise_assets(eng_free_list), "booked": _serialise_assets(eng_booked_list)},
+        "iocards": {"free": _serialise_assets(ioc_free_list), "booked": _serialise_assets(ioc_booked_list)},
+        "gpus":    {"free": _serialise_assets(gpu_free_list), "booked": _serialise_assets(gpu_booked_list)},
+    })
+
+    # Strip-only AJAX request from JS week nav
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" and request.GET.get("_strip_only"):
+        return JsonResponse({
+            "eng_free": eng_free, "eng_total": eng_total,
+            "ioc_free": ioc_free, "ioc_total": ioc_total,
+            "gpu_free": gpu_free, "gpu_total": gpu_total,
+            "popup": {
+                "engines": {"free": _serialise_assets(eng_free_list), "booked": _serialise_assets(eng_booked_list)},
+                "iocards": {"free": _serialise_assets(ioc_free_list), "booked": _serialise_assets(ioc_booked_list)},
+                "gpus":    {"free": _serialise_assets(gpu_free_list), "booked": _serialise_assets(gpu_booked_list)},
+            },
+        })
+
     context = {
         "assets": assets,
         "asset_types": Asset.AssetType.choices,
@@ -74,6 +144,18 @@ def asset_list_view(request):
         "show_archived": show_archived,
         "query": query,
         "active_nav": "assets",
+        # Stats strip
+        "range_start": range_start,
+        "range_end": range_end,
+        "prev_week_start": prev_week_start,
+        "prev_week_end": prev_week_start + datetime.timedelta(days=6),
+        "next_week_start": next_week_start,
+        "next_week_end": next_week_start + datetime.timedelta(days=6),
+        "is_this_week": is_this_week,
+        "eng_free": eng_free, "eng_total": eng_total,
+        "ioc_free": ioc_free, "ioc_total": ioc_total,
+        "gpu_free": gpu_free, "gpu_total": gpu_total,
+        "strip_popup_data": strip_popup_data,
     }
     return render(request, "inventory/asset_list.html", context)
 
@@ -218,7 +300,7 @@ def _container_create_view(request, kind):
     if request.method == "POST":
         asset_id = request.POST.get("asset_id", "").strip()
         make_model = request.POST.get("make_model", "").strip()
-        serial = request.POST.get("serial", "").strip()
+        serial = request.POST.get("serial", "").strip().upper()
         qty = request.POST.get("qty", "1").strip()
         status = request.POST.get("status", Asset.Status.AVAILABLE)
         archived = request.POST.get("archived") == "on"
@@ -311,7 +393,7 @@ def _container_edit_view(request, kind, container_id):
     if request.method == "POST":
         asset_id = request.POST.get("asset_id", "").strip()
         make_model = request.POST.get("make_model", "").strip()
-        serial = request.POST.get("serial", "").strip()
+        serial = request.POST.get("serial", "").strip().upper()
         qty = request.POST.get("qty", "1").strip()
         status = request.POST.get("status", Asset.Status.AVAILABLE)
         archived = request.POST.get("archived") == "on"
@@ -564,7 +646,7 @@ def asset_create_view(request):
         asset_id    = request.POST.get("asset_id", "").strip()
         asset_type  = request.POST.get("asset_type", "").strip()
         make_model  = request.POST.get("make_model", "").strip()
-        serial      = request.POST.get("serial", "").strip()
+        serial      = request.POST.get("serial", "").strip().upper()
         qty_raw     = request.POST.get("qty", "1").strip()
         status      = request.POST.get("status", Asset.Status.AVAILABLE)
         archived    = request.POST.get("archived") == "on"
@@ -666,7 +748,7 @@ def asset_edit_view(request, asset_id):
         new_asset_id  = request.POST.get("asset_id", "").strip()
         asset_type    = request.POST.get("asset_type", asset.asset_type).strip()
         make_model    = request.POST.get("make_model", "").strip()
-        serial        = request.POST.get("serial", "").strip()
+        serial        = request.POST.get("serial", "").strip().upper()
         qty_raw       = request.POST.get("qty", "1").strip()
         status        = request.POST.get("status", Asset.Status.AVAILABLE)
         archived      = request.POST.get("archived") == "on"
