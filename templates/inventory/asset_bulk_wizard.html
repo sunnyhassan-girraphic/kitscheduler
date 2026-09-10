@@ -1,0 +1,579 @@
+{% extends "inventory/base.html" %}
+{% block title %}G.R.E.G - Bulk Add Assets{% endblock %}
+{% block brand_sub %}Bulk asset wizard{% endblock %}
+
+{% block header_actions %}
+  <a class="btn" href="/assets/">Cancel</a>
+{% endblock %}
+
+{% block extra_style %}
+  .form-field { margin-bottom: 14px; }
+  .form-field:last-child { margin-bottom: 0; }
+  .form-field label { display: block; font-size: 12px; font-weight: 500; color: var(--text-dim); margin-bottom: 5px; }
+  .form-field input[type="text"],
+  .form-field input[type="number"],
+  .form-field input[type="date"],
+  .form-field select { width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px; font-family: inherit; box-sizing: border-box; }
+  .form-field input:focus, .form-field select:focus { outline: none; border-color: var(--accent); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .error-msg { background: var(--red-dim); border: 1px solid var(--red); color: var(--red); border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; display: none; }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+
+  /* Wizard layout */
+  .wiz-wrap { max-width: 680px; margin: 28px auto; padding: 0 16px 60px; }
+  .wiz-steps { display: flex; align-items: center; margin-bottom: 28px; }
+  .wiz-step { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-faint); flex-shrink: 0; }
+  .wiz-step.active { color: var(--accent); font-weight: 600; }
+  .wiz-step.done { color: var(--text-dim); }
+  .wiz-step-num { width: 24px; height: 24px; border-radius: 50%; border: 2px solid currentColor; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .wiz-step.active .wiz-step-num { background: var(--accent); color: #000; border-color: var(--accent); }
+  .wiz-step.done .wiz-step-num { background: var(--surface-2); border-color: var(--border-strong); }
+  .wiz-step-line { flex: 1; height: 1px; background: var(--border); margin: 0 10px; min-width: 16px; }
+  .wiz-pane { display: none; }
+  .wiz-pane.active { display: block; }
+
+  /* Form section cards */
+  .form-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+  .form-section-head { padding: 12px 16px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); background: var(--surface-2); border-bottom: 1px solid var(--border); }
+  .form-section-body { padding: 20px; }
+  .form-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 16px; }
+
+  /* ID mode selector cards */
+  .id-mode-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .id-mode-card {
+    border: 2px solid var(--border-strong); border-radius: 8px;
+    padding: 14px 12px; cursor: pointer; transition: border-color 0.12s, background 0.12s;
+    background: var(--surface-2); position: relative;
+  }
+  .id-mode-card:hover { border-color: var(--accent-deep); background: var(--surface); }
+  .id-mode-card.selected { border-color: var(--accent); background: var(--accent-glow); }
+  .id-mode-card input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+  .id-mode-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .id-mode-card.selected .id-mode-title { color: var(--accent); }
+  .id-mode-desc { font-size: 11px; color: var(--text-faint); line-height: 1.4; }
+
+  /* Step 2 */
+  .last-id-note { font-size: 13px; color: var(--text-dim); margin-bottom: 16px; padding: 10px 12px; background: var(--surface-2); border-radius: 6px; border: 1px solid var(--border); }
+  .last-id-note strong { font-family: var(--mono); color: var(--text); }
+  .id-preview-label { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; margin: 14px 0 8px; }
+  .id-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 28px; }
+  .id-chip { font-family: var(--mono); font-size: 12px; padding: 4px 10px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--accent); }
+  .id-chips-manual { font-size: 13px; color: var(--text-faint); font-style: italic; padding: 4px 0; }
+
+  /* Step 4 tables */
+  .serial-table { width: 100%; border-collapse: collapse; }
+  .serial-table th { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 10px; border-bottom: 2px solid var(--border); text-align: left; }
+  .serial-table td { padding: 4px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .serial-table .id-cell { font-family: var(--mono); font-size: 12px; color: var(--accent); padding: 8px 10px; white-space: nowrap; }
+  .serial-table input { width: 100%; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 6px; padding: 7px 10px; font-family: var(--mono); font-size: 12px; color: var(--text); box-sizing: border-box; }
+  .serial-table input.id-input { color: var(--accent); }
+  .serial-table input:focus { outline: none; border-color: var(--accent); }
+
+  /* Step 5 review */
+  .review-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .review-table th { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; padding: 6px 12px; border-bottom: 2px solid var(--border); text-align: left; }
+  .review-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  .review-table .mono { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+  .review-meta { margin-top: 16px; padding: 14px 16px; background: var(--surface-2); border-radius: 6px; border: 1px solid var(--border); }
+  .review-meta-row { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+  .review-meta-row:last-child { margin-bottom: 0; }
+  .review-meta-label { color: var(--text-dim); font-size: 12px; min-width: 140px; }
+
+  /* Success */
+  .wiz-success { text-align: center; padding: 48px 24px; }
+  .wiz-success h2 { color: var(--accent); font-size: 22px; margin-bottom: 10px; }
+  .wiz-success p { color: var(--text-dim); font-size: 14px; margin-bottom: 24px; line-height: 1.6; }
+{% endblock %}
+
+{% block content %}
+<div class="wiz-wrap">
+
+  <div class="wiz-steps" id="wizSteps">
+    <div class="wiz-step active" data-step="1"><div class="wiz-step-num">1</div>Type</div>
+    <div class="wiz-step-line"></div>
+    <div class="wiz-step" data-step="2"><div class="wiz-step-num">2</div>Quantity</div>
+    <div class="wiz-step-line"></div>
+    <div class="wiz-step" data-step="3"><div class="wiz-step-num">3</div>Details</div>
+    <div class="wiz-step-line"></div>
+    <div class="wiz-step" data-step="4"><div class="wiz-step-num">4</div>Serials</div>
+    <div class="wiz-step-line"></div>
+    <div class="wiz-step" data-step="5"><div class="wiz-step-num">5</div>Review</div>
+  </div>
+
+  <!-- Step 1: Type, Region, ID Mode -->
+  <div class="wiz-pane active" id="pane1">
+    <div class="form-section">
+      <div class="form-section-head">Step 1 - Asset type &amp; region</div>
+      <div class="form-section-body">
+        <div style="display:flex; align-items:flex-end; gap:10px; margin-bottom:14px; flex-wrap:nowrap;">
+          <div class="form-field" style="margin-bottom:0; width:160px; flex-shrink:0;">
+            <label>Region prefix</label>
+            <select id="w_prefix" onchange="toggleCustomPrefix(this)">
+              <option value="UK" selected>UK</option>
+              <option value="AU">AU</option>
+              <option value="US">US</option>
+              <option value="custom">Other...</option>
+            </select>
+          </div>
+          <div class="form-field" id="w_prefix_custom_wrap" style="display:none; margin-bottom:0; width:80px; flex-shrink:0;">
+            <label>&nbsp;</label>
+            <input type="text" id="w_prefix_custom" placeholder="e.g. EU" maxlength="4" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <div class="form-field" style="margin-bottom:0; flex:1;">
+            <label>Asset type</label>
+            <select id="w_type">
+              <option value="">Select type...</option>
+              {% for value, label in asset_type_choices %}
+                {% if value != "LICENSE" %}
+                  <option value="{{ value }}">{{ label }}</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-field" style="margin-bottom:0;">
+          <label>How do you want to assign Asset IDs?</label>
+          <div class="id-mode-grid">
+            <div class="id-mode-card selected" data-mode="sequential" onclick="selectMode('sequential')">
+              <input type="radio" name="id_mode" value="sequential" checked>
+              <div class="id-mode-title">Sequential</div>
+              <div class="id-mode-desc">Continue from the last ID in inventory. GREG suggests the next available numbers.</div>
+            </div>
+            <div class="id-mode-card" data-mode="custom_start" onclick="selectMode('custom_start')">
+              <input type="radio" name="id_mode" value="custom_start">
+              <div class="id-mode-title">Custom start</div>
+              <div class="id-mode-desc">Sequential, but you choose which number to start from.</div>
+            </div>
+            <div class="id-mode-card" data-mode="manual" onclick="selectMode('manual')">
+              <input type="radio" name="id_mode" value="manual">
+              <div class="id-mode-title">Name myself</div>
+              <div class="id-mode-desc">You type each Asset ID manually. For non-standard naming.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="error-msg" id="err1"></div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="goStep2()">Next &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Quantity -->
+  <div class="wiz-pane" id="pane2">
+    <div class="form-section">
+      <div class="form-section-head">Step 2 - Quantity</div>
+      <div class="form-section-body">
+
+        <!-- Sequential mode -->
+        <div id="qty-sequential">
+          <div class="last-id-note" id="lastIdNote">Checking inventory...</div>
+          <div style="display:grid; grid-template-columns:140px; gap:14px;">
+            <div class="form-field" style="margin-bottom:0;">
+              <label>How many?</label>
+              <input type="number" id="w_qty" value="1" min="1" max="50" oninput="updateIdPreview()" onwheel="this.blur()">
+            </div>
+          </div>
+          <div class="id-preview-label">Asset IDs that will be created</div>
+          <div class="id-chips" id="idChips"></div>
+        </div>
+
+        <!-- Custom start mode -->
+        <div id="qty-custom-start" style="display:none;">
+          <div class="last-id-note" id="lastIdNoteCustom">Checking inventory...</div>
+          <div style="display:grid; grid-template-columns:140px 180px; gap:14px;">
+            <div class="form-field" style="margin-bottom:0;">
+              <label>How many?</label>
+              <input type="number" id="w_qty_custom" value="1" min="1" max="50" oninput="updateIdPreviewCustom()" onwheel="this.blur()">
+            </div>
+            <div class="form-field" style="margin-bottom:0;">
+              <label>Start from number</label>
+              <input type="number" id="w_start_num" min="1" placeholder="e.g. 30" oninput="updateIdPreviewCustom()" onwheel="this.blur()">
+            </div>
+          </div>
+          <div class="id-preview-label">Asset IDs that will be created</div>
+          <div class="id-chips" id="idChipsCustom"></div>
+        </div>
+
+        <!-- Manual mode -->
+        <div id="qty-manual" style="display:none;">
+          <div style="display:grid; grid-template-columns:140px; gap:14px;">
+            <div class="form-field" style="margin-bottom:0;">
+              <label>How many?</label>
+              <input type="number" id="w_qty_manual" value="1" min="1" max="50" onwheel="this.blur()">
+            </div>
+          </div>
+          <p style="font-size:13px; color:var(--text-dim); margin-top:14px;">You'll enter each Asset ID on the next step.</p>
+        </div>
+
+        <div class="error-msg" id="err2"></div>
+        <div class="form-actions">
+          <button class="btn" onclick="goPane(1)">Back</button>
+          <button class="btn btn-primary" onclick="goStep3()">Next &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Shared details -->
+  <div class="wiz-pane" id="pane3">
+    <div class="form-section">
+      <div class="form-section-head">Step 3 - Shared details</div>
+      <div class="form-section-body">
+        <p style="font-size:13px; color:var(--text-dim); margin-bottom:16px;">These apply to all assets in the batch.</p>
+        <div class="form-field">
+          <label>Make / Model</label>
+          <input type="text" id="w_make_model" placeholder="">
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>Status</label>
+            <select id="w_status">
+              {% for value, label in statuses %}
+                <option value="{{ value }}" {% if value == "AVAILABLE" %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Notes (optional)</label>
+            <input type="text" id="w_notes" placeholder="Applies to all assets">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn" onclick="goPane(2)">Back</button>
+          <button class="btn btn-primary" onclick="goStep4()">Next &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: Serials (and IDs if manual) -->
+  <div class="wiz-pane" id="pane4">
+    <div class="form-section">
+      <div class="form-section-head" id="step4Head">Step 4 - Serial numbers</div>
+      <div class="form-section-body">
+        <p style="font-size:13px; color:var(--text-dim); margin-bottom:16px;" id="step4Hint">Enter the serial for each asset. Leave blank if unknown. Tab between fields for speed.</p>
+        <table class="serial-table">
+          <thead id="serialTableHead">
+            <tr><th>Asset ID</th><th>Serial number</th></tr>
+          </thead>
+          <tbody id="serialTableBody"></tbody>
+        </table>
+        <div class="form-actions">
+          <button class="btn" onclick="goPane(3)">Back</button>
+          <button class="btn btn-primary" onclick="goStep5()">Review &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 5: Review -->
+  <div class="wiz-pane" id="pane5">
+    <div class="form-section">
+      <div class="form-section-head">Step 5 - Review &amp; confirm</div>
+      <div class="form-section-body">
+        <p style="font-size:13px; color:var(--text-dim); margin-bottom:16px;">Check everything before creating. Go back to change anything.</p>
+        <table class="review-table">
+          <thead><tr><th>Asset ID</th><th>Make / Model</th><th>Serial</th><th>Status</th></tr></thead>
+          <tbody id="reviewTableBody"></tbody>
+        </table>
+        <div class="review-meta" id="reviewMeta"></div>
+        <div class="error-msg" id="errSubmit"></div>
+        <div class="form-actions">
+          <button class="btn" onclick="goPane(4)">Back</button>
+          <button class="btn btn-primary" id="submitBtn" onclick="submitWizard()">Create assets</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success -->
+  <div class="wiz-pane" id="paneSuccess">
+    <div class="form-section">
+      <div class="form-section-body">
+        <div class="wiz-success">
+          <h2 id="successHeading">Assets created</h2>
+          <p id="successBody"></p>
+          <div style="display:flex; gap:10px; justify-content:center;">
+            <a href="/assets/" class="btn btn-primary">Go to Inventory</a>
+            <a href="/assets/bulk-add/" class="btn">Add more</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "";
+
+let state = {
+  prefix: "UK",
+  assetType: "",
+  assetTypeLabel: "",
+  idMode: "sequential",  // sequential | custom_start | manual
+  qty: 1,
+  nextNum: 1,
+  autoNextNum: 1,
+  pattern: "",
+  assetIds: [],
+  makeModel: "",
+  status: "AVAILABLE",
+  statusLabel: "Available",
+  notes: "",
+  serials: {},
+  currentPane: 1,
+  staffId: "{{ current_staff_id }}",
+  staffName: "{{ current_staff_name }}",
+  today: "{{ today }}",
+};
+
+// --- Step 1 ---
+
+function toggleCustomPrefix(sel) {
+  document.getElementById("w_prefix_custom_wrap").style.display = sel.value === "custom" ? "flex" : "none";
+  document.getElementById("w_prefix_custom_wrap").style.flexDirection = "column";
+}
+
+function getPrefix() {
+  const sel = document.getElementById("w_prefix").value;
+  return sel === "custom" ? document.getElementById("w_prefix_custom").value.trim().toUpperCase() : sel;
+}
+
+function selectMode(mode) {
+  state.idMode = mode;
+  document.querySelectorAll(".id-mode-card").forEach(card => {
+    card.classList.toggle("selected", card.dataset.mode === mode);
+  });
+}
+
+async function goStep2() {
+  const prefix = getPrefix();
+  const assetType = document.getElementById("w_type").value;
+  const errEl = document.getElementById("err1");
+  errEl.style.display = "none";
+  if (!prefix) { errEl.textContent = "Enter a region prefix."; errEl.style.display = "block"; return; }
+  if (!assetType) { errEl.textContent = "Select an asset type."; errEl.style.display = "block"; return; }
+  state.prefix = prefix;
+  state.assetType = assetType;
+  state.assetTypeLabel = document.getElementById("w_type").options[document.getElementById("w_type").selectedIndex].text;
+  goPane(2);
+
+  // Show the right qty section
+  document.getElementById("qty-sequential").style.display = state.idMode === "sequential" ? "block" : "none";
+  document.getElementById("qty-custom-start").style.display = state.idMode === "custom_start" ? "block" : "none";
+  document.getElementById("qty-manual").style.display = state.idMode === "manual" ? "block" : "none";
+
+  if (state.idMode !== "manual") {
+    const noteId = state.idMode === "sequential" ? "lastIdNote" : "lastIdNoteCustom";
+    document.getElementById(noteId).textContent = "Checking inventory...";
+    const r = await fetch(`/api/assets/bulk-next-id/?prefix=${prefix}&type=${assetType}`);
+    const data = await r.json();
+    state.nextNum = data.next_num;
+    state.autoNextNum = data.next_num;
+    state.pattern = data.pattern;
+    const note = data.last_id
+      ? `Last in inventory: <strong>${data.last_id}</strong>`
+      : `No existing <strong>${data.pattern}</strong> assets - starting from 01`;
+    document.getElementById(noteId).innerHTML = note;
+    if (state.idMode === "sequential") updateIdPreview();
+    else updateIdPreviewCustom();
+  }
+}
+
+// --- Step 2 ---
+
+function updateIdPreview() {
+  const qty = Math.max(1, Math.min(50, parseInt(document.getElementById("w_qty").value) || 1));
+  state.qty = qty;
+  state.assetIds = [];
+  for (let i = 0; i < qty; i++) {
+    state.assetIds.push(state.pattern + String(state.nextNum + i).padStart(2, "0"));
+  }
+  document.getElementById("idChips").innerHTML = state.assetIds.map(id => `<span class="id-chip">${id}</span>`).join("");
+}
+
+function updateIdPreviewCustom() {
+  const qty = Math.max(1, Math.min(50, parseInt(document.getElementById("w_qty_custom").value) || 1));
+  const startEl = document.getElementById("w_start_num");
+  const startVal = parseInt(startEl.value);
+  const startNum = (!isNaN(startVal) && startVal >= 1) ? startVal : state.autoNextNum;
+  state.qty = qty;
+  state.nextNum = startNum;
+  state.assetIds = [];
+  for (let i = 0; i < qty; i++) {
+    state.assetIds.push(state.pattern + String(startNum + i).padStart(2, "0"));
+  }
+  document.getElementById("idChipsCustom").innerHTML = state.assetIds.map(id => `<span class="id-chip">${id}</span>`).join("");
+}
+
+function goStep3() {
+  const errEl = document.getElementById("err2");
+  errEl.style.display = "none";
+  let qty = 1;
+  if (state.idMode === "sequential") {
+    qty = parseInt(document.getElementById("w_qty").value) || 0;
+    updateIdPreview();
+  } else if (state.idMode === "custom_start") {
+    qty = parseInt(document.getElementById("w_qty_custom").value) || 0;
+    updateIdPreviewCustom();
+  } else {
+    qty = parseInt(document.getElementById("w_qty_manual").value) || 0;
+    state.qty = qty;
+    state.assetIds = Array.from({length: qty}, (_, i) => "");  // blanks for manual
+  }
+  if (qty < 1 || qty > 50) { errEl.textContent = "Enter a quantity between 1 and 50."; errEl.style.display = "block"; return; }
+  goPane(3);
+}
+
+// --- Step 3 ---
+
+function goStep4() {
+  state.makeModel = document.getElementById("w_make_model").value.trim();
+  state.status = document.getElementById("w_status").value;
+  state.statusLabel = document.getElementById("w_status").options[document.getElementById("w_status").selectedIndex].text;
+  state.notes = document.getElementById("w_notes").value.trim();
+
+  const tbody = document.getElementById("serialTableBody");
+  tbody.innerHTML = "";
+  const isManual = state.idMode === "manual";
+
+  // Update step 4 header and hint based on mode
+  document.getElementById("step4Head").textContent = isManual ? "Step 4 - Asset IDs & Serials" : "Step 4 - Serial numbers";
+  document.getElementById("step4Hint").textContent = isManual
+    ? "Enter the Asset ID and serial for each asset. Tab between fields for speed."
+    : "Enter the serial for each asset. Leave blank if unknown. Tab between fields for speed.";
+  document.getElementById("serialTableHead").innerHTML = isManual
+    ? "<tr><th>Asset ID</th><th>Serial number</th></tr>"
+    : "<tr><th>Asset ID</th><th>Serial number</th></tr>";
+
+  const count = isManual ? state.qty : state.assetIds.length;
+  for (let i = 0; i < count; i++) {
+    const id = isManual ? "" : state.assetIds[i];
+    const tr = document.createElement("tr");
+    if (isManual) {
+      tr.innerHTML = `
+        <td style="padding:4px 6px;"><input type="text" class="id-input" id="assetid_${i}" placeholder="" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()"></td>
+        <td style="padding:4px 6px;"><input type="text" id="serial_${i}" placeholder="Optional" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()"></td>`;
+    } else {
+      tr.innerHTML = `
+        <td class="id-cell">${id}</td>
+        <td style="padding:4px 6px;"><input type="text" id="serial_${i}" placeholder="Optional" style="text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()"></td>`;
+    }
+    tbody.appendChild(tr);
+  }
+  goPane(4);
+  const first = document.getElementById(isManual ? "assetid_0" : "serial_0");
+  if (first) first.focus();
+}
+
+// --- Step 5 ---
+
+function goStep5() {
+  const isManual = state.idMode === "manual";
+  const finalIds = [];
+
+  for (let i = 0; i < state.qty; i++) {
+    const id = isManual
+      ? (document.getElementById("assetid_" + i)?.value.trim().toUpperCase() || "")
+      : state.assetIds[i];
+    finalIds.push(id);
+    const serialEl = document.getElementById("serial_" + i);
+    state.serials[id] = serialEl ? serialEl.value.trim().toUpperCase() : "";
+  }
+
+  // Validate manual IDs aren't empty
+  if (isManual) {
+    const empty = finalIds.filter(id => !id);
+    if (empty.length > 0) {
+      alert(`Please fill in all Asset IDs before continuing.`);
+      return;
+    }
+  }
+
+  state.assetIds = finalIds;
+
+  const tbody = document.getElementById("reviewTableBody");
+  tbody.innerHTML = "";
+  state.assetIds.forEach(id => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="mono">${id}</td>
+      <td style="font-size:13px;">${state.makeModel || '<span style="color:var(--text-faint)">-</span>'}</td>
+      <td style="font-family:var(--mono); font-size:12px; color:var(--text-dim);">${state.serials[id] || '<span style="color:var(--text-faint)">-</span>'}</td>
+      <td style="font-size:13px;">${state.statusLabel}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("reviewMeta").innerHTML = `
+    <div class="review-meta-row"><span class="review-meta-label">Type</span><span>${state.assetTypeLabel}</span></div>
+    <div class="review-meta-row"><span class="review-meta-label">Region prefix</span><span style="font-family:var(--mono)">${state.prefix}</span></div>
+    <div class="review-meta-row"><span class="review-meta-label">ID assignment</span><span>${{sequential:"Sequential from inventory", custom_start:"Sequential from custom start", manual:"Manually named"}[state.idMode]}</span></div>
+    ${state.notes ? `<div class="review-meta-row"><span class="review-meta-label">Notes</span><span>${state.notes}</span></div>` : ""}
+    <div class="review-meta-row"><span class="review-meta-label">Last updated by</span><span>${state.staffName || "Not set"}</span></div>
+    <div class="review-meta-row"><span class="review-meta-label">Last updated date</span><span>${state.today}</span></div>`;
+
+  document.getElementById("submitBtn").textContent = `Create ${state.assetIds.length} asset${state.assetIds.length !== 1 ? "s" : ""}`;
+  goPane(5);
+}
+
+// --- Submit ---
+
+async function submitWizard() {
+  const errEl = document.getElementById("errSubmit");
+  errEl.style.display = "none";
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true;
+  btn.textContent = "Creating...";
+
+  const payload = {
+    shared: { asset_type: state.assetType, make_model: state.makeModel, status: state.status, notes: state.notes },
+    last_updated_by_id: state.staffId,
+    last_updated_date: state.today,
+    assets: state.assetIds.map(id => ({ asset_id: id, serial: state.serials[id] || "" })),
+  };
+
+  const r = await fetch("/assets/bulk-add/", {
+    method: "POST",
+    headers: { "X-CSRFToken": CSRF, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await r.json();
+  if (!r.ok && !data.created?.length) {
+    errEl.textContent = data.error || "Something went wrong.";
+    errEl.style.display = "block";
+    btn.disabled = false;
+    btn.textContent = `Create ${state.assetIds.length} assets`;
+    return;
+  }
+
+  document.getElementById("successHeading").textContent = `${data.created.length} asset${data.created.length !== 1 ? "s" : ""} created`;
+  let body = data.created.join(", ");
+  if (data.errors?.length) body += `\n\nWarnings: ${data.errors.join("; ")}`;
+  document.getElementById("successBody").textContent = body;
+  goPane("success");
+}
+
+// --- Shared pane navigation ---
+
+function goPane(n) {
+  const current = "pane" + state.currentPane;
+  document.getElementById(current).classList.remove("active");
+  const target = n === "success" ? "paneSuccess" : "pane" + n;
+  document.getElementById(target).classList.add("active");
+  state.currentPane = n;
+  document.querySelectorAll(".wiz-step").forEach(el => {
+    const s = parseInt(el.dataset.step);
+    el.classList.remove("active", "done");
+    if (s === n) el.classList.add("active");
+    else if (s < n) el.classList.add("done");
+  });
+  window.scrollTo(0, 0);
+}
+</script>
+{% endblock %}

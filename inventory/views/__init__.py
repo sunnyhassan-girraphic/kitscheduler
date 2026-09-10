@@ -45,6 +45,8 @@ from .assets import (
     io_device_edit_view,
     io_device_delete_view,
     asset_create_view,
+    asset_bulk_wizard_view,
+    asset_bulk_next_id,
     asset_edit_view,
     asset_delete_view,
 )

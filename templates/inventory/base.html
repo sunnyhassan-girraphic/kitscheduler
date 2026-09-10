@@ -273,6 +273,11 @@
   td.weekend, th.weekend { background: var(--surface-2); }
   html.light-mode td.weekend, html.light-mode th.weekend { background: #eeece6; }
   th.today { color: var(--accent); font-weight: 700; box-shadow: inset 0 4px 0 0 var(--accent); padding-top: 12px; }
+  /* Remove number input spinners globally */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+
   ::-webkit-scrollbar { height: 8px; width: 8px; }
   ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
   .col-resize-handle {

@@ -4,7 +4,23 @@
 {% block brand_sub %}{{ total_active }} asset{{ total_active|pluralize }} tracked{% endblock %}
 {% block header_actions %}
   <a class="btn" href="/stocktake/">Stock Take</a>
-  <a class="btn btn-primary" href="/assets/new/">+ New asset</a>
+  <button class="btn btn-primary" onclick="document.getElementById('newAssetChoiceDialog').showModal()">+ New asset</button>
+
+  <dialog id="newAssetChoiceDialog" class="dialog-panel" style="max-width:340px;">
+    <button type="button" class="dialog-close-x" onclick="document.getElementById('newAssetChoiceDialog').close()" aria-label="Close">&times;</button>
+    <h3>Add asset</h3>
+    <p style="font-size:13px; color:var(--text-dim); margin-bottom:18px;">Are you adding one asset or multiple identical ones?</p>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <a href="/assets/new/" class="btn btn-primary" style="text-align:center; padding:12px;">
+        Single asset
+        <span style="display:block; font-size:11px; font-weight:400; color:var(--accent-dim); margin-top:2px;">Fill in one asset form</span>
+      </a>
+      <a href="/assets/bulk-add/" class="btn" style="text-align:center; padding:12px;">
+        Bulk assets
+        <span style="display:block; font-size:11px; font-weight:400; color:var(--text-faint); margin-top:2px;">Add multiple identical assets at once</span>
+      </a>
+    </div>
+  </dialog>
 {% endblock %}
 {% block extra_style %}
   .inv-strip {

@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from ..models import Asset, AssetBooking, KitBooking, StaffMember, Tag, AssetHistory
+from ..models import Asset, AssetBooking, KitBooking, StaffMember, Tag, AssetHistory, LicenseFunctionality
 from ..models.assets import ASSET_HISTORY_SHARED_FIELDS
 from .common import _date_range
 
@@ -841,3 +841,163 @@ def asset_delete_view(request, asset_id):
         return redirect("/assets/")
     asset.delete()
     return redirect("/assets/")
+
+
+@login_required
+def asset_bulk_wizard_view(request):
+    """GET: render the bulk add wizard. POST: create all assets."""
+    staff_members = list(StaffMember.objects.filter(active=True).order_by("name"))
+    current_staff = StaffMember.for_user(request.user)
+
+    if request.method == "POST":
+        import json
+        try:
+            payload = json.loads(request.body)
+        except (ValueError, AttributeError):
+            return JsonResponse({"error": "Invalid JSON."}, status=400)
+
+        assets_data = payload.get("assets", [])
+        shared = payload.get("shared", {})
+        lu_by_id = payload.get("last_updated_by_id", "")
+        lu_date_str = payload.get("last_updated_date", "")
+        lu_notes = payload.get("last_updated_notes", "").strip()
+
+        if not assets_data:
+            return JsonResponse({"error": "No assets provided."}, status=400)
+
+        try:
+            lu_date = datetime.date.fromisoformat(lu_date_str)
+        except ValueError:
+            return JsonResponse({"error": "Invalid last updated date."}, status=400)
+
+        lu_by = None
+        if str(lu_by_id).isdigit():
+            lu_by = StaffMember.objects.filter(pk=lu_by_id).first()
+
+        status = shared.get("status", Asset.Status.AVAILABLE)
+        if status not in Asset.Status.values:
+            status = Asset.Status.AVAILABLE
+
+        make_model = shared.get("make_model", "").strip()
+        notes = shared.get("notes", "").strip()
+        asset_type = shared.get("asset_type", "")
+        license_type = shared.get("license_type", "").strip()
+        license_duration_start = shared.get("license_duration_start", "").strip() or None
+        license_duration_end = shared.get("license_duration_end", "").strip() or None
+        viz_ticket = shared.get("viz_ticket", "").strip()
+        func_ids = [int(i) for i in shared.get("functionality_ids", []) if str(i).isdigit()]
+
+        try:
+            lu_dur_start = datetime.date.fromisoformat(license_duration_start) if license_duration_start else None
+            lu_dur_end = datetime.date.fromisoformat(license_duration_end) if license_duration_end else None
+        except ValueError:
+            lu_dur_start = lu_dur_end = None
+
+        created = []
+        errors = []
+        for row in assets_data:
+            asset_id = row.get("asset_id", "").strip().upper()
+            serial = row.get("serial", "").strip().upper()
+            row_make_model = row.get("make_model", make_model).strip()
+            row_notes = row.get("notes", notes).strip()
+
+            if not asset_id:
+                errors.append("Row missing asset ID.")
+                continue
+            if Asset.objects.filter(asset_id=asset_id).exists():
+                errors.append(f"{asset_id} already exists.")
+                continue
+
+            asset = Asset.objects.create(
+                asset_id=asset_id,
+                asset_type=asset_type,
+                make_model=row_make_model,
+                serial=serial,
+                status=status,
+                notes=row_notes,
+                license_type=license_type if asset_type == "LICENSE" else "",
+                license_duration_start=lu_dur_start if asset_type == "LICENSE" else None,
+                license_duration_end=lu_dur_end if asset_type == "LICENSE" else None,
+                viz_ticket=viz_ticket if asset_type == "LICENSE" else "",
+                last_updated_by=lu_by,
+                last_updated_date=lu_date,
+                last_updated_notes=lu_notes,
+            )
+            if asset_type == "LICENSE" and func_ids:
+                asset.functionalities.set(LicenseFunctionality.objects.filter(id__in=func_ids))
+            created.append(asset_id)
+
+        if errors and not created:
+            return JsonResponse({"error": "; ".join(errors)}, status=400)
+
+        return JsonResponse({"created": created, "errors": errors})
+
+    # GET - find the last asset ID per prefix/type to suggest next IDs
+    latest_by_type = {}
+    for asset_type_val, _ in Asset.AssetType.choices:
+        last = (
+            Asset.objects.filter(asset_type=asset_type_val)
+            .order_by("-asset_id")
+            .values_list("asset_id", flat=True)
+            .first()
+        )
+        latest_by_type[asset_type_val] = last or ""
+
+    context = {
+        "asset_type_choices": Asset.AssetType.choices,
+        "statuses": Asset.Status.choices,
+        "license_types": Asset.LicenseType.choices,
+        "functionality_options": list(LicenseFunctionality.objects.all()),
+        "staff_members": staff_members,
+        "current_staff_id": current_staff.id if current_staff else "",
+        "current_staff_name": current_staff.name if current_staff else "",
+        "latest_by_type": latest_by_type,
+        "today": datetime.date.today().isoformat(),
+        "active_nav": "assets",
+    }
+    return render(request, "inventory/asset_bulk_wizard.html", context)
+
+
+@login_required
+def asset_bulk_next_id(request):
+    """Return the next suggested asset ID given a prefix and type."""
+    prefix = request.GET.get("prefix", "UK").strip().upper()
+    asset_type = request.GET.get("type", "").strip()
+
+    # Map type to short code
+    TYPE_CODES = {
+        "ENGINE": "ENG",
+        "LAPTOP": "LAP",
+        "COMPONENT": "GPU",
+        "IO_DEVICE": "IOC",
+        "PERIPHERAL": "PER",
+        "CABLE": "CBL",
+        "STANDALONE": "STD",
+        "LICENSE": "LIC",
+    }
+    code = TYPE_CODES.get(asset_type, "AST")
+
+    # Find highest numeric suffix for this prefix+code combo
+    pattern = f"{prefix}-{code}-"
+    existing = (
+        Asset.objects.filter(asset_id__startswith=pattern)
+        .values_list("asset_id", flat=True)
+    )
+    max_num = 0
+    for aid in existing:
+        suffix = aid[len(pattern):]
+        try:
+            num = int(suffix)
+            if num > max_num:
+                max_num = num
+        except ValueError:
+            pass
+
+    next_num = max_num + 1
+    next_id = f"{prefix}-{code}-{str(next_num).zfill(2)}"
+    return JsonResponse({
+        "next_id": next_id,
+        "last_id": f"{pattern}{str(max_num).zfill(2)}" if max_num else None,
+        "pattern": pattern,
+        "next_num": next_num,
+    })
