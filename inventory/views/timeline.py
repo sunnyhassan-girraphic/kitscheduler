@@ -53,110 +53,111 @@ def _kit_member_rows(kit):
 
 @login_required
 def timeline_view(request):
-    range_mode = request.GET.get("range", "week")
-    if range_mode not in ("week", "month"):
-        range_mode = "week"
+    range_mode = request.GET.get("range", "2week")
+    if range_mode not in ("2week", "month"):
+        range_mode = "2week"
 
-    show_kits = request.GET.get("kits", "1") != "0"
-    show_staff = request.GET.get("staff", "0") != "0"
-    show_licenses = request.GET.get("licenses", "1") != "0"
+    show_engines = request.GET.get("engines", "1") != "0"
+    show_laptops = request.GET.get("laptops", "1") != "0"
+    show_kits = request.GET.get("kits", "0") != "0"
 
     anchor = _parse_anchor(request, range_mode=range_mode)
     if range_mode == "month":
         days = _month_range(anchor)
     else:
-        days = _date_range(anchor)
-    week_days = days[:7]
+        days = _date_range(anchor, days=14)
 
-    kits = list(Kit.objects.prefetch_related("assets", "bookings__job").order_by("name"))
-    kit_bookings = list(
+    today = datetime.date.today()
+
+    # --- Engines ---
+    engines = list(Asset.objects.filter(
+        asset_type=Asset.AssetType.ENGINE, archived=False, parent_engine__isnull=True
+    ).order_by("asset_id")) if show_engines else []
+    engine_bookings = list(
+        AssetBooking.objects.select_related("job", "asset").filter(
+            asset__asset_type=Asset.AssetType.ENGINE,
+            start_date__lte=days[-1], end_date__gte=days[0]
+        )
+    ) if show_engines else []
+    bookings_by_engine = {}
+    for b in engine_bookings:
+        bookings_by_engine.setdefault(b.asset_id, []).append(b)
+
+    # --- Laptops ---
+    laptops = list(Asset.objects.filter(
+        asset_type=Asset.AssetType.LAPTOP, archived=False
+    ).order_by("asset_id")) if show_laptops else []
+    laptop_bookings = list(
+        AssetBooking.objects.select_related("job", "asset").filter(
+            asset__asset_type=Asset.AssetType.LAPTOP,
+            start_date__lte=days[-1], end_date__gte=days[0]
+        )
+    ) if show_laptops else []
+    bookings_by_laptop = {}
+    for b in laptop_bookings:
+        bookings_by_laptop.setdefault(b.asset_id, []).append(b)
+
+    # --- Kits (optional) ---
+    kits = list(Kit.objects.exclude(status=Kit.Status.ARCHIVED).prefetch_related(
+        "assets", "bookings__job"
+    ).order_by("name")) if show_kits else []
+    kit_bookings_qs = list(
         KitBooking.objects.select_related("job", "kit").filter(
             start_date__lte=days[-1], end_date__gte=days[0]
         )
-    )
+    ) if show_kits else []
     bookings_by_kit = {}
-    for b in kit_bookings:
+    for b in kit_bookings_qs:
         bookings_by_kit.setdefault(b.kit_id, []).append(b)
     kit_rows = _build_rows(kits, bookings_by_kit, days)
 
-    staff = list(StaffMember.objects.filter(active=True).order_by("name"))
-    staff_bookings = list(
-        StaffBooking.objects.select_related("job", "staff_member").filter(
-            start_date__lte=days[-1], end_date__gte=days[0]
-        )
-    )
-    bookings_by_staff = {}
-    for b in staff_bookings:
-        bookings_by_staff.setdefault(b.staff_member_id, []).append(b)
-    staff_rows = _build_rows(staff, bookings_by_staff, days, overlap_ok=True)
+    def _build_strip_rows(assets, bookings_by_asset_id, days):
+        day_index = {d: i for i, d in enumerate(days)}
+        rows = []
+        for asset in assets:
+            asset_bookings = bookings_by_asset_id.get(asset.id, [])
+            strips = []
+            for d in days:
+                hit = next((b for b in asset_bookings if b.start_date <= d <= b.end_date), None)
+                strips.append({
+                    "date": d,
+                    "booking": hit,
+                    "is_weekend": d.weekday() >= 5,
+                    "is_today": d == today,
+                })
+            visible = [b for b in asset_bookings if b.start_date <= days[-1] and b.end_date >= days[0]]
+            visible.sort(key=lambda b: b.start_date)
+            spans = []
+            for b in visible:
+                clipped_start = max(b.start_date, days[0])
+                clipped_end = min(b.end_date, days[-1])
+                spans.append({
+                    "booking": b,
+                    "color": b.job.resolve_color(),
+                    "grid_col_start": day_index[clipped_start] + 1,
+                    "grid_col_end": day_index[clipped_end] + 2,
+                    "continues_before": b.start_date < days[0],
+                    "continues_after": b.end_date > days[-1],
+                })
+            rows.append({"asset": asset, "strips": strips, "spans": spans})
+        return rows
 
-    licenses = list(Asset.objects.filter(
-        asset_type=Asset.AssetType.LICENSE, archived=False
-    ).prefetch_related("functionalities").order_by("asset_id"))
-    for lic in licenses:
-        lic.func_tags = [f.name for f in lic.functionalities.all()]
+    def _group_by_make_model(rows):
+        """Group strip rows by make_model, preserving asset_id order within each group."""
+        seen = {}
+        order = []
+        for row in rows:
+            key = row["asset"].make_model.strip() if row["asset"].make_model else "Other"
+            if key not in seen:
+                seen[key] = []
+                order.append(key)
+            seen[key].append(row)
+        return [{"make_model": k, "rows": seen[k]} for k in order]
 
-    license_bookings = list(
-        AssetBooking.objects.select_related("job", "asset").prefetch_related("asset__kits").filter(
-            asset__asset_type=Asset.AssetType.LICENSE,
-            start_date__lte=days[-1], end_date__gte=days[0]
-        )
-    )
-    bookings_by_license = {}
-    for b in license_bookings:
-        bookings_by_license.setdefault(b.asset_id, []).append(b)
-    license_rows = _build_rows(licenses, bookings_by_license, days)
-    for row in license_rows:
-        lic = row["item"]
-        start, end = lic.license_duration_start, lic.license_duration_end
-        for cell in row["cells"]:
-            cell["in_duration"] = bool(start and end and start <= cell["date"] <= end)
-
-    license_details = {
-        row["item"].id: {
-            "id": row["item"].id,
-            "assetId": row["item"].asset_id,
-            "editUrl": f"/licenses/{row['item'].id}/edit/",
-            "type": row["item"].get_license_type_display() or None,
-            "functionalities": [f.name for f in row["item"].functionalities.all()],
-            "durationStart": row["item"].license_duration_start.strftime("%d %b %Y") if row["item"].license_duration_start else None,
-            "durationEnd": row["item"].license_duration_end.strftime("%d %b %Y") if row["item"].license_duration_end else None,
-            "vizTicket": row["item"].viz_ticket or None,
-            "status": row["item"].get_status_display(),
-            "archived": row["item"].archived,
-            "serial": row["item"].serial or None,
-            "notes": row["item"].notes or None,
-            "kits": [k.name for k in row["item"].kits.all()],
-            "lastUpdatedBy": row["item"].last_updated_by.name if row["item"].last_updated_by_id else None,
-            "lastUpdatedDate": row["item"].last_updated_date.strftime("%d %b %Y") if row["item"].last_updated_date else None,
-            "lastUpdatedNotes": row["item"].last_updated_notes or None,
-        }
-        for row in license_rows
-    }
-
-    today = datetime.date.today()
-    kit_details = {}
-    for row in kit_rows:
-        kit = row["item"]
-        current_booking = kit.bookings.filter(
-            start_date__lte=today, end_date__gte=today
-        ).select_related("job").first()
-        kit_details[kit.id] = {
-            "id": kit.id,
-            "name": kit.name,
-            "editUrl": f"/kits/{kit.id}/edit/",
-            "notes": kit.notes or None,
-            "memberCount": kit.assets.count(),
-            "members": _kit_member_rows(kit),
-            "currentJob": current_booking.job.name if current_booking else None,
-            "currentJobDates": (
-                f"{current_booking.start_date.strftime('%d %b')} \u2013 {current_booking.end_date.strftime('%d %b %Y')}"
-                if current_booking else None
-            ),
-        }
-
-    kits_fully_free, kits_partially_free = _week_availability(kits, bookings_by_kit, week_days)
-    staff_fully_free, staff_partially_free = _week_availability(staff, bookings_by_staff, week_days)
+    engine_rows = _build_strip_rows(engines, bookings_by_engine, days)
+    laptop_rows = _build_strip_rows(laptops, bookings_by_laptop, days)
+    engine_groups = _group_by_make_model(engine_rows)
+    laptop_groups = _group_by_make_model(laptop_rows)
 
     jobs = list(Job.objects.order_by("-start_date")[:200])
 
@@ -168,33 +169,28 @@ def timeline_view(request):
         else:
             next_anchor = next_month.replace(month=next_month.month + 1)
     else:
-        prev_anchor = anchor - datetime.timedelta(days=STEP_DAYS)
-        next_anchor = anchor + datetime.timedelta(days=STEP_DAYS)
+        prev_anchor = anchor - datetime.timedelta(days=14)
+        next_anchor = anchor + datetime.timedelta(days=14)
 
     context = {
         "range_mode": range_mode,
+        "show_engines": show_engines,
+        "show_laptops": show_laptops,
         "show_kits": show_kits,
-        "show_staff": show_staff,
-        "show_licenses": show_licenses,
         "days": days,
+        "engine_rows": engine_rows,
+        "laptop_rows": laptop_rows,
+        "engine_groups": engine_groups,
+        "laptop_groups": laptop_groups,
         "kit_rows": kit_rows,
-        "staff_rows": staff_rows,
-        "license_rows": license_rows,
-        "license_details_json": license_details,
-        "kit_details_json": kit_details,
         "jobs": jobs,
         "job_categories": Job.Category.choices,
-        "today": datetime.date.today(),
+        "today": today,
         "anchor": anchor,
         "prev_anchor": prev_anchor,
         "next_anchor": next_anchor,
-        "total_kits": len(kits),
-        "total_staff": len(staff),
-        "total_licenses": len(licenses),
-        "kits_fully_free": kits_fully_free,
-        "kits_partially_free": kits_partially_free,
-        "staff_fully_free": staff_fully_free,
-        "staff_partially_free": staff_partially_free,
+        "total_engines": len(engines),
+        "total_laptops": len(laptops),
         "active_nav": "timeline",
     }
     return render(request, "inventory/timeline.html", context)
@@ -490,6 +486,82 @@ def create_license_booking(request):
 @require_POST
 def delete_license_booking(request, booking_id):
     booking = get_object_or_404(AssetBooking, pk=booking_id)
+    booking.delete()
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@require_POST
+def create_asset_booking(request):
+    """Book an engine or laptop on a job from the availability timeline."""
+    asset_id = request.POST.get("asset_id")
+    job_id = request.POST.get("job_id")
+    new_job_name = request.POST.get("new_job_name", "").strip()
+    new_job_category = request.POST.get("new_job_category", "").strip()
+    new_job_notes = request.POST.get("new_job_notes", "").strip()
+    new_job_color = request.POST.get("new_job_color", "").strip()
+    start_date = request.POST.get("start_date")
+    end_date = request.POST.get("end_date")
+
+    if not all([asset_id, start_date, end_date]):
+        return JsonResponse({"error": "Missing required fields."}, status=400)
+    if not job_id and not new_job_name:
+        return JsonResponse({"error": "Pick an existing job or enter a name for a new one."}, status=400)
+    if new_job_color and not re.fullmatch(r"#[0-9A-Fa-f]{6}", new_job_color):
+        new_job_color = ""
+
+    asset = get_object_or_404(
+        Asset, pk=asset_id,
+        asset_type__in=[Asset.AssetType.ENGINE, Asset.AssetType.LAPTOP]
+    )
+
+    try:
+        start = datetime.date.fromisoformat(start_date)
+        end = datetime.date.fromisoformat(end_date)
+    except ValueError:
+        return JsonResponse({"error": "Invalid date format."}, status=400)
+
+    if start > end:
+        return JsonResponse({"error": "End date cannot be before start date."}, status=400)
+
+    if job_id:
+        job = get_object_or_404(Job, pk=job_id)
+    else:
+        category = new_job_category if new_job_category in Job.Category.values else Job.Category.TX
+        job = Job.objects.create(
+            name=new_job_name, category=category, notes=new_job_notes,
+            custom_color=new_job_color, start_date=start, end_date=end,
+        )
+
+    same_job_existing = AssetBooking.objects.filter(
+        asset=asset, job=job, start_date__lte=end, end_date__gte=start
+    ).first()
+    if same_job_existing:
+        same_job_existing.start_date = start
+        same_job_existing.end_date = end
+        same_job_existing.save(update_fields=["start_date", "end_date"])
+        return JsonResponse({"ok": True, "booking_id": same_job_existing.id, "job_id": job.id})
+
+    conflict = AssetBooking.objects.filter(
+        asset=asset, start_date__lte=end, end_date__gte=start
+    ).exclude(job=job)
+    if conflict.exists():
+        return JsonResponse(
+            {"error": f"{asset.asset_id} is already booked on {conflict.first().job.name} in that window."},
+            status=409,
+        )
+
+    booking = AssetBooking.objects.create(asset=asset, job=job, start_date=start, end_date=end)
+    return JsonResponse({"ok": True, "booking_id": booking.id, "job_id": job.id})
+
+
+@login_required
+@require_POST
+def delete_asset_booking(request, booking_id):
+    booking = get_object_or_404(
+        AssetBooking, pk=booking_id,
+        asset__asset_type__in=[Asset.AssetType.ENGINE, Asset.AssetType.LAPTOP]
+    )
     booking.delete()
     return JsonResponse({"ok": True})
 

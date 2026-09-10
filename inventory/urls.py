@@ -66,6 +66,8 @@ urlpatterns = [
         views.delete_staff_booking,
         name="delete_staff_booking",
     ),
+    path("api/asset-bookings/create/", views.create_asset_booking, name="create_asset_booking"),
+    path("api/asset-bookings/<int:booking_id>/delete/", views.delete_asset_booking, name="delete_asset_booking"),
     path("api/license-bookings/create/", views.create_license_booking, name="create_license_booking"),
     path(
         "api/license-bookings/<int:booking_id>/delete/",

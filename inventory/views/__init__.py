@@ -32,6 +32,8 @@ from .timeline import (
     delete_staff_booking,
     create_license_booking,
     delete_license_booking,
+    create_asset_booking,
+    delete_asset_booking,
 )
 
 from .assets import (

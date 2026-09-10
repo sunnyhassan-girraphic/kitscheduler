@@ -1,440 +1,368 @@
 {% extends "inventory/base.html" %}
 {% block title %}G.R.E.G - Timeline{% endblock %}
-{% block brand_sub %}{{ total_kits }} kit{{ total_kits|pluralize }}, {{ total_staff }} staff{% endblock %}
+{% block brand_sub %}{{ total_engines }} engines - {{ total_laptops }} laptops{% endblock %}
 
-{% block header_actions %}
-  <button type="button" class="btn btn-primary" onclick="document.getElementById('newJobDialog').showModal()">+ New job</button>
-{% endblock %}
+{% block header_actions %}{% endblock %}
 
 {% block extra_style %}
-  /* CSS Grid timeline -- one column per day, flexible width so all days
-     always fit without scrolling regardless of range (week=14, month=30+) */
-  .cal-grid {
-    display: grid;
-    grid-template-columns: 160px repeat({{ days|length }}, minmax(0, 1fr));
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    width: 100%;
-  }
-  .grid-wrap { width: 100%; }
+  :root { --tl-name-width: 160px; --tl-row-height: 38px; }
 
-  /* Header row */
-  .gh {
-    background: var(--surface-2);
-    border-right: 1px solid var(--border);
+  .tl-wrap { display: flex; flex-direction: column; height: calc(100vh - 90px); overflow: hidden; }
+
+  /* Toolbar - same height as inventory stats bar (72px) */
+  .tl-toolbar {
+    display: flex; align-items: stretch;
+    min-height: 72px;
     border-bottom: 1px solid var(--border);
-    text-align: center;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--text-dim);
-    padding: 6px 2px;
-    line-height: 1.3;
+    background: var(--surface); flex-shrink: 0;
+  }
+  .tl-toolbar-left {
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 16px; flex: 1;
+  }
+  .tl-week-nav {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 16px; margin-left: auto; border-left: 1px solid var(--border);
+  }
+  .tl-week-label {
+    font-size: 13px; color: var(--text-dim);
+    padding: 0 4px; white-space: nowrap; min-width: 160px; text-align: center;
     font-family: var(--mono);
   }
-  .gh.namecol-header {
-    text-align: left;
-    padding: 8px 12px;
-    font-size: 11px;
-    color: var(--text-faint);
-    position: sticky;
-    left: 0;
-    background: var(--surface-2);
-    z-index: 3;
-  }
-  .gh.today { color: var(--accent); font-weight: 700; box-shadow: inset 0 3px 0 0 var(--accent); }
-  .gh.weekend { background: var(--surface-2); }
 
-  /* Name column */
-  .gname {
-    background: var(--surface);
+  .tl-board { flex: 1; overflow: auto; }
+
+  /* Date ruler */
+  .tl-ruler {
+    display: grid;
+    grid-template-columns: var(--tl-name-width) repeat({{ days|length }}, minmax(30px, 1fr));
+    position: sticky; top: 0; z-index: 10;
+    background: var(--surface-2); border-bottom: 2px solid var(--border);
+  }
+  .tl-ruler-corner {
     border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    padding: 0 12px;
+    position: relative;
+  }
+  .tl-ruler-day {
+    text-align: center; padding: 6px 2px; border-right: 1px solid var(--border);
+    font-size: 10px; color: var(--text-faint); font-family: var(--mono); line-height: 1.3;
+  }
+  .tl-ruler-day .dn { font-size: 14px; font-weight: 700; color: var(--text-dim); display: block; }
+  .tl-ruler-day.today { background: rgba(234,179,8,0.06); }
+  .tl-ruler-day.today .dn { color: var(--accent); font-size: 16px; }
+  .tl-ruler-day.today { border-top: 3px solid var(--accent); padding-top: 3px; }
+  .tl-ruler-day.weekend { background: var(--surface-2); }
+  .tl-ruler-day.weekend .dn { color: var(--text-faint); }
+
+  /* Section headers - sticky, amber left accent */
+  .tl-section {
+    position: sticky; top: 45px; z-index: 9;
+    background: var(--surface-2); border-bottom: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 5px 12px;
+    font-size: 10px; font-weight: 700; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+
+  /* Subgroup headers */
+  .tl-subgroup {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    border-left: 3px solid var(--border-strong);
+    padding: 3px 12px 3px 16px;
+    font-size: 9px; font-weight: 600; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    cursor: pointer; user-select: none;
+    display: flex; align-items: center; gap: 6px;
+    overflow: hidden; white-space: nowrap;
+  }
+  .tl-subgroup:hover { color: var(--text); border-left-color: var(--accent); }
+  .tl-subgroup-caret {
+    display: inline-block; font-size: 8px; transition: transform 0.15s;
+    color: var(--text-faint); flex-shrink: 0;
+  }
+  .tl-subgroup.collapsed .tl-subgroup-caret { transform: rotate(-90deg); }
+  .tl-group-rows.hidden { display: none; }
+
+  /* Asset rows */
+  .tl-row {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-height: 38px;
-    position: sticky;
-    left: 0;
-    z-index: 2;
+    border-bottom: 1px solid var(--border);
+    min-height: var(--tl-row-height);
   }
-  .item-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text);
-    text-decoration: none;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .tl-row:hover { background: rgba(255,255,255,0.018); }
+
+  .tl-name {
+    width: var(--tl-name-width); min-width: var(--tl-name-width); flex-shrink: 0;
+    padding: 0 10px; display: flex; flex-direction: column;
+    justify-content: center; border-right: 1px solid var(--border);
+    position: sticky; left: 0; background: var(--surface); z-index: 5;
+    min-height: var(--tl-row-height);
   }
-  .item-name:hover { color: var(--accent); }
-  .item-meta { font-size: 11px; color: var(--text-faint); font-family: var(--mono); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tl-row:hover .tl-name { background: var(--surface-2); }
+  .tl-name-id { font-size: 11px; font-family: var(--mono); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tl-name-sub { font-size: 9px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Cell + block area */
+  .tl-cells {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat({{ days|length }}, minmax(30px, 1fr));
+    grid-template-rows: var(--tl-row-height);
+    position: relative;
+  }
 
   /* Day cells */
-  .gc {
+  .tl-cell {
+    grid-row: 1;
     border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    min-height: 38px;
-    position: relative;
     cursor: crosshair;
   }
-  .gc.weekend { background: var(--surface-2); }
-  .gc.preview { background: var(--accent-glow); }
-  .gc.in-license-duration { background: rgba(52, 199, 89, 0.14); }
+  .tl-cell.weekend { background: var(--surface-2); }
+  .tl-cell.today { background: rgba(234,179,8,0.04); box-shadow: inset 2px 0 0 rgba(234,179,8,0.4); }
+  .tl-cell.drag-preview { background: var(--accent-glow); }
 
-  /* Row cells wrapper: position:relative so .block-layer can overlay it absolutely */
-  .grow-cells {
-    grid-column: 2 / -1;
-    display: grid;
-    grid-template-columns: repeat({{ days|length }}, minmax(0, 1fr));
-    border-bottom: 1px solid var(--border);
-    position: relative;
-}
-
-  /* Block overlay */
-  .block-layer {
+  /* Block layer */
+  .tl-block-layer {
     position: absolute;
     inset: 0;
     display: grid;
-    grid-template-columns: repeat({{ days|length }}, minmax(0, 1fr));
-    grid-auto-rows: 30px;
-    align-content: start;
-    gap: 4px 0;
-    padding: 4px 0 8px;
+    grid-template-columns: repeat({{ days|length }}, minmax(30px, 1fr));
     pointer-events: none;
-  }
-  .gblock {
-    position: relative;
-    z-index: 2;
-    border-radius: 4px;
-    border-left: 3px solid currentColor;
-    font-size: 11px;
-    font-family: var(--mono);
-    display: flex;
     align-items: center;
-    padding: 0 7px;
+    padding: 5px 0;
+  }
+
+  .tl-block {
+    height: 26px;
+    border-radius: 4px;
+    display: flex; align-items: center;
+    padding: 0 8px;
+    font-size: 10px; font-family: var(--mono); font-weight: 600;
+    white-space: nowrap; overflow: hidden;
+    cursor: pointer; pointer-events: auto;
     margin: 0 1px;
-    height: 24px;
-    overflow: hidden;
-    white-space: nowrap;
-    cursor: pointer;
-    pointer-events: auto;
+    border-left: 3px solid currentColor;
   }
-  .gblock.continues-before { border-radius: 0 4px 4px 0; margin-left: 0; }
-  .gblock.continues-after  { border-radius: 4px 0 0 4px; margin-right: 0; }
+  .tl-block.continues-before { border-radius: 0 4px 4px 0; margin-left: 0; border-left: none; }
+  .tl-block.continues-after { border-radius: 4px 0 0 4px; margin-right: 0; }
+  .tl-block.continues-before.continues-after { border-radius: 0; }
 
-  /* Job/License/Kit detail dialogs */
-  dialog#jobDetailDialog, dialog#licenseDetailDialog, dialog#kitDetailDialog {
-    background: var(--surface); color: var(--text);
-    border: 1px solid var(--border-strong); border-radius: 10px;
-    padding: 0; width: 400px; max-width: 92vw;
-  }
-  dialog#jobDetailDialog::backdrop, dialog#licenseDetailDialog::backdrop, dialog#kitDetailDialog::backdrop { background: rgba(0,0,0,0.6); }
-  .jd-header { padding: 16px 80px 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 10px; }
-  .jd-color-bar { width: 4px; border-radius: 2px; min-height: 36px; flex-shrink: 0; }
-  .jd-title { font-size: 15px; font-weight: 600; line-height: 1.3; }
-  .jd-category { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
-  .jd-body { padding: 14px 20px; }
-  .jd-row { display: flex; gap: 12px; margin-bottom: 10px; font-size: 13px; }
-  .jd-label { color: var(--text-dim); font-size: 11px; min-width: 60px; padding-top: 1px; }
-  .jd-value { color: var(--text); }
-  .jd-actions { display: flex; gap: 8px; padding: 10px 20px 16px; border-top: 1px solid var(--border); }
-  .jd-actions .spacer { flex: 1; }
-  .kd-member-row { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:12px; border-top:1px solid var(--border); flex-wrap:wrap; }
-  .kd-member-row:first-child { border-top: none; }
-  .kd-member-row .kd-aid { font-family: var(--mono); color: var(--text); }
-  .kd-member-row .kd-amodel { color: var(--text-dim); flex:1; }
-  .kd-nested-row { display:flex; align-items:center; gap:8px; padding:5px 0 5px 16px; font-size:11px; color:var(--text-dim); border-top:1px solid var(--border); }
-  .kd-nested-row.indent { padding-left: 30px; }
-  .kd-tag {
-    font-size:9px; padding:1px 6px; border-radius:999px; font-weight:700; text-transform:uppercase;
-    letter-spacing:0.02em; background:var(--accent-glow); color:var(--accent); border:1px solid var(--accent-deep);
-  }
-  .kd-empty { padding: 8px 0; color: var(--text-faint); font-size: 12px; font-style: italic; }
-
-  /* Tab switcher in booking dialog */
+  /* Booking dialog tabs */
   .tab-bar { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
   .tab-btn { padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--text-dim); border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
   .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
   .tab-pane { display: none; }
   .tab-pane.active { display: block; }
+
+  /* Job detail dialog */
+  .ajd-header { padding: 14px 60px 12px 18px; border-bottom: 1px solid var(--border); }
+  .ajd-job { font-size: 15px; font-weight: 600; }
+  .ajd-asset { font-size: 11px; font-family: var(--mono); color: var(--text-dim); margin-top: 3px; }
+  .ajd-body { padding: 12px 18px; }
+  .ajd-row { display: flex; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+  .ajd-label { color: var(--text-dim); font-size: 11px; min-width: 56px; padding-top: 1px; }
+  .ajd-actions { display: flex; gap: 8px; padding: 10px 18px 14px; border-top: 1px solid var(--border); }
+  .ajd-spacer { flex: 1; }
 {% endblock %}
 
 {% block content %}
+<div class="tl-wrap">
 
-<div class="stats-bar">
-  <div class="stat"><div class="num">{{ kits_fully_free }} <span style="font-size:13px; color:var(--text-faint); font-weight:400;">/ {{ total_kits }}</span></div><div class="label">kits free all week</div></div>
-  <div class="stat"><div class="num">{{ kits_partially_free }} <span style="font-size:13px; color:var(--text-faint); font-weight:400;">/ {{ total_kits }}</span></div><div class="label">kits free at least 1 day</div></div>
-  <div class="stat"><div class="num">{{ staff_fully_free }} <span style="font-size:13px; color:var(--text-faint); font-weight:400;">/ {{ total_staff }}</span></div><div class="label">staff free all week</div></div>
-  <div class="stat"><div class="num">{{ staff_partially_free }} <span style="font-size:13px; color:var(--text-faint); font-weight:400;">/ {{ total_staff }}</span></div><div class="label">staff free at least 1 day</div></div>
-</div>
-
-<div class="filter-bar">
-  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ prev_anchor|date:'Y-m-d' }}">&larr;</a>
-  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Today</a>
-  <a class="btn" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ next_anchor|date:'Y-m-d' }}">&rarr;</a>
-  <span class="range-label">
-    {% if range_mode == "month" %}{{ days.0|date:"F Y" }}{% else %}{{ days.0|date:"j M" }} &ndash; {{ days|last|date:"j M" }}{% endif %}
-  </span>
-  <span style="font-size:11px; color:var(--text-faint); margin-left:16px;">Drag across a row to pick a date range &middot; click a block to see details</span>
-
-  <span style="margin-left:auto; display:flex; align-items:center; gap:8px; flex-shrink:0;">
-    <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em;">Range</span>
-    <a class="btn {% if range_mode == 'week' %}btn-active{% endif %}" href="?range=week&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Week</a>
-    <a class="btn {% if range_mode == 'month' %}btn-active{% endif %}" href="?range=month&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}">Month</a>
-    <span style="width:1px; height:16px; background:var(--border); margin:0 4px;"></span>
-    <span style="font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em;">Show</span>
-    <a class="btn {% if show_kits %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'0,1' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Kits</a>
-    <a class="btn {% if show_licenses %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'1,0' }}&licenses={{ show_licenses|yesno:'0,1' }}&start={{ anchor|date:'Y-m-d' }}">Licenses</a>
-    <a class="btn {% if show_staff %}btn-active{% endif %}" href="?range={{ range_mode }}&kits={{ show_kits|yesno:'1,0' }}&staff={{ show_staff|yesno:'0,1' }}&licenses={{ show_licenses|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Staff</a>
-  </span>
-</div>
-
-{% if show_kits %}
-<div class="section-label">Kits</div>
-{% if kit_rows %}
-<div class="grid-wrap">
-<div class="cal-grid resizable-grid" data-resize-key="timeline-kits">
-  <div class="gh namecol-header">Kit</div>
-  {% for d in days %}
-    <div class="gh {% if d == today %}today{% endif %} {% if d.weekday >= 5 %}weekend{% endif %}">
-      {% if range_mode == "month" %}{{ d|date:"j" }}{% else %}{{ d|date:"D" }}<br>{{ d|date:"j" }}{% endif %}
+  <div class="tl-toolbar">
+    <div class="tl-toolbar-left">
+      <a class="btn {% if show_engines %}btn-active{% endif %}" href="?range={{ range_mode }}&engines={{ show_engines|yesno:'0,1' }}&laptops={{ show_laptops|yesno:'1,0' }}&kits={{ show_kits|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Engines</a>
+      <a class="btn {% if show_laptops %}btn-active{% endif %}" href="?range={{ range_mode }}&engines={{ show_engines|yesno:'1,0' }}&laptops={{ show_laptops|yesno:'0,1' }}&kits={{ show_kits|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Laptops</a>
+      <a class="btn {% if show_kits %}btn-active{% endif %}" href="?range={{ range_mode }}&engines={{ show_engines|yesno:'1,0' }}&laptops={{ show_laptops|yesno:'1,0' }}&kits={{ show_kits|yesno:'0,1' }}&start={{ anchor|date:'Y-m-d' }}">Kits</a>
+      <button class="btn" id="collapseToggle" onclick="toggleCollapseAll()">Collapse all</button>
     </div>
-  {% endfor %}
-
-  {% for row in kit_rows %}
-    <div class="gname">
-      <a class="item-name" href="/kits/{{ row.item.id }}/edit/" onclick="openKitDetail({{ row.item.id }}); return false;">{{ row.item.name }}</a>
-      <span class="item-meta">{{ row.item.assets.count }} member{{ row.item.assets.count|pluralize }}</span>
-    </div>
-    <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
-      {% for cell in row.cells %}
-        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %}"
-             data-kind="kit"
-             data-item-id="{{ row.item.id }}"
-             data-item-name="{{ row.item.name }}"
-             data-date="{{ cell.date|date:'Y-m-d' }}">
-        </div>
-      {% endfor %}
-      <div class="block-layer">
-        {% for span in row.spans %}
-          <div class="gblock {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
-               style="grid-column: {{ span.grid_col_start }} / {{ span.grid_col_end }};
-                      grid-row: {{ span.grid_row }};
-                      background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
-               data-job-id="{{ span.booking.job.id }}"
-               onclick="openJobDetail({{ span.booking.job.id }}, 'kit', {{ span.booking.id }});">
-            {{ span.booking.job.name }}
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endfor %}
-</div>
-</div>
-{% else %}
-<div class="empty">No kits yet. <a href="/kits/new/">Create your first kit</a>.</div>
-{% endif %}
-{% endif %}{# end show_kits #}
-
-{% if show_licenses %}
-<div class="section-label">Licenses <span style="font-weight:400; color:var(--text-faint); text-transform:none; letter-spacing:normal;">- <span style="display:inline-block; width:10px; height:10px; background:rgba(52,199,89,0.35); border-radius:2px; vertical-align:middle;"></span> shaded days are within the license's active Duration window; drag across days to book a job on it</span></div>
-{% if license_rows %}
-<div class="grid-wrap">
-<div class="cal-grid resizable-grid" data-resize-key="timeline-licenses">
-  <div class="gh namecol-header">License</div>
-  {% for d in days %}
-    <div class="gh {% if d == today %}today{% endif %} {% if d.weekday >= 5 %}weekend{% endif %}">
-      {% if range_mode == "month" %}{{ d|date:"j" }}{% else %}{{ d|date:"D" }}<br>{{ d|date:"j" }}{% endif %}
-    </div>
-  {% endfor %}
-
-  {% for row in license_rows %}
-    <div class="gname">
-      <a class="item-name" href="/licenses/{{ row.item.id }}/edit/" onclick="openLicenseDetail({{ row.item.id }}); return false;">{{ row.item.asset_id }}</a>
-      {% if row.item.serial %}<div class="item-meta">{{ row.item.serial }}</div>{% endif %}
-    </div>
-    <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
-      {% for cell in row.cells %}
-        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %} {% if cell.in_duration %}in-license-duration{% endif %}"
-             title="{% if cell.in_duration %}Licensed and usable on this date{% endif %}"
-             data-kind="license"
-             data-item-id="{{ row.item.id }}"
-             data-item-name="{{ row.item.asset_id }}"
-             data-functionalities="{% for tag in row.item.func_tags %}{{ tag }}{% if not forloop.last %},{% endif %}{% endfor %}"
-             data-date="{{ cell.date|date:'Y-m-d' }}">
-        </div>
-      {% endfor %}
-      <div class="block-layer">
-        {% for span in row.spans %}
-          <div class="gblock {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
-               style="grid-column: {{ span.grid_col_start }} / {{ span.grid_col_end }};
-                      grid-row: {{ span.grid_row }};
-                      background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
-               data-job-id="{{ span.booking.job.id }}"
-               onclick="openJobDetail({{ span.booking.job.id }}, 'license', {{ span.booking.id }});">
-            <span style="font-weight:600;">{{ span.booking.job.name }}</span>
-            {% if span.booking.functionalities %}
-              <span style="opacity:0.85; margin-left:5px; font-size:10px;">{{ span.booking.functionalities }}</span>
-            {% endif %}
-            {% with kits=span.booking.asset.kits.all %}
-              {% if kits %}
-                <span style="opacity:0.75; margin-left:5px; font-size:10px;">&middot; {% for k in kits %}{{ k.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
-              {% endif %}
-            {% endwith %}
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endfor %}
-</div>
-</div>
-{% else %}
-<div class="empty">No licenses yet. <a href="/licenses/new/">Add a license</a>.</div>
-{% endif %}
-{% endif %}{# end show_licenses #}
-
-{% if show_staff %}
-<div class="section-label">Staff</div>
-{% if staff_rows %}
-<div class="grid-wrap">
-<div class="cal-grid resizable-grid" data-resize-key="timeline-staff">
-  <div class="gh namecol-header">Person</div>
-  {% for d in days %}
-    <div class="gh {% if d == today %}today{% endif %} {% if d.weekday >= 5 %}weekend{% endif %}">
-      {% if range_mode == "month" %}{{ d|date:"j" }}{% else %}{{ d|date:"D" }}<br>{{ d|date:"j" }}{% endif %}
-    </div>
-  {% endfor %}
-
-  {% for row in staff_rows %}
-    <div class="gname">
-      <span class="item-name">{{ row.item.name }}</span>
-    </div>
-    <div class="grow-cells" style="min-height: {% widthratio row.lane_count 1 32 %}px;">
-      {% for cell in row.cells %}
-        <div class="gc {% if cell.date == today %}today{% endif %} {% if cell.is_weekend %}weekend{% endif %}"
-             data-kind="staff"
-             data-item-id="{{ row.item.id }}"
-             data-item-name="{{ row.item.name }}"
-             data-date="{{ cell.date|date:'Y-m-d' }}">
-        </div>
-      {% endfor %}
-      <div class="block-layer">
-        {% for span in row.spans %}
-          <div class="gblock {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
-               style="grid-column: {{ span.grid_col_start }} / {{ span.grid_col_end }};
-                      grid-row: {{ span.grid_row }};
-                      background-color:{{ span.color }}; color:#fff; border-left-color: color-mix(in srgb, {{ span.color }} 60%, black);"
-               data-job-id="{{ span.booking.job.id }}"
-               onclick="openJobDetail({{ span.booking.job.id }}, 'staff', {{ span.booking.id }});">
-            {{ span.booking.job.name }}
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endfor %}
-</div>
-</div>
-{% else %}
-<div class="empty">No staff yet. <a href="/admin/inventory/staffmember/add/">Add your first team member</a>.</div>
-{% endif %}
-{% endif %}{# end show_staff #}
-
-<!-- Job Detail Dialog -->
-<dialog id="jobDetailDialog">
-  <a class="dialog-edit-icon" id="jdEditLink" href="#" title="Edit" aria-label="Edit job">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-  </a>
-  <button type="button" class="dialog-close-x" onclick="document.getElementById('jobDetailDialog').close()" aria-label="Close">&times;</button>
-  <div class="jd-header">
-    <div class="jd-color-bar" id="jdColorBar"></div>
-    <div>
-      <div class="jd-title" id="jdTitle"></div>
-      <div class="jd-category" id="jdCategory"></div>
+    {# Right: range + date nav #}
+    <div class="tl-week-nav">
+      <a class="btn {% if range_mode == '2week' %}btn-active{% endif %}" href="?range=2week&engines={{ show_engines|yesno:'1,0' }}&laptops={{ show_laptops|yesno:'1,0' }}&kits={{ show_kits|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">2 weeks</a>
+      <a class="btn {% if range_mode == 'month' %}btn-active{% endif %}" href="?range=month&engines={{ show_engines|yesno:'1,0' }}&laptops={{ show_laptops|yesno:'1,0' }}&kits={{ show_kits|yesno:'1,0' }}&start={{ anchor|date:'Y-m-d' }}">Month</a>
+      <span class="tl-week-label">{{ days.0|date:"j M" }} - {{ days|last|date:"j M Y" }}</span>
+      <a class="btn" href="?range={{ range_mode }}&engines={{ show_engines|yesno:'1,0' }}&laptops={{ show_laptops|yesno:'1,0' }}&kits={{ show_kits|yesno:'1,0' }}&start={{ prev_anchor|date:'Y-m-d' }}">&larr;</a>
+      <a class="btn" href="?range={{ range_mode }}&engines={{ show_engines|yesno:'1,0' }}&laptops={{ show_laptops|yesno:'1,0' }}&kits={{ show_kits|yesno:'1,0' }}">Today</a>
+      <a class="btn" href="?range={{ range_mode }}&engines={{ show_engines|yesno:'1,0' }}&laptops={{ show_laptops|yesno:'1,0' }}&kits={{ show_kits|yesno:'1,0' }}&start={{ next_anchor|date:'Y-m-d' }}">&rarr;</a>
+      <button class="btn" onclick="document.getElementById('tlCalPicker').showPicker ? document.getElementById('tlCalPicker').showPicker() : document.getElementById('tlCalPicker').click()" title="Jump to date">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </button>
+      <input type="date" id="tlCalPicker" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;" onchange="jumpToDate(this.value)">
     </div>
   </div>
-  <div class="jd-body">
-    <div class="jd-row"><span class="jd-label">Dates</span><span class="jd-value" id="jdDates"></span></div>
-    <div class="jd-row" id="jdKitsRow" style="display:none;"><span class="jd-label">Kits</span><span class="jd-value" id="jdKits"></span></div>
-    <div class="jd-row" id="jdStaffRow" style="display:none;"><span class="jd-label">Staff</span><span class="jd-value" id="jdStaff"></span></div>
-    <div class="jd-row" id="jdNotesRow" style="display:none;"><span class="jd-label">Notes</span><span class="jd-value" id="jdNotes"></span></div>
+
+  <div class="tl-board" id="tlBoard">
+
+    <div class="tl-ruler resizable-grid" data-resize-key="timeline-board" id="tlRuler">
+      <div class="tl-ruler-corner namecol-header"></div>
+      {% for d in days %}
+        <div class="tl-ruler-day {% if d == today %}today{% endif %} {% if d.weekday >= 5 %}weekend{% endif %}">
+          <span class="dn">{{ d|date:"j" }}</span>{{ d|date:"D" }}
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if show_engines %}
+    <div class="tl-section">Engines - {{ total_engines }}</div>
+    {% for group in engine_groups %}
+    <div class="tl-subgroup" onclick="toggleGroup(this)" data-group-key="eng-{{ group.make_model }}">
+      <span class="tl-subgroup-caret">&#9660;</span>{{ group.make_model }} - {{ group.rows|length }}
+    </div>
+    <div class="tl-group-rows" data-group-key="eng-{{ group.make_model }}">
+    {% for row in group.rows %}
+    <div class="tl-row">
+      <div class="tl-name">
+        <span class="tl-name-id">{{ row.asset.asset_id }}</span>
+      </div>
+      <div class="tl-cells">
+        {% for strip in row.strips %}
+          <div class="tl-cell {% if strip.is_weekend %}weekend{% endif %} {% if strip.is_today %}today{% endif %}"
+               data-asset-id="{{ row.asset.id }}"
+               data-asset-label="{{ row.asset.asset_id }}"
+               data-asset-kind="engine"
+               data-date="{{ strip.date|date:'Y-m-d' }}"></div>
+        {% endfor %}
+        {% if row.spans %}
+        <div class="tl-block-layer">
+          {% for span in row.spans %}
+            <div class="tl-block {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
+                 style="grid-column:{{ span.grid_col_start }}/{{ span.grid_col_end }}; background:{{ span.color }}22; color:{{ span.color }};"
+                 data-booking-id="{{ span.booking.id }}"
+                 data-job-id="{{ span.booking.job.id }}"
+                 data-job-name="{{ span.booking.job.name }}"
+                 data-job-start="{{ span.booking.start_date|date:'j M Y' }}"
+                 data-job-end="{{ span.booking.end_date|date:'j M Y' }}"
+                 data-asset-label="{{ row.asset.asset_id }}"
+                 onclick="openAssetJobDetail(this)">{{ span.booking.job.name }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    </div>{# end tl-group-rows #}
+    {% empty %}
+      <div class="empty" style="padding:20px 16px;">No engines found.</div>
+    {% endfor %}
+    {% endif %}
+
+    {% if show_laptops %}
+    <div class="tl-section">Laptops - {{ total_laptops }}</div>
+    {% for group in laptop_groups %}
+    <div class="tl-subgroup" onclick="toggleGroup(this)" data-group-key="lap-{{ group.make_model }}">
+      <span class="tl-subgroup-caret">&#9660;</span>{{ group.make_model }} - {{ group.rows|length }}
+    </div>
+    <div class="tl-group-rows" data-group-key="lap-{{ group.make_model }}">
+    {% for row in group.rows %}
+    <div class="tl-row">
+      <div class="tl-name">
+        <span class="tl-name-id">{{ row.asset.asset_id }}</span>
+      </div>
+      <div class="tl-cells">
+        {% for strip in row.strips %}
+          <div class="tl-cell {% if strip.is_weekend %}weekend{% endif %} {% if strip.is_today %}today{% endif %}"
+               data-asset-id="{{ row.asset.id }}"
+               data-asset-label="{{ row.asset.asset_id }}"
+               data-asset-kind="laptop"
+               data-date="{{ strip.date|date:'Y-m-d' }}"></div>
+        {% endfor %}
+        {% if row.spans %}
+        <div class="tl-block-layer">
+          {% for span in row.spans %}
+            <div class="tl-block {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
+                 style="grid-column:{{ span.grid_col_start }}/{{ span.grid_col_end }}; background:{{ span.color }}22; color:{{ span.color }};"
+                 data-booking-id="{{ span.booking.id }}"
+                 data-job-id="{{ span.booking.job.id }}"
+                 data-job-name="{{ span.booking.job.name }}"
+                 data-job-start="{{ span.booking.start_date|date:'j M Y' }}"
+                 data-job-end="{{ span.booking.end_date|date:'j M Y' }}"
+                 data-asset-label="{{ row.asset.asset_id }}"
+                 onclick="openAssetJobDetail(this)">{{ span.booking.job.name }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    </div>{# end tl-group-rows #}
+    {% empty %}
+      <div class="empty" style="padding:20px 16px;">No laptops found.</div>
+    {% endfor %}
+    {% endif %}
+
+    {% if show_kits %}
+    <div class="tl-section">Kits</div>
+    {% for row in kit_rows %}
+    <div class="tl-row">
+      <div class="tl-name">
+        <span class="tl-name-id">{{ row.item.name }}</span>
+        <span class="tl-name-sub">{{ row.item.assets.count }} member{{ row.item.assets.count|pluralize }}</span>
+      </div>
+      <div class="tl-cells">
+        {% for cell in row.cells %}
+          <div class="tl-cell {% if cell.is_weekend %}weekend{% endif %} {% if cell.date == today %}today{% endif %}"
+               data-asset-id="{{ row.item.id }}"
+               data-asset-label="{{ row.item.name }}"
+               data-asset-kind="kit"
+               data-date="{{ cell.date|date:'Y-m-d' }}"></div>
+        {% endfor %}
+        {% if row.spans %}
+        <div class="tl-block-layer">
+          {% for span in row.spans %}
+            <div class="tl-block {% if span.continues_before %}continues-before{% endif %} {% if span.continues_after %}continues-after{% endif %}"
+                 style="grid-column:{{ span.grid_col_start }}/{{ span.grid_col_end }}; background:{{ span.color }}22; color:{{ span.color }};"
+                 data-booking-id="{{ span.booking.id }}"
+                 data-job-id="{{ span.booking.job.id }}"
+                 data-job-name="{{ span.booking.job.name }}"
+                 data-job-start="{{ span.booking.start_date|date:'j M Y' }}"
+                 data-job-end="{{ span.booking.end_date|date:'j M Y' }}"
+                 data-asset-label="{{ row.item.name }}"
+                 onclick="openAssetJobDetail(this)">{{ span.booking.job.name }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
   </div>
-  <div class="jd-actions">
-    <span class="spacer"></span>
-    <button class="btn" id="jdCloneBtn" onclick="cloneJob()">Duplicate</button>
-    <button class="btn" id="jdUnassignBtn" style="color:var(--accent);" onclick="unassignBooking()">Unassign</button>
-    <button class="btn" id="jdDeleteBtn" style="color:var(--red);" onclick="deleteJob()">Delete job</button>
+</div>
+
+<dialog id="assetJobDialog">
+  <button type="button" class="dialog-close-x" onclick="document.getElementById('assetJobDialog').close()" aria-label="Close">&times;</button>
+  <div class="ajd-header">
+    <div class="ajd-job" id="ajdJobName"></div>
+    <div class="ajd-asset" id="ajdAssetId"></div>
+  </div>
+  <div class="ajd-body">
+    <div class="ajd-row"><span class="ajd-label">Dates</span><span id="ajdDates"></span></div>
+  </div>
+  <div class="ajd-actions">
+    <a class="btn" id="ajdEditLink" href="#">Edit job</a>
+    <span class="ajd-spacer"></span>
+    <button class="btn" style="color:var(--red);" onclick="deleteAssetBooking()">Unassign</button>
   </div>
 </dialog>
 
-<!-- License Detail Dialog -->
-<dialog id="licenseDetailDialog">
-  <a class="dialog-edit-icon" id="ldEditLink" href="#" title="Edit" aria-label="Edit license">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-  </a>
-  <button type="button" class="dialog-close-x" onclick="document.getElementById('licenseDetailDialog').close()" aria-label="Close">&times;</button>
-  <div class="jd-header">
-    <div>
-      <div class="jd-title" id="ldTitle"></div>
-      <div class="jd-category" id="ldStatus"></div>
-    </div>
-  </div>
-  <div class="jd-body">
-    <div class="jd-row" id="ldTypeRow" style="display:none;"><span class="jd-label">Type</span><span class="jd-value" id="ldType"></span></div>
-    <div class="jd-row" id="ldFuncRow" style="display:none;"><span class="jd-label">Functionality</span><span class="jd-value" id="ldFunc"></span></div>
-    <div class="jd-row" id="ldDurationRow" style="display:none;"><span class="jd-label">Duration</span><span class="jd-value" id="ldDuration"></span></div>
-    <div class="jd-row" id="ldVizRow" style="display:none;"><span class="jd-label">Viz Ticket</span><span class="jd-value" id="ldViz"></span></div>
-    <div class="jd-row" id="ldSerialRow" style="display:none;"><span class="jd-label">Serial</span><span class="jd-value" id="ldSerial"></span></div>
-    <div class="jd-row" id="ldKitsRow" style="display:none;"><span class="jd-label">In kits</span><span class="jd-value" id="ldKits"></span></div>
-    <div class="jd-row" id="ldNotesRow" style="display:none;"><span class="jd-label">Notes</span><span class="jd-value" id="ldNotes"></span></div>
-    <div class="jd-row" id="ldUpdatedRow" style="display:none;"><span class="jd-label">Last updated</span><span class="jd-value" id="ldUpdated"></span></div>
-    <div class="jd-row" id="ldUpdatedNotesRow" style="display:none;"><span class="jd-label">What changed</span><span class="jd-value" id="ldUpdatedNotes"></span></div>
-    <div class="jd-row" id="ldArchivedRow" style="display:none;"><span class="jd-label"></span><span class="jd-value badge badge-archived">Archived</span></div>
-  </div>
-</dialog>
-
-<!-- Kit Detail Dialog -->
-<dialog id="kitDetailDialog">
-  <a class="dialog-edit-icon" id="kdEditLink" href="#" title="Edit" aria-label="Edit kit">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-  </a>
-  <button type="button" class="dialog-close-x" onclick="document.getElementById('kitDetailDialog').close()" aria-label="Close">&times;</button>
-  <div class="jd-header">
-    <div>
-      <div class="jd-title" id="kdTitle"></div>
-      <div class="jd-category" id="kdMemberCount"></div>
-    </div>
-  </div>
-  <div class="jd-body">
-    <div class="jd-row" id="kdCurrentJobRow" style="display:none;"><span class="jd-label">Booked</span><span class="jd-value" id="kdCurrentJob"></span></div>
-    <div class="jd-row" id="kdNotesRow" style="display:none;"><span class="jd-label">Notes</span><span class="jd-value" id="kdNotes"></span></div>
-    <div class="jd-label" style="margin:10px 0 4px;">Members</div>
-    <div id="kdMembersList"></div>
-  </div>
-</dialog>
-
-<!-- Booking Dialog -->
 <dialog id="bookingDialog" class="dialog-panel">
-  <button type="button" class="dialog-close-x" onclick="closeBookingDialog()" aria-label="Close">&times;</button>
-  <h3 id="dialogTitle">New booking</h3>
+  <button type="button" class="dialog-close-x" onclick="document.getElementById('bookingDialog').close()" aria-label="Close">&times;</button>
+  <h3>New booking</h3>
+  <p id="bookingDialogSubtitle" style="font-size:12px; color:var(--text-dim); font-family:var(--mono); margin:-8px 0 12px;"></p>
   <form id="bookingForm">
     {% csrf_token %}
-    <input type="hidden" id="f_kind" name="kind">
-    <input type="hidden" id="f_item_id" name="item_id">
-
+    <input type="hidden" id="f_asset_id" name="asset_id">
+    <input type="hidden" id="f_start_date" name="start_date">
+    <input type="hidden" id="f_end_date" name="end_date">
+    <input type="hidden" id="f_asset_kind" name="asset_kind">
     <div class="tab-bar">
-      <button type="button" class="tab-btn active" onclick="switchJobTab('existing')">Existing job</button>
-      <button type="button" class="tab-btn" onclick="switchJobTab('new')">New job</button>
+      <button type="button" class="tab-btn active" onclick="switchTab('existing')">Existing job</button>
+      <button type="button" class="tab-btn" onclick="switchTab('new')">New job</button>
     </div>
-
     <div class="tab-pane active" id="tab-existing">
       <label for="f_job">Job</label>
       <select id="f_job" name="job_id">
         <option value="">Select a job...</option>
-        {% for job in jobs %}
-          <option value="{{ job.id }}" data-start="{{ job.start_date|date:'Y-m-d' }}" data-end="{{ job.end_date|date:'Y-m-d' }}">{{ job.name }}</option>
-        {% endfor %}
+        {% for job in jobs %}<option value="{{ job.id }}" data-start="{{ job.start_date|date:'Y-m-d' }}" data-end="{{ job.end_date|date:'Y-m-d' }}">{{ job.name }}</option>{% endfor %}
       </select>
     </div>
     <div class="tab-pane" id="tab-new">
@@ -442,76 +370,54 @@
       <input type="text" id="f_new_name" name="new_job_name">
       <label for="f_new_cat">Category</label>
       <select id="f_new_cat" name="new_job_category">
-        {% for value, label in job_categories %}
-          <option value="{{ value }}">{{ label }}</option>
-        {% endfor %}
+        {% for value, label in job_categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
       </select>
       <label for="f_new_notes">Notes (optional)</label>
       <input type="text" id="f_new_notes" name="new_job_notes">
       <div class="color-override-row">
         <input class="color-swatch-input" type="color" id="f_new_color" name="new_job_color" value="#EAB308" disabled>
         <label class="color-override-label" for="f_new_color_override">
-          <input type="checkbox" id="f_new_color_override" name="color_override"
-                 onchange="document.getElementById('f_new_color').disabled = !this.checked">
+          <input type="checkbox" id="f_new_color_override" onchange="document.getElementById('f_new_color').disabled = !this.checked">
           Custom color
         </label>
       </div>
     </div>
-
-    <label for="f_start">Start date</label>
-    <input type="date" id="f_start" name="start_date" required>
-    <label for="f_end">End date</label>
-    <input type="date" id="f_end" name="end_date" required>
-
-    <div id="f_functionalities_section" style="display:none;">
-      <label style="margin-top:10px; display:block; font-size:12px; color:var(--text-dim);">Functionalities being used</label>
-      <div id="f_functionalities_list" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px;"></div>
-      <div class="dialog-hint">Tick the capabilities in use. The whole license is blocked regardless.</div>
-    </div>
-
-    <div class="dialog-error" id="dialogError"></div>
-    <div class="dialog-hint" id="dialogHint" style="display:none;">
-      Staff bookings aren't blocked on overlap - if this person is already booked on another job in this window, both will show as separate blocks.
-    </div>
+    <label for="f_start_date">Start date</label>
+    <input type="date" id="f_start_display" name="start_date_display" readonly style="background:var(--surface-2); color:var(--text-dim);">
+    <label for="f_end_date">End date</label>
+    <input type="date" id="f_end_display" name="end_date_display" readonly style="background:var(--surface-2); color:var(--text-dim);">
+    <div class="dialog-error" id="bookingError"></div>
     <div class="dialog-actions">
-      <button type="button" class="btn btn-primary" onclick="submitBooking()">Save</button>
+      <button type="button" class="btn btn-primary" onclick="submitBooking()">Book</button>
     </div>
   </form>
 </dialog>
 
-<!-- New Job Dialog (standalone - no kit/staff/license attached yet) -->
 <dialog id="newJobDialog" class="dialog-panel">
   <button type="button" class="dialog-close-x" onclick="document.getElementById('newJobDialog').close()" aria-label="Close">&times;</button>
   <h3>New job</h3>
   <form id="newJobForm">
     {% csrf_token %}
     <label for="nj_name">Job name</label>
-    <input type="text" id="nj_name" autofocus>
-
-    <label for="nj_category">Category</label>
-    <select id="nj_category">
-      {% for value, label in job_categories %}
-        <option value="{{ value }}">{{ label }}</option>
-      {% endfor %}
+    <input type="text" id="nj_name" name="name" autofocus>
+    <label for="nj_cat">Category</label>
+    <select id="nj_cat" name="category">
+      {% for value, label in job_categories %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
     </select>
-
     <label for="nj_start">Start date</label>
-    <input type="date" id="nj_start">
+    <input type="date" id="nj_start" name="start_date">
     <label for="nj_end">End date</label>
-    <input type="date" id="nj_end">
-
+    <input type="date" id="nj_end" name="end_date">
     <label for="nj_notes">Notes (optional)</label>
-    <input type="text" id="nj_notes">
-
+    <input type="text" id="nj_notes" name="notes">
     <div class="color-override-row">
-      <input class="color-swatch-input" type="color" id="nj_color" value="#EAB308" disabled>
+      <input class="color-swatch-input" type="color" id="nj_color" name="new_job_color" value="#EAB308" disabled>
       <label class="color-override-label" for="nj_color_override">
         <input type="checkbox" id="nj_color_override" onchange="document.getElementById('nj_color').disabled = !this.checked">
         Custom color
       </label>
     </div>
-
-    <div class="dialog-hint">This creates the job on its own. Book kits, staff, or licenses onto it afterwards by dragging across their row on the timeline.</div>
+    <div class="dialog-hint">Creates the job standalone. Book assets onto it by dragging across their row on the timeline.</div>
     <div class="dialog-error" id="newJobError"></div>
     <div class="dialog-actions">
       <button type="button" class="btn btn-primary" onclick="submitNewJob()">Create job</button>
@@ -519,386 +425,196 @@
   </form>
 </dialog>
 
-{{ license_details_json|json_script:"license-details-data" }}
-{{ kit_details_json|json_script:"kit-details-data" }}
 <script>
-const dialog = document.getElementById("bookingDialog");
-const jobDetailDialog = document.getElementById("jobDetailDialog");
-const LICENSE_DETAILS = JSON.parse(document.getElementById("license-details-data").textContent);
-const KIT_DETAILS = JSON.parse(document.getElementById("kit-details-data").textContent);
-let activeKind = "kit";
-let activeJobId = null;
-let currentBookingId = null;
-let activeBookingKind = null;
-let activeBookingId = null;
+const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "";
+let activeBookingId = null, activeBookingKind = null;
 
-const ENDPOINTS = {
-  kit:     { create: "/api/bookings/create/",         idField: "kit_id",    deleteBase: "/api/bookings/" },
-  staff:   { create: "/api/staff-bookings/create/",   idField: "staff_id",  deleteBase: "/api/staff-bookings/" },
-  license: { create: "/api/license-bookings/create/", idField: "asset_id",  deleteBase: "/api/license-bookings/" },
-};
+function openAssetJobDetail(el) {
+  activeBookingId = el.dataset.bookingId;
+  activeBookingKind = el.dataset.assetKind || "asset";
+  document.getElementById("ajdJobName").textContent = el.dataset.jobName;
+  document.getElementById("ajdAssetId").textContent = el.dataset.assetLabel || "";
+  document.getElementById("ajdDates").textContent = el.dataset.jobStart + " - " + el.dataset.jobEnd;
+  document.getElementById("ajdEditLink").href = "/jobs/" + el.dataset.jobId + "/edit/";
+  document.getElementById("assetJobDialog").showModal();
+}
 
-function switchJobTab(tab) {
-  document.querySelectorAll(".tab-btn").forEach((b, i) => {
-    b.classList.toggle("active", (i === 0) === (tab === "existing"));
+async function deleteAssetBooking() {
+  const ok = await showConfirm({ title: "Unassign asset?", message: "This removes the booking. The job itself is not deleted.", okLabel: "Unassign", cancelLabel: "Cancel" });
+  if (!ok) return;
+  const url = activeBookingKind === "kit" ? `/api/bookings/${activeBookingId}/delete/` : `/api/asset-bookings/${activeBookingId}/delete/`;
+  const r = await fetch(url, { method: "POST", headers: { "X-CSRFToken": CSRF } });
+  if (r.ok) { document.getElementById("assetJobDialog").close(); location.reload(); }
+}
+
+let dragState = null;
+
+document.getElementById("tlBoard").addEventListener("mousedown", function(e) {
+  const cell = e.target.closest(".tl-cell");
+  if (!cell || !cell.dataset.assetId) return;
+  e.preventDefault();
+  dragState = { assetId: cell.dataset.assetId, assetKind: cell.dataset.assetKind, assetLabel: cell.dataset.assetLabel, startDate: cell.dataset.date, endDate: cell.dataset.date };
+  cell.classList.add("drag-preview");
+});
+
+document.addEventListener("mouseover", function(e) {
+  if (!dragState) return;
+  const cell = e.target.closest(".tl-cell");
+  if (!cell || cell.dataset.assetId !== dragState.assetId) return;
+  document.querySelectorAll(".tl-cell.drag-preview").forEach(c => c.classList.remove("drag-preview"));
+  const a = dragState.startDate, b = cell.dataset.date;
+  const [from, to] = a <= b ? [a, b] : [b, a];
+  dragState.startDate = from; dragState.endDate = to;
+  document.querySelectorAll(`.tl-cell[data-asset-id="${dragState.assetId}"]`).forEach(c => {
+    if (c.dataset.date >= from && c.dataset.date <= to) c.classList.add("drag-preview");
   });
+});
+
+document.addEventListener("mouseup", function(e) {
+  if (!dragState) return;
+  document.querySelectorAll(".tl-cell.drag-preview").forEach(c => c.classList.remove("drag-preview"));
+  const { assetId, assetKind, assetLabel, startDate, endDate } = dragState;
+  dragState = null;
+  openBookingDialog(assetId, assetKind, assetLabel, startDate, endDate);
+});
+
+function openBookingDialog(assetId, assetKind, assetLabel, startDate, endDate) {
+  document.getElementById("f_asset_id").value = assetId;
+  document.getElementById("f_asset_kind").value = assetKind;
+  document.getElementById("f_start_date").value = startDate;
+  document.getElementById("f_end_date").value = endDate;
+  document.getElementById("f_start_display").value = startDate;
+  document.getElementById("f_end_display").value = endDate;
+  document.getElementById("bookingDialogSubtitle").textContent = assetLabel + "  " + fmtDate(startDate) + (startDate !== endDate ? " - " + fmtDate(endDate) : "");
+  document.getElementById("bookingError").textContent = "";
+  document.getElementById("f_job").value = "";
+  document.getElementById("f_new_name").value = "";
+  switchTab("existing");
+  document.getElementById("bookingDialog").showModal();
+}
+
+function fmtDate(iso) {
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+function switchTab(tab) {
+  document.querySelectorAll(".tab-btn").forEach((b, i) => b.classList.toggle("active", (i === 0) === (tab === "existing")));
   document.getElementById("tab-existing").classList.toggle("active", tab === "existing");
   document.getElementById("tab-new").classList.toggle("active", tab === "new");
 }
 
-document.getElementById("f_job").addEventListener("change", function() {
-  const opt = this.options[this.selectedIndex];
-  if (!opt || !opt.value) return;
-  // Autofill from the selected job's own dates - still fully editable
-  // afterward, this just saves re-typing the common case of booking
-  // something for the job's whole span.
-  if (opt.dataset.start) document.getElementById("f_start").value = opt.dataset.start;
-  if (opt.dataset.end) document.getElementById("f_end").value = opt.dataset.end;
-});
-
-function openDialogForRange(kind, itemId, itemName, startDate, endDate, functionalities) {
-  activeKind = kind;
-  document.getElementById("dialogTitle").textContent = `Book ${itemName}`;
-  document.getElementById("f_kind").value = kind;
-  document.getElementById("f_item_id").value = itemId;
-  document.getElementById("f_start").value = startDate;
-  document.getElementById("f_end").value = endDate;
-  document.getElementById("f_job").value = "";
-  document.getElementById("f_new_name").value = "";
-  document.getElementById("f_new_notes").value = "";
-  document.getElementById("f_new_color_override").checked = false;
-  document.getElementById("f_new_color").disabled = true;
-  document.getElementById("f_new_color").value = "#EAB308";
-  document.getElementById("dialogError").style.display = "none";
-  document.getElementById("dialogHint").style.display = kind === "staff" ? "block" : "none";
-
-  const funcSection = document.getElementById("f_functionalities_section");
-  const funcList = document.getElementById("f_functionalities_list");
-  funcList.innerHTML = "";
-  if (kind === "license" && functionalities && functionalities.length) {
-    functionalities.forEach(tag => {
-      if (!tag.trim()) return;
-      const label = document.createElement("label");
-      label.style.cssText = "display:inline-flex; align-items:center; gap:4px; font-size:11px; cursor:pointer; padding:3px 8px; border:1px solid var(--border-strong); border-radius:999px; background:var(--surface-2); white-space:nowrap; user-select:none;";
-      const cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.value = tag.trim();
-      cb.style.cssText = "width:10px; height:10px; margin:0; accent-color:var(--accent); cursor:pointer; flex-shrink:0;";
-      cb.addEventListener("change", () => {
-        label.style.background = cb.checked ? "var(--accent-glow)" : "var(--surface-2)";
-        label.style.borderColor = cb.checked ? "var(--accent-deep)" : "var(--border-strong)";
-        label.style.color = cb.checked ? "var(--accent)" : "";
-      });
-      label.appendChild(cb);
-      label.appendChild(document.createTextNode(" " + tag.trim()));
-      funcList.appendChild(label);
-    });
-    funcSection.style.display = "block";
-  } else {
-    funcSection.style.display = "none";
-  }
-
-  switchJobTab("existing");
-  dialog.showModal();
-}
-
-function closeBookingDialog() {
-  dialog.close();
-}
-
 async function submitBooking() {
-  const kind = document.getElementById("f_kind").value;
-  const itemId = document.getElementById("f_item_id").value;
-  const startDate = document.getElementById("f_start").value;
-  const endDate = document.getElementById("f_end").value;
-  const jobId = document.getElementById("f_job").value;
-  const newJobName = document.getElementById("f_new_name").value.trim();
-  const newJobCategory = document.getElementById("f_new_cat").value;
-  const newJobNotes = document.getElementById("f_new_notes").value.trim();
-  const colorOverride = document.getElementById("f_new_color_override").checked;
-  const newJobColor = colorOverride ? document.getElementById("f_new_color").value : "";
-
-  const errorEl = document.getElementById("dialogError");
-  errorEl.style.display = "none";
-
-  const idField = ENDPOINTS[kind]?.idField ?? "kit_id";
-  const endpoint = ENDPOINTS[kind]?.create ?? "/api/bookings/create/";
-  const params = { [idField]: itemId, start_date: startDate, end_date: endDate };
-
-  if (kind === "license") {
-    const checked = Array.from(
-      document.querySelectorAll("#f_functionalities_list input[type='checkbox']:checked")
-    ).map(cb => cb.value);
-    if (checked.length) params.functionalities = checked.join(", ");
-  }
-
-  if (jobId) {
-    params.job_id = jobId;
-  } else {
-    if (!newJobName) { errorEl.textContent = "Enter a job name."; errorEl.style.display = "block"; return; }
-    params.new_job_name = newJobName;
-    params.new_job_category = newJobCategory;
-    if (newJobNotes) params.new_job_notes = newJobNotes;
-    if (newJobColor) params.new_job_color = newJobColor;
-  }
-
-  const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
-  const body = new URLSearchParams(params);
-
-  try {
-    const resp = await fetch(endpoint, {
-      method: "POST", headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
-      body: body.toString(),
-    });
-    const data = await resp.json();
-    if (!resp.ok) { errorEl.textContent = data.error || "Something went wrong."; errorEl.style.display = "block"; return; }
-    dialog.close();
-    location.reload();
-  } catch (err) {
-    errorEl.textContent = "Network error. Please try again."; errorEl.style.display = "block";
-  }
+  const errEl = document.getElementById("bookingError");
+  errEl.style.display = "none";
+  const assetKind = document.getElementById("f_asset_kind").value;
+  const url = assetKind === "kit" ? "/api/bookings/create/" : "/api/asset-bookings/create/";
+  const data = new FormData(document.getElementById("bookingForm"));
+  if (assetKind === "kit") { data.set("kit_id", data.get("asset_id")); data.delete("asset_id"); }
+  data.delete("asset_kind");
+  const r = await fetch(url, { method: "POST", headers: { "X-CSRFToken": CSRF }, body: data });
+  const json = await r.json();
+  if (!r.ok) { errEl.textContent = json.error || "Something went wrong."; return; }
+  document.getElementById("bookingDialog").close();
+  location.reload();
 }
 
 async function submitNewJob() {
-  const name = document.getElementById("nj_name").value.trim();
-  const category = document.getElementById("nj_category").value;
-  const startDate = document.getElementById("nj_start").value;
-  const endDate = document.getElementById("nj_end").value;
-  const notes = document.getElementById("nj_notes").value.trim();
-  const colorOverride = document.getElementById("nj_color_override").checked;
-  const color = colorOverride ? document.getElementById("nj_color").value : "";
+  const errEl = document.getElementById("newJobError");
+  errEl.style.display = "none";
+  const data = new FormData(document.getElementById("newJobForm"));
+  const body = { name: data.get("name"), category: data.get("category"), start_date: data.get("start_date"), end_date: data.get("end_date"), notes: data.get("notes") };
+  if (!body.name || !body.start_date || !body.end_date) { errEl.textContent = "Name, start and end date are required."; errEl.style.display = "block"; return; }
+  const r = await fetch("/api/jobs/create/", { method: "POST", headers: { "X-CSRFToken": CSRF, "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(body) });
+  const json = await r.json();
+  if (!r.ok) { errEl.textContent = json.error || "Something went wrong."; errEl.style.display = "block"; return; }
+  document.getElementById("newJobDialog").close();
+  location.reload();
+}
 
-  const errorEl = document.getElementById("newJobError");
-  errorEl.style.display = "none";
-
-  if (!name) { errorEl.textContent = "Enter a job name."; errorEl.style.display = "block"; return; }
-  if (!startDate || !endDate) { errorEl.textContent = "Pick a start and end date."; errorEl.style.display = "block"; return; }
-
-  const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
-  const params = { name, category, start_date: startDate, end_date: endDate };
-  if (notes) params.notes = notes;
-  if (color) params.custom_color = color;
-
+function toggleGroup(header) {
+  const key = header.dataset.groupKey;
+  const rows = document.querySelector(`.tl-group-rows[data-group-key="${key}"]`);
+  if (!rows) return;
+  const collapsed = rows.classList.toggle("hidden");
+  header.classList.toggle("collapsed", collapsed);
   try {
-    const resp = await fetch("/api/jobs/create/", {
-      method: "POST", headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(params).toString(),
-    });
-    const data = await resp.json();
-    if (!resp.ok) { errorEl.textContent = data.error || "Something went wrong."; errorEl.style.display = "block"; return; }
-    document.getElementById("newJobDialog").close();
-    location.reload();
-  } catch (err) {
-    errorEl.textContent = "Network error. Please try again."; errorEl.style.display = "block";
-  }
+    const stored = JSON.parse(localStorage.getItem("tl-collapsed") || "{}");
+    if (collapsed) { stored[key] = 1; } else { delete stored[key]; }
+    localStorage.setItem("tl-collapsed", JSON.stringify(stored));
+  } catch(e) {}
 }
 
-async function openJobDetail(jobId, bookingKind, bookingId) {
-  activeJobId = jobId;
-  activeBookingKind = bookingKind || null;
-  activeBookingId = bookingId || null;
-  try {
-    const resp = await fetch(`/api/jobs/${jobId}/`);
-    const job = await resp.json();
-    document.getElementById("jdTitle").textContent = job.name;
-    document.getElementById("jdCategory").textContent = job.category_display;
-    document.getElementById("jdColorBar").style.background = job.color;
-    const start = new Date(job.start_date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-    const end = new Date(job.end_date + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-    document.getElementById("jdDates").textContent = start === end ? start : `${start} - ${end}`;
-    if (job.kits.length) { document.getElementById("jdKits").textContent = job.kits.join(", "); document.getElementById("jdKitsRow").style.display = "flex"; }
-    else document.getElementById("jdKitsRow").style.display = "none";
-    if (job.staff.length) { document.getElementById("jdStaff").textContent = job.staff.join(", "); document.getElementById("jdStaffRow").style.display = "flex"; }
-    else document.getElementById("jdStaffRow").style.display = "none";
-    if (job.notes) { document.getElementById("jdNotes").textContent = job.notes; document.getElementById("jdNotesRow").style.display = "flex"; }
-    else document.getElementById("jdNotesRow").style.display = "none";
-    document.getElementById("jdEditLink").href = `/jobs/${jobId}/edit/`;
-
-    const unassignBtn = document.getElementById("jdUnassignBtn");
-    unassignBtn.style.display = (activeBookingKind && activeBookingId) ? "inline-flex" : "none";
-
-    jobDetailDialog.showModal();
-  } catch(e) { console.error(e); }
-}
-
-function openLicenseDetail(licenseId) {
-  const lic = LICENSE_DETAILS[licenseId];
-  if (!lic) return;
-  document.getElementById("ldTitle").textContent = lic.assetId;
-  document.getElementById("ldStatus").textContent = lic.status;
-  document.getElementById("ldEditLink").href = lic.editUrl;
-
-  const setRow = (rowId, valueId, text) => {
-    const row = document.getElementById(rowId);
-    if (text) { document.getElementById(valueId).textContent = text; row.style.display = "flex"; }
-    else row.style.display = "none";
-  };
-  setRow("ldTypeRow", "ldType", lic.type);
-  setRow("ldFuncRow", "ldFunc", lic.functionalities && lic.functionalities.length ? lic.functionalities.join(", ") : "");
-  const duration = (lic.durationStart || lic.durationEnd) ? `${lic.durationStart || "?"} \u2013 ${lic.durationEnd || "?"}` : "";
-  setRow("ldDurationRow", "ldDuration", duration);
-  setRow("ldVizRow", "ldViz", lic.vizTicket);
-  setRow("ldSerialRow", "ldSerial", lic.serial);
-  setRow("ldKitsRow", "ldKits", lic.kits && lic.kits.length ? lic.kits.join(", ") : "");
-  setRow("ldNotesRow", "ldNotes", lic.notes);
-  const updated = lic.lastUpdatedBy || lic.lastUpdatedDate
-    ? `${lic.lastUpdatedBy || ""}${lic.lastUpdatedBy && lic.lastUpdatedDate ? " on " : ""}${lic.lastUpdatedDate || ""}`
-    : "";
-  setRow("ldUpdatedRow", "ldUpdated", updated);
-  setRow("ldUpdatedNotesRow", "ldUpdatedNotes", lic.lastUpdatedNotes);
-  document.getElementById("ldArchivedRow").style.display = lic.archived ? "flex" : "none";
-
-  document.getElementById("licenseDetailDialog").showModal();
-}
-
-function kdBadge(status) {
-  return `<span class="badge badge-${status.toLowerCase().replace(/ /g, "_")}" style="font-size:9px; padding:1px 6px;">${status}</span>`;
-}
-
-function openKitDetail(kitId) {
-  const kit = KIT_DETAILS[kitId];
-  if (!kit) return;
-  document.getElementById("kdTitle").textContent = kit.name;
-  document.getElementById("kdMemberCount").textContent = `${kit.memberCount} member${kit.memberCount === 1 ? "" : "s"}`;
-  document.getElementById("kdEditLink").href = kit.editUrl;
-
-  const jobRow = document.getElementById("kdCurrentJobRow");
-  if (kit.currentJob) {
-    document.getElementById("kdCurrentJob").textContent = `${kit.currentJob} (${kit.currentJobDates})`;
-    jobRow.style.display = "flex";
-  } else jobRow.style.display = "none";
-
-  const notesRow = document.getElementById("kdNotesRow");
-  if (kit.notes) { document.getElementById("kdNotes").textContent = kit.notes; notesRow.style.display = "flex"; }
-  else notesRow.style.display = "none";
-
-  const list = document.getElementById("kdMembersList");
-  if (!kit.members.length) {
-    list.innerHTML = `<div class="kd-empty">No members added yet.</div>`;
+function toggleCollapseAll() {
+  const btn = document.getElementById("collapseToggle");
+  const allCollapsed = document.querySelectorAll(".tl-group-rows.hidden").length ===
+                       document.querySelectorAll(".tl-group-rows").length;
+  if (allCollapsed) {
+    // Expand all
+    document.querySelectorAll(".tl-group-rows").forEach(r => r.classList.remove("hidden"));
+    document.querySelectorAll(".tl-subgroup").forEach(h => h.classList.remove("collapsed"));
+    btn.textContent = "Collapse all";
+    try { localStorage.setItem("tl-collapsed", "{}"); } catch(e) {}
   } else {
-    list.innerHTML = kit.members.map(m => {
-      let html = `
-        <div class="kd-member-row">
-          <span class="kd-aid">${m.assetId}</span>
-          <span class="kd-amodel">${m.type}${m.model ? " &middot; " + m.model : ""}</span>
-          ${m.tag ? `<span class="kd-tag" style="background:${m.tag.color}22;color:${m.tag.color};border-color:${m.tag.color}44;">${m.tag.name}</span>` : ""}
-          ${m.tag2 ? `<span class="kd-tag" style="background:${m.tag2.color}22;color:${m.tag2.color};border-color:${m.tag2.color}44;">${m.tag2.name}</span>` : ""}
-          ${kdBadge(m.status)}
-        </div>`;
-      m.nested.forEach(n => {
-        html += `
-          <div class="kd-nested-row ${n.indent ? "indent" : ""}">
-            <span class="kd-aid" style="font-size:11px;">${n.assetId}</span>
-            <span style="flex:1;">${n.type}${n.model ? " &middot; " + n.model : ""}</span>
-            ${kdBadge(n.status)}
-          </div>`;
-      });
-      return html;
-    }).join("");
+    // Collapse all
+    document.querySelectorAll(".tl-group-rows").forEach(r => r.classList.add("hidden"));
+    document.querySelectorAll(".tl-subgroup").forEach(h => h.classList.add("collapsed"));
+    btn.textContent = "Expand all";
+    try {
+      const stored = {};
+      document.querySelectorAll(".tl-group-rows").forEach(r => { stored[r.dataset.groupKey] = 1; });
+      localStorage.setItem("tl-collapsed", JSON.stringify(stored));
+    } catch(e) {}
   }
-
-  document.getElementById("kitDetailDialog").showModal();
 }
 
-async function unassignBooking() {
-  if (!activeBookingKind || !activeBookingId) return;
-  const kindLabel = { kit: "kit", staff: "staff member", license: "license" }[activeBookingKind] || "item";
-  const okUnassign = await showConfirm({
-    title: `Unassign ${kindLabel}?`,
-    message: "The job itself and any other assignments on it will stay.",
-    okLabel: "Unassign", cancelLabel: "Cancel"
-  });
-  if (!okUnassign) return;
-  const base = ENDPOINTS[activeBookingKind]?.deleteBase;
-  if (!base) return;
-  const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
-  await fetch(`${base}${activeBookingId}/delete/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
-  jobDetailDialog.close();
-  location.reload();
+function jumpToDate(val) {
+  if (!val) return;
+  const params = new URLSearchParams(window.location.search);
+  params.set("start", val);
+  window.location.search = params.toString();
 }
 
-async function deleteJob() {
-  if (!activeJobId) return;
-  const okDel = await showConfirm({
-    title: "Delete entire job?",
-    message: "This will permanently delete the job and all its kit, staff and license bookings. This cannot be undone.",
-    okLabel: "Delete", cancelLabel: "Cancel"
+// Sync CSS variable with resizable-grid width changes
+// base.html modifies grid.style.gridTemplateColumns directly; we mirror col 0 to --tl-name-width
+(function() {
+  const ruler = document.getElementById("tlRuler");
+  if (!ruler) return;
+  const obs = new MutationObserver(() => {
+    const cols = ruler.style.gridTemplateColumns;
+    if (!cols) return;
+    const w = cols.split(" ")[0];
+    if (w) document.documentElement.style.setProperty("--tl-name-width", w);
   });
-  if (!okDel) return;
-  const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
-  await fetch(`/api/jobs/${activeJobId}/delete/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
-  jobDetailDialog.close();
-  location.reload();
-}
-
-async function cloneJob() {
-  if (!activeJobId) return;
-  const csrf = document.querySelector("[name=csrfmiddlewaretoken]").value;
-  const resp = await fetch(`/api/jobs/${activeJobId}/clone/`, { method: "POST", headers: { "X-CSRFToken": csrf } });
-  const data = await resp.json();
-  if (data.ok) { jobDetailDialog.close(); location.reload(); }
-}
-
-// Drag-to-book
-(function setupDrag() {
-  let dragState = null;
-
-  function clearPreview(rowEl) {
-    if (!rowEl) return;
-    rowEl.querySelectorAll(".gc.preview").forEach(c => c.classList.remove("preview"));
-  }
-
-  function applyPreview(rowEl, startIdx, endIdx) {
-    clearPreview(rowEl);
-    const cells = rowEl.querySelectorAll(".gc");
-    const lo = Math.min(startIdx, endIdx), hi = Math.max(startIdx, endIdx);
-    cells.forEach((c, i) => { if (i >= lo && i <= hi) c.classList.add("preview"); });
-  }
-
-  document.addEventListener("mousedown", (e) => {
-    const cell = e.target.closest(".gc");
-    if (!cell || e.button !== 0) return;
-    const rowEl = cell.closest(".grow-cells");
-    if (!rowEl) return;
-    const cells = Array.from(rowEl.querySelectorAll(".gc"));
-    const idx = cells.indexOf(cell);
-    dragState = {
-      kind: cell.dataset.kind, itemId: cell.dataset.itemId, itemName: cell.dataset.itemName,
-      functionalities: cell.dataset.functionalities || "",
-      startCell: cell, startIdx: idx, endIdx: idx, rowEl,
-    };
-    applyPreview(rowEl, idx, idx);
-    e.preventDefault();
-  });
-
-  document.addEventListener("mousemove", (e) => {
-    if (!dragState) return;
-    const cell = e.target.closest(".gc");
-    if (!cell) return;
-    const rowEl = cell.closest(".grow-cells");
-    if (rowEl !== dragState.rowEl) return;
-    const cells = Array.from(rowEl.querySelectorAll(".gc"));
-    const idx = cells.indexOf(cell);
-    if (idx !== dragState.endIdx) { dragState.endIdx = idx; applyPreview(rowEl, dragState.startIdx, idx); }
-  });
-
-  document.addEventListener("mouseup", (e) => {
-    if (!dragState) return;
-    const { kind, itemId, itemName, functionalities, startCell, startIdx, endIdx, rowEl } = dragState;
-    const cells = Array.from(rowEl.querySelectorAll(".gc"));
-    const endCell = cells[endIdx];
-    clearPreview(rowEl);
-    dragState = null;
-    if (e.target.closest(".gblock")) return;
-    const lo = startCell.dataset.date <= (endCell || startCell).dataset.date ? startCell.dataset.date : (endCell || startCell).dataset.date;
-    const hi = startCell.dataset.date <= (endCell || startCell).dataset.date ? (endCell || startCell).dataset.date : startCell.dataset.date;
-    const funcList = functionalities ? functionalities.split(",").map(s => s.trim()).filter(Boolean) : [];
-    openDialogForRange(kind, itemId, itemName, lo, hi, funcList);
-  });
-
-  document.addEventListener("mouseleave", () => {
-    if (dragState) clearPreview(dragState.rowEl);
-  });
+  obs.observe(ruler, { attributes: true, attributeFilter: ["style"] });
+  // Also restore on load from base.html's storage key
+  try {
+    const saved = localStorage.getItem("kitscheduler-colwidth-timeline-board");
+    if (saved) {
+      const w = Math.max(80, Math.min(400, parseInt(saved)));
+      document.documentElement.style.setProperty("--tl-name-width", w + "px");
+    }
+  } catch(e) {}
 })();
+
+// Restore collapsed state on load
+(function() {
+  try {
+    const stored = JSON.parse(localStorage.getItem("tl-collapsed") || "{}");
+    Object.keys(stored).forEach(key => {
+      const rows = document.querySelector(`.tl-group-rows[data-group-key="${key}"]`);
+      const header = document.querySelector(`.tl-subgroup[data-group-key="${key}"]`);
+      if (rows) rows.classList.add("hidden");
+      if (header) header.classList.add("collapsed");
+    });
+  } catch(e) {}
+  // Sync button label with actual state after restore
+  const btn = document.getElementById("collapseToggle");
+  if (btn) {
+    const total = document.querySelectorAll(".tl-group-rows").length;
+    const collapsed = document.querySelectorAll(".tl-group-rows.hidden").length;
+    if (total > 0 && collapsed === total) btn.textContent = "Expand all";
+  }
+})();
+
 </script>
 {% endblock %}

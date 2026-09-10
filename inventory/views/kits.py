@@ -39,17 +39,28 @@ def kit_list_view(request):
         qty_by_asset_id = {kat.asset_id: kat.quantity for kat in kit.kit_asset_tags.all()}
         members = list(kit.assets.all().order_by("asset_type", "asset_id"))
         member_ids = [m.id for m in members]
-        # For each member, find other kits it also belongs to (excluding this kit)
+        # For each member, find other kits it also belongs to (excluding this kit
+        # and any archived kits - archived kits are no longer relevant).
+        # Cables are never tracked across kits (they will become bulk assets).
+        # Bulk peripherals (qty > 1) are also excluded - no point tracking stock items.
         other_kits_by_asset = {}
         for kat in KitAssetTag.objects.filter(
             asset_id__in=member_ids
-        ).exclude(kit=kit).select_related("kit"):
+        ).exclude(kit=kit).exclude(kit__status=Kit.Status.ARCHIVED).select_related("kit"):
             other_kits_by_asset.setdefault(kat.asset_id, []).append(kat.kit.name)
         for m in members:
             m.kit_tag = tags_by_asset_id.get(m.id)
             m.kit_tag_2 = tags2_by_asset_id.get(m.id)
             m.kit_qty = qty_by_asset_id.get(m.id, 1)
-            m.also_in_kits = other_kits_by_asset.get(m.id, [])
+            # Suppress "also in" for cables entirely, and for bulk peripherals.
+            # qty can live on KitAssetTag.quantity (kit-level override) or Asset.qty
+            # (the asset's own field) - check both.
+            is_bulk = m.kit_qty > 1 or m.qty > 1
+            hide_also_in = (
+                m.asset_type == Asset.AssetType.CABLE
+                or (m.asset_type == Asset.AssetType.PERIPHERAL and is_bulk)
+            )
+            m.also_in_kits = [] if hide_also_in else other_kits_by_asset.get(m.id, [])
         nested_count = sum(
             m.nested_assets.count()
             + sum(c.nested_assets.count() for c in m.nested_assets.all() if c.asset_type in Asset.NESTABLE_CONTAINER_TYPES)

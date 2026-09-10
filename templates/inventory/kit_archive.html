@@ -117,13 +117,13 @@
           <div class="arch-member">
             <span class="arch-member-id">{{ member.asset_id }}</span>
             <span class="arch-member-model">{{ member.get_asset_type_display }}{% if member.make_model %} &middot; {{ member.make_model }}{% endif %}</span>
-            <span class="badge badge-{{ member.status|lower }}" style="font-size:10px; flex-shrink:0;">{{ member.get_status_display }}</span>
+            <span class="badge badge-{{ member.status|lower }}" style="font-size:10px; flex-shrink:0; opacity:0.5;" title="Live asset status">{{ member.get_status_display }}</span>
           </div>
           {% for comp in member.nested_assets.all %}
           <div class="arch-member-nested">
             <span style="font-family:var(--mono); font-size:11px; color:var(--text-dim); min-width:100px; flex-shrink:0;">{{ comp.asset_id }}</span>
             <span style="color:var(--text-faint); flex:1;">{{ comp.get_asset_type_display }}{% if comp.make_model %} &middot; {{ comp.make_model }}{% endif %}</span>
-            <span class="badge badge-{{ comp.status|lower }}" style="font-size:10px; flex-shrink:0;">{{ comp.get_status_display }}</span>
+            <span class="badge badge-{{ comp.status|lower }}" style="font-size:10px; flex-shrink:0; opacity:0.5;" title="Live asset status">{{ comp.get_status_display }}</span>
           </div>
           {% endfor %}
         {% empty %}
