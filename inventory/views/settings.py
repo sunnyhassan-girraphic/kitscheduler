@@ -1,7 +1,11 @@
 import csv
 import datetime
 import io
+import os
 import re
+import shutil
+import subprocess
+import tempfile
 import zipfile
 
 from django.contrib.auth.decorators import login_required
@@ -232,3 +236,305 @@ def settings_key_value(request):
     if key.startswith("ticket_"):
         return redirect("/settings/#tickets")
     return redirect("/settings/")
+
+
+# ── Database backup ──────────────────────────────────────────────────────────
+
+def _db_info():
+    """Return (db_type, db_settings_dict) for the default database."""
+    from django.db import connection
+    vendor = connection.vendor  # 'postgresql' or 'sqlite'
+    from django.conf import settings as django_settings
+    db = django_settings.DATABASES["default"]
+    return vendor, db
+
+
+def _pg_bin(tool):
+    # Return full path to a PostgreSQL CLI tool, respecting PG_BIN_PATH env var.
+    pg_bin = os.environ.get("PG_BIN_PATH", "").strip()
+    if pg_bin:
+        return os.path.join(pg_bin, tool)
+    return tool
+
+
+@login_required
+def db_backup_view(request):
+    if not _is_admin(request.user):
+        return redirect("/settings/")
+
+    vendor, db = _db_info()
+    today = datetime.date.today().isoformat()
+
+    if vendor == "postgresql":
+        env = os.environ.copy()
+        env["PGPASSWORD"] = db.get("PASSWORD", "")
+        cmd = [
+            _pg_bin("pg_dump"),
+            "-h", db.get("HOST", "localhost"),
+            "-p", str(db.get("PORT", 5432)),
+            "-U", db.get("USER", ""),
+            "-d", db.get("NAME", ""),
+            "--no-password",
+            "--format=plain",
+            "--encoding=UTF8",
+            "--clean",        # adds DROP statements before each CREATE
+            "--if-exists",    # prevents errors if objects don't exist yet
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, env=env, timeout=120)
+            if result.returncode != 0:
+                return HttpResponse(
+                    f"pg_dump failed: {result.stderr.decode()}", status=500, content_type="text/plain"
+                )
+            response = HttpResponse(result.stdout, content_type="application/sql")
+            response["Content-Disposition"] = f'attachment; filename="greg-backup-{today}.sql"'
+            return response
+        except FileNotFoundError:
+            return HttpResponse(
+                "pg_dump not found. Set PG_BIN_PATH in your .env to the PostgreSQL bin directory, e.g. C:\\Program Files\\PostgreSQL\\18\\bin",
+                status=500, content_type="text/plain"
+            )
+
+    elif vendor == "sqlite":
+        db_path = str(db.get("NAME", ""))
+        if not os.path.exists(db_path):
+            return HttpResponse("SQLite database file not found.", status=404, content_type="text/plain")
+        with open(db_path, "rb") as f:
+            data = f.read()
+        response = HttpResponse(data, content_type="application/octet-stream")
+        response["Content-Disposition"] = f'attachment; filename="greg-backup-{today}.db"'
+        return response
+
+    return HttpResponse("Unsupported database type.", status=500, content_type="text/plain")
+
+
+@login_required
+@require_POST
+def db_restore_view(request):
+    if not _is_admin(request.user):
+        return redirect("/settings/")
+
+    confirm = request.POST.get("confirm_word", "").strip()
+    if confirm != "RESTORE":
+        from django.contrib import messages
+        messages.error(request, "Type RESTORE to confirm.")
+        return redirect("/settings/#data")
+
+    uploaded = request.FILES.get("restore_file")
+    if not uploaded:
+        return redirect("/settings/#data")
+
+    vendor, db = _db_info()
+    filename = uploaded.name.lower()
+
+    if vendor == "postgresql":
+        if not filename.endswith(".sql"):
+            return HttpResponse("Upload a .sql file for PostgreSQL restore.", status=400, content_type="text/plain")
+
+        with tempfile.NamedTemporaryFile(suffix=".sql", delete=False) as tmp:
+            for chunk in uploaded.chunks():
+                tmp.write(chunk)
+            tmp_path = tmp.name
+
+        try:
+            env = os.environ.copy()
+            env["PGPASSWORD"] = db.get("PASSWORD", "")
+            psql_base = [
+                _pg_bin("psql"),
+                "-h", db.get("HOST", "localhost"),
+                "-p", str(db.get("PORT", 5432)),
+                "-U", db.get("USER", ""),
+                "-d", db.get("NAME", ""),
+                "--no-password",
+            ]
+
+            # Step 1: drop all existing tables/sequences/views in public schema
+            # This ensures a clean slate before restoring
+            drop_sql = (
+                "DROP SCHEMA public CASCADE; "
+                "CREATE SCHEMA public; "
+                "GRANT ALL ON SCHEMA public TO public;"
+            )
+            drop_result = subprocess.run(
+                psql_base + ["-c", drop_sql],
+                capture_output=True, env=env, timeout=60
+            )
+            if drop_result.returncode != 0:
+                return HttpResponse(
+                    f"Failed to clear existing schema: {drop_result.stderr.decode()}",
+                    status=500, content_type="text/plain"
+                )
+
+            # Step 2: restore the backup
+            restore_result = subprocess.run(
+                psql_base + ["-f", tmp_path],
+                capture_output=True, env=env, timeout=300
+            )
+            if restore_result.returncode != 0:
+                return HttpResponse(
+                    f"psql restore failed: {restore_result.stderr.decode()}",
+                    status=500, content_type="text/plain"
+                )
+        finally:
+            os.unlink(tmp_path)
+
+        from django.contrib import messages
+        messages.success(request, "Database restored successfully.")
+        return redirect("/settings/#data")
+
+    elif vendor == "sqlite":
+        if not filename.endswith(".db"):
+            return HttpResponse("Upload a .db file for SQLite restore.", status=400, content_type="text/plain")
+
+        db_path = str(db.get("NAME", ""))
+        # Backup existing before overwrite
+        if os.path.exists(db_path):
+            shutil.copy2(db_path, db_path + ".pre-restore-backup")
+
+        with open(db_path, "wb") as f:
+            for chunk in uploaded.chunks():
+                f.write(chunk)
+
+        from django.contrib import messages
+        messages.success(request, "Database restored. Previous database saved as .pre-restore-backup.")
+        return redirect("/settings/#data")
+
+    return HttpResponse("Unsupported database type.", status=500, content_type="text/plain")
+
+
+# ── CSV import ───────────────────────────────────────────────────────────────
+
+IMPORTABLE_MODELS = {
+    "assets": {
+        "label": "Assets",
+        "required_headers": ["asset_id", "type", "status"],
+        "optional_headers": ["make_model", "serial", "qty", "notes", "archived"],
+    },
+    "jobs": {
+        "label": "Jobs",
+        "required_headers": ["job_name", "start_date", "end_date"],
+        "optional_headers": ["category", "notes"],
+    },
+}
+
+
+@login_required
+@require_POST
+def csv_import_view(request):
+    if not _is_admin(request.user):
+        return redirect("/settings/")
+
+    from django.contrib import messages
+
+    model_key = request.POST.get("model", "").strip()
+    uploaded = request.FILES.get("csv_file")
+    action = request.POST.get("action", "preview")
+
+    if model_key not in IMPORTABLE_MODELS or not uploaded:
+        messages.error(request, "Select a model and upload a CSV file.")
+        return redirect("/settings/#data")
+
+    meta = IMPORTABLE_MODELS[model_key]
+
+    try:
+        decoded = uploaded.read().decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(decoded))
+        rows = list(reader)
+        headers = reader.fieldnames or []
+    except Exception as e:
+        messages.error(request, f"Could not read CSV: {e}")
+        return redirect("/settings/#data")
+
+    # Validate required headers
+    missing = [h for h in meta["required_headers"] if h not in headers]
+    if missing:
+        messages.error(request, f"CSV is missing required columns: {', '.join(missing)}")
+        return redirect("/settings/#data")
+
+    if action == "preview":
+        # Return JSON preview for the frontend
+        from django.http import JsonResponse
+        preview = rows[:20]
+        return JsonResponse({
+            "headers": headers,
+            "rows": preview,
+            "total": len(rows),
+            "model": model_key,
+            "model_label": meta["label"],
+        })
+
+    # action == "import"
+    created = 0
+    skipped = 0
+    errors = []
+
+    if model_key == "assets":
+        TYPE_MAP = {label.lower(): value for value, label in Asset.AssetType.choices}
+        STATUS_MAP = {label.lower(): value for value, label in Asset.Status.choices}
+        for row in rows:
+            asset_id = row.get("asset_id", "").strip().upper()
+            if not asset_id:
+                skipped += 1
+                continue
+            if Asset.objects.filter(asset_id=asset_id).exists():
+                skipped += 1
+                continue
+            asset_type = TYPE_MAP.get(row.get("type", "").strip().lower(), "")
+            status = STATUS_MAP.get(row.get("status", "").strip().lower(), Asset.Status.AVAILABLE)
+            if not asset_type:
+                errors.append(f"{asset_id}: unknown type '{row.get('type', '')}'")
+                continue
+            try:
+                qty_val = int(row.get("qty", 1) or 1)
+            except ValueError:
+                qty_val = 1
+            Asset.objects.create(
+                asset_id=asset_id,
+                asset_type=asset_type,
+                make_model=row.get("make_model", "").strip(),
+                serial=row.get("serial", "").strip().upper(),
+                qty=qty_val,
+                status=status,
+                notes=row.get("notes", "").strip(),
+                archived=row.get("archived", "").strip().lower() == "yes",
+            )
+            created += 1
+
+    elif model_key == "jobs":
+        CAT_MAP = {label.lower(): value for value, label in Job.Category.choices}
+        for row in rows:
+            name = row.get("job_name", "").strip()
+            if not name:
+                skipped += 1
+                continue
+            try:
+                start = datetime.date.fromisoformat(row.get("start_date", "").strip())
+                end = datetime.date.fromisoformat(row.get("end_date", "").strip())
+            except ValueError:
+                errors.append(f"'{name}': invalid dates")
+                continue
+            category = CAT_MAP.get(row.get("category", "").strip().lower(), Job.Category.TX)
+            Job.objects.create(
+                name=name, category=category, start_date=start, end_date=end,
+                notes=row.get("notes", "").strip(),
+            )
+            created += 1
+
+    result_msg = f"Import complete: {created} created, {skipped} skipped."
+    if errors:
+        result_msg += f" Errors: {'; '.join(errors[:5])}"
+        messages.warning(request, result_msg)
+    else:
+        messages.success(request, result_msg)
+
+    return redirect("/settings/#data")
+
+
+@login_required
+def db_info_view(request):
+    """Return the database vendor so the frontend can label the backup button."""
+    vendor, _ = _db_info()
+    return HttpResponse(
+        f'{{"vendor": "{vendor}"}}',
+        content_type="application/json"
+    )

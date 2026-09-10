@@ -83,6 +83,10 @@ from .settings import (
     settings_functionality_edit,
     settings_key_value,
     export_csv_view,
+    db_backup_view,
+    db_restore_view,
+    db_info_view,
+    csv_import_view,
     logout_view,
     change_password_view,
 )

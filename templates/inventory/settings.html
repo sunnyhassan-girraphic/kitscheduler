@@ -42,6 +42,47 @@
 
   /* Cards */
   .s-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+  /* Data panel tabs */
+  .data-tab-bar { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .data-tab {
+    padding: 8px 16px; font-size: 13px; cursor: pointer; color: var(--text-dim);
+    border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    font-weight: 600; /* always bold to reserve width */
+    color: var(--text-faint);
+  }
+  .data-tab::after {
+    /* invisible bold clone reserves width so switching never shifts layout */
+    content: attr(data-label);
+    display: block; height: 0; overflow: hidden;
+    font-weight: 600; visibility: hidden;
+  }
+  .data-tab:hover { color: var(--text-dim); }
+  .data-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .data-tab-pane { display: none; }
+  .data-tab-pane.active { display: block; }
+
+  /* Custom file button */
+  .data-file-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 12px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--border-strong); background: var(--surface-2);
+    font-size: 12px; color: var(--text-dim); transition: border-color 0.12s, color 0.12s;
+    white-space: nowrap; user-select: none;
+  }
+  .data-file-btn:hover { border-color: var(--accent); color: var(--text); }
+  .data-file-btn svg { flex-shrink: 0; }
+
+  /* Data select */
+  .data-select { font-size: 12px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 6px; padding: 7px 10px; color: var(--text); }
+
+  /* Danger card */
+  .data-danger-card { border-color: rgba(248,81,73,0.25); }
+  .data-danger-card .s-card-head { background: rgba(248,81,73,0.05); }
+
+  .s-message { padding: 10px 14px; border-radius: 6px; font-size: 13px; }
+  .s-message-success { background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.3); color: #3fb950; }
+  .s-message-error { background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3); color: var(--red); }
+  .s-message-warning { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); color: var(--accent); }
   .s-card-head { padding: 13px 18px; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .s-card-head-sub { font-size: 11px; font-weight: 400; color: var(--text-faint); }
   .s-card-desc { padding: 12px 18px; font-size: 12px; color: var(--text-dim); line-height: 1.5; border-bottom: 1px solid var(--border); }
@@ -145,7 +186,7 @@
       My account
     </button>
     <button class="sidebar-item" data-panel="appearance">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="19" cy="11" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="10" cy="18.5" r="2.5"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.1 0 2-.9 2-2 0-.55-.22-1.05-.58-1.41-.36-.37-.58-.87-.58-1.42 0-1.1.9-2 2-2h2.34c3.1 0 5.82-2.58 5.82-6C23 6.39 18.03 2 12 2z"/></svg>
       Appearance
     </button>
     <button class="sidebar-item" data-panel="notifications">
@@ -582,27 +623,150 @@
     <!-- Data -->
     <div class="settings-panel" id="panel-data">
       <div class="settings-panel-title">Data</div>
-      <p class="settings-panel-sub">Export, backup, and manage your G.R.E.G data.</p>
+      <p class="settings-panel-sub">Backup, restore, export and import your G.R.E.G data.</p>
 
-      <div class="s-card">
-        <div class="s-card-head">Export</div>
-        <div class="s-action-row">
-          <div class="s-action-text">
-            <strong>Export all data as CSV</strong>
-            <p>Assets, kits, and jobs exported as a zip of CSVs. Good for backups or spreadsheet analysis.</p>
+      {% if messages %}
+        {% for message in messages %}
+          <div class="s-message s-message-{{ message.tags }}" style="margin-bottom:16px;">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+
+      <!-- Data sub-tabs -->
+      <div class="data-tab-bar">
+        <button class="data-tab active" data-label="Database" onclick="switchDataTab('database')">Database</button>
+        <button class="data-tab" data-label="CSV" onclick="switchDataTab('csv')">CSV</button>
+      </div>
+
+      <!-- Database tab -->
+      <div class="data-tab-pane active" id="data-tab-database">
+
+        <!-- Backup -->
+        <div class="s-card">
+          <div class="s-card-head">
+            Backup
+            <span class="s-card-head-sub" id="dbTypeLabel">Detecting...</span>
           </div>
-          <a class="btn" href="/settings/export/">Download zip</a>
+          <div class="s-card-desc">
+            Downloads a complete database backup. On PostgreSQL this runs <code>pg_dump</code> and gives you a <code>.sql</code> file. Use this before any major changes or to move data to another server or environment.
+          </div>
+          <div class="s-action-row">
+            <div class="s-action-text">
+              <strong>Download full backup</strong>
+              <p style="color:var(--text-faint); font-size:12px;">Includes all assets, jobs, kits, bookings, tickets and settings.</p>
+            </div>
+            <a class="btn btn-primary" href="/settings/db-backup/" id="dbBackupBtn">Download backup</a>
+          </div>
+        </div>
+
+        <!-- Restore -->
+        <div class="s-card data-danger-card">
+          <div class="s-card-head">
+            <span style="color:var(--red);">Restore</span>
+            <span class="s-card-head-sub">Destructive - cannot be undone</span>
+          </div>
+          <div class="s-card-desc">
+            Replaces the <strong>entire database</strong> with the contents of a backup file. All existing data will be overwritten. Only use this if you know exactly what you are doing - for example, pulling production data into a local test environment.
+          </div>
+          <div class="s-action-row">
+            <div class="s-action-text">
+              <strong>Upload backup file</strong>
+              <p style="color:var(--text-faint); font-size:12px;">Select a <code>.sql</code> backup file, then confirm in the dialog.</p>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+              <label class="data-file-btn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span id="restoreFileLabel">Choose backup file</span>
+                <input type="file" id="restoreFileInput" accept=".sql,.db" style="display:none;" onchange="onRestoreFileSelected(this)">
+              </label>
+              <button class="btn" style="color:var(--red); border-color:rgba(248,81,73,0.4);" id="restoreOpenBtn" disabled onclick="openRestoreDialog()">
+                Restore database
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="s-card">
-        <div class="s-card-head">Import <span class="s-card-head-sub">Coming soon</span></div>
-        <div class="coming-soon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          CSV import for bulk asset creation is coming in a future update.
+      <!-- CSV tab -->
+      <div class="data-tab-pane" id="data-tab-csv">
+
+        <!-- CSV Export -->
+        <div class="s-card">
+          <div class="s-card-head">Export</div>
+          <div class="s-card-desc">
+            Exports assets, kits and jobs as a ZIP of CSV files. Good for sharing data externally or spreadsheet analysis. Not suitable for restoring into GREG - use the Database backup for that.
+          </div>
+          <div class="s-action-row">
+            <div class="s-action-text">
+              <strong>Export all data as CSV</strong>
+              <p style="color:var(--text-faint); font-size:12px;">Downloads <code>assets.csv</code>, <code>kits.csv</code> and <code>jobs.csv</code> in a ZIP.</p>
+            </div>
+            <a class="btn" href="/settings/export/">Download ZIP</a>
+          </div>
+        </div>
+
+        <!-- CSV Import -->
+        <div class="s-card">
+          <div class="s-card-head">Import</div>
+          <div class="s-card-desc">
+            Import assets or jobs from a CSV file. Existing records with the same ID are skipped - this only creates new entries. Download a CSV export first to see the expected column format.
+          </div>
+          <form method="post" action="/settings/csv-import/" enctype="multipart/form-data" id="csvImportForm">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="import">
+            <div class="s-action-row">
+              <div class="s-action-text">
+                <strong>Upload CSV file</strong>
+                <p style="color:var(--text-faint); font-size:12px;">Select a model type and upload a CSV matching the export format.</p>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+                <select name="model" class="data-select">
+                  <option value="assets">Assets</option>
+                  <option value="jobs">Jobs</option>
+                </select>
+                <label class="data-file-btn">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <span id="csvFileLabel">Choose CSV file</span>
+                  <input type="file" name="csv_file" accept=".csv" style="display:none;" onchange="document.getElementById('csvFileLabel').textContent = this.files[0]?.name || 'Choose CSV file'">
+                </label>
+                <button type="submit" class="btn btn-primary">Import CSV</button>
+              </div>
+            </div>
+          </form>
         </div>
       </div>
+
     </div>
+
+    <!-- Restore confirmation dialog -->
+    <dialog id="restoreDialog" class="dialog-panel" style="max-width:420px;">
+      <button type="button" class="dialog-close-x" onclick="document.getElementById('restoreDialog').close()">&times;</button>
+      <h3 style="color:var(--red);">Restore database</h3>
+      <p style="font-size:13px; color:var(--text-dim); margin-bottom:12px;">
+        This will <strong>completely replace</strong> your current database with the uploaded backup. Every record - assets, jobs, kits, tickets, bookings - will be overwritten.
+      </p>
+      <p style="font-size:13px; color:var(--text-dim); margin-bottom:16px;">
+        Only use this if you know exactly what you are doing. A common use case is pulling production data into a local test environment.
+      </p>
+      <div style="background:rgba(248,81,73,0.08); border:1px solid rgba(248,81,73,0.3); border-radius:6px; padding:12px 14px; margin-bottom:16px; font-size:12px; color:var(--red);">
+        File selected: <strong id="restoreDialogFilename"></strong>
+      </div>
+      <form method="post" action="/settings/db-restore/" enctype="multipart/form-data" id="restoreForm">
+        {% csrf_token %}
+        <input type="file" name="restore_file" id="restoreFormFile" style="display:none;">
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:5px;">Type <strong>RESTORE</strong> to confirm</label>
+          <input type="text" name="confirm_word" id="restoreConfirmInput" placeholder="RESTORE"
+            style="width:100%; background:var(--surface-2); border:1px solid var(--red); border-radius:6px; padding:8px 10px; color:var(--text); font-size:13px; box-sizing:border-box;"
+            oninput="document.getElementById('restoreSubmitBtn').disabled = this.value !== 'RESTORE'">
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="btn" onclick="document.getElementById('restoreDialog').close()">Cancel</button>
+          <button type="submit" class="btn" style="color:var(--red); border-color:rgba(248,81,73,0.4);" id="restoreSubmitBtn" disabled>
+            Yes, restore database
+          </button>
+        </div>
+      </form>
+    </dialog>
 
     {% endif %}
   </main>
@@ -631,6 +795,52 @@
 </div>
 
 <script>
+// ── Data panel tabs ──────────────────────────────────────────────────────────
+function switchDataTab(tab) {
+  document.querySelectorAll(".data-tab").forEach(b => b.classList.toggle("active", b.textContent.toLowerCase().trim() === tab));
+  document.querySelectorAll(".data-tab-pane").forEach(p => p.classList.toggle("active", p.id === "data-tab-" + tab));
+}
+
+// ── Restore file selection + dialog ──────────────────────────────────────────
+function onRestoreFileSelected(input) {
+  const label = document.getElementById("restoreFileLabel");
+  const btn = document.getElementById("restoreOpenBtn");
+  if (input.files.length) {
+    label.textContent = input.files[0].name;
+    btn.disabled = false;
+  } else {
+    label.textContent = "Choose backup file";
+    btn.disabled = true;
+  }
+}
+
+function openRestoreDialog() {
+  const input = document.getElementById("restoreFileInput");
+  if (!input.files.length) return;
+  // Transfer the file to the hidden form input via DataTransfer
+  const dt = new DataTransfer();
+  dt.items.add(input.files[0]);
+  document.getElementById("restoreFormFile").files = dt.files;
+  document.getElementById("restoreDialogFilename").textContent = input.files[0].name;
+  document.getElementById("restoreConfirmInput").value = "";
+  document.getElementById("restoreSubmitBtn").disabled = true;
+  document.getElementById("restoreDialog").showModal();
+}
+
+// ── DB type label ───────────────────────────────────────────────────────────
+(function() {
+  const label = document.getElementById("dbTypeLabel");
+  const btn = document.getElementById("dbBackupBtn");
+  if (!label) return;
+  fetch("/api/settings/db-info/")
+    .then(r => r.json())
+    .then(data => {
+      label.textContent = data.vendor === "postgresql" ? "PostgreSQL - downloads .sql" : "SQLite - downloads .db";
+      if (btn) btn.textContent = data.vendor === "postgresql" ? "Download .sql backup" : "Download .db backup";
+    })
+    .catch(() => { label.textContent = ""; });
+})();
+
 // ── Sidebar nav ─────────────────────────────────────────────────────────────
 (function() {
   const items  = document.querySelectorAll(".sidebar-item[data-panel]");

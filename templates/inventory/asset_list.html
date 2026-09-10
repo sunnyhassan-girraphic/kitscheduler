@@ -51,7 +51,7 @@
   #inv-stat-dialog::backdrop { background: rgba(0,0,0,0.45); }
   .inv-dialog-head {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 40px 10px 14px; background: var(--surface-2);
+    padding: 8px 10px 8px 14px; background: var(--surface-2);
     border-bottom: 1px solid var(--border);
     font-size: 12px; font-weight: 600; color: var(--text);
   }
@@ -98,10 +98,13 @@
 
 <!-- Stat popup dialog -->
 <dialog id="inv-stat-dialog" style="background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:10px;">
-  <button type="button" class="dialog-close-x" onclick="document.getElementById('inv-stat-dialog').close()" aria-label="Close">&times;</button>
   <div class="inv-dialog-head">
     <span id="inv-dialog-title"></span>
     <span class="inv-dialog-range" id="inv-dialog-range"></span>
+    <button type="button" onclick="document.getElementById('inv-stat-dialog').close()" aria-label="Close"
+      style="margin-left:auto; flex-shrink:0; width:24px; height:24px; border-radius:5px; background:transparent; border:none; color:var(--text-dim); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; outline:none; padding:0;"
+      onmouseover="this.style.background='var(--surface)'; this.style.color='var(--text)'"
+      onmouseout="this.style.background='transparent'; this.style.color='var(--text-dim)'">&times;</button>
   </div>
   <div class="inv-dialog-scroll" id="inv-dialog-body"></div>
 </dialog>
