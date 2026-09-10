@@ -968,7 +968,9 @@ function openTagEdit(id, name, color) {
   document.getElementById("tag-edit-id").value   = id;
   document.getElementById("tag-edit-name").value = name;
   document.getElementById("tag-edit-colour-val").value = color;
-  document.getElementById("tag-edit-colour-btn").style.background = color;
+  const btn = document.getElementById("tag-edit-colour-btn");
+  btn.style.background = color;
+  btn.onclick = function() { openColourPicker(btn, color, "tag-edit-colour-val"); };
   form.classList.add("open");
   document.getElementById("tag-edit-name").focus();
 }
