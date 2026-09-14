@@ -205,7 +205,8 @@
             </div>
             <div class="form-field">
               <div class="color-override-row" style="margin-top:22px;">
-                <input type="color" id="f-color" name="custom_color" value="{{ form_values.custom_color|default:job.custom_color|default:'#EAB308' }}" {% if not job.custom_color and not form_values.custom_color %}disabled{% endif %}>
+                <input type="color" id="f-color" name="custom_color" value="{{ form_values.custom_color|default:job.custom_color|default:'#EAB308' }}" {% if not job.custom_color and not form_values.custom_color %}disabled{% endif %}
+                  onclick="if(this.disabled){this.disabled=false;document.getElementById('f-color-override').checked=true;this.click();}">
                 <label for="f-color-override">
                   <input type="checkbox" id="f-color-override" {% if job.custom_color or form_values.custom_color %}checked{% endif %}
                          onchange="document.getElementById('f-color').disabled = !this.checked;">

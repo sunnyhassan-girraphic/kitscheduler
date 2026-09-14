@@ -320,9 +320,10 @@
 {% endif %}
 
 <!-- Asset type change confirmation dialog -->
-<dialog id="type-confirm-dialog">
-  <h2>Change asset type?</h2>
-  <p id="type-confirm-msg"></p>
+<dialog id="type-confirm-dialog" class="dialog-panel" style="max-width:400px;">
+  <button type="button" class="dialog-close-x" onclick="cancelTypeChange()" aria-label="Close">&times;</button>
+  <h3>Change asset type?</h3>
+  <p id="type-confirm-msg" style="font-size:13px; color:var(--text-dim); margin:12px 0 0; padding:0 18px;"></p>
   <div class="dialog-actions">
     <button type="button" class="btn" onclick="cancelTypeChange()">Cancel</button>
     <button type="button" class="btn btn-primary" onclick="acceptTypeChange()">Yes, change it</button>

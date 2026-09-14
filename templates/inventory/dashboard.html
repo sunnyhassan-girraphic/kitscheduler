@@ -807,7 +807,8 @@
     <label for="nj_notes">Notes (optional)</label>
     <input type="text" id="nj_notes">
     <div class="color-override-row">
-      <input class="color-swatch-input" type="color" id="nj_color" value="#EAB308" disabled>
+      <input class="color-swatch-input" type="color" id="nj_color" value="#EAB308" disabled
+        onclick="if(this.disabled){this.disabled=false;document.getElementById('nj_color_override').checked=true;this.click();}">
       <label class="color-override-label" for="nj_color_override">
         <input type="checkbox" id="nj_color_override" onchange="document.getElementById('nj_color').disabled = !this.checked">
         Custom color

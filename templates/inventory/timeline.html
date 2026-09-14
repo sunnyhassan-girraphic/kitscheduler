@@ -183,10 +183,12 @@
       <a class="btn" href="?range={{ range_mode }}&engines={{ show_engines|yesno:'1,0' }}&laptops={{ show_laptops|yesno:'1,0' }}&kits={{ show_kits|yesno:'1,0' }}&start={{ prev_anchor|date:'Y-m-d' }}">&larr;</a>
       <a class="btn" href="?range={{ range_mode }}&engines={{ show_engines|yesno:'1,0' }}&laptops={{ show_laptops|yesno:'1,0' }}&kits={{ show_kits|yesno:'1,0' }}">Today</a>
       <a class="btn" href="?range={{ range_mode }}&engines={{ show_engines|yesno:'1,0' }}&laptops={{ show_laptops|yesno:'1,0' }}&kits={{ show_kits|yesno:'1,0' }}&start={{ next_anchor|date:'Y-m-d' }}">&rarr;</a>
-      <button class="btn" onclick="document.getElementById('tlCalPicker').showPicker ? document.getElementById('tlCalPicker').showPicker() : document.getElementById('tlCalPicker').click()" title="Jump to date">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      </button>
-      <input type="date" id="tlCalPicker" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;" onchange="jumpToDate(this.value)">
+      <div style="position:relative; display:inline-flex;">
+        <button class="btn" onclick="document.getElementById('tlCalPicker').showPicker ? document.getElementById('tlCalPicker').showPicker() : document.getElementById('tlCalPicker').click()" title="Jump to date">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </button>
+        <input type="date" id="tlCalPicker" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none;" onchange="jumpToDate(this.value)">
+      </div>
     </div>
   </div>
 
@@ -328,7 +330,7 @@
   </div>
 </div>
 
-<dialog id="assetJobDialog">
+<dialog id="assetJobDialog" class="dialog-panel" style="max-width:380px;">
   <button type="button" class="dialog-close-x" onclick="document.getElementById('assetJobDialog').close()" aria-label="Close">&times;</button>
   <div class="ajd-header">
     <div class="ajd-job" id="ajdJobName"></div>
@@ -347,7 +349,7 @@
 <dialog id="bookingDialog" class="dialog-panel">
   <button type="button" class="dialog-close-x" onclick="document.getElementById('bookingDialog').close()" aria-label="Close">&times;</button>
   <h3>New booking</h3>
-  <p id="bookingDialogSubtitle" style="font-size:12px; color:var(--text-dim); font-family:var(--mono); margin:-8px 0 12px;"></p>
+  <p id="bookingDialogSubtitle" style="font-size:12px; color:var(--text-dim); font-family:var(--mono); margin:-8px 0 12px; padding:0 18px;"></p>
   <form id="bookingForm">
     {% csrf_token %}
     <input type="hidden" id="f_asset_id" name="asset_id">
@@ -375,7 +377,8 @@
       <label for="f_new_notes">Notes (optional)</label>
       <input type="text" id="f_new_notes" name="new_job_notes">
       <div class="color-override-row">
-        <input class="color-swatch-input" type="color" id="f_new_color" name="new_job_color" value="#EAB308" disabled>
+        <input class="color-swatch-input" type="color" id="f_new_color" name="new_job_color" value="#EAB308" disabled
+          onclick="if(this.disabled){this.disabled=false;document.getElementById('f_new_color_override').checked=true;this.click();}">
         <label class="color-override-label" for="f_new_color_override">
           <input type="checkbox" id="f_new_color_override" onchange="document.getElementById('f_new_color').disabled = !this.checked">
           Custom color
@@ -383,9 +386,9 @@
       </div>
     </div>
     <label for="f_start_date">Start date</label>
-    <input type="date" id="f_start_display" name="start_date_display" readonly style="background:var(--surface-2); color:var(--text-dim);">
+    <input type="text" id="f_start_display" name="start_date_display" readonly style="background:var(--surface-2); color:var(--text-dim);">
     <label for="f_end_date">End date</label>
-    <input type="date" id="f_end_display" name="end_date_display" readonly style="background:var(--surface-2); color:var(--text-dim);">
+    <input type="text" id="f_end_display" name="end_date_display" readonly style="background:var(--surface-2); color:var(--text-dim);">
     <div class="dialog-error" id="bookingError"></div>
     <div class="dialog-actions">
       <button type="button" class="btn btn-primary" onclick="submitBooking()">Book</button>
@@ -411,7 +414,8 @@
     <label for="nj_notes">Notes (optional)</label>
     <input type="text" id="nj_notes" name="notes">
     <div class="color-override-row">
-      <input class="color-swatch-input" type="color" id="nj_color" name="new_job_color" value="#EAB308" disabled>
+      <input class="color-swatch-input" type="color" id="nj_color" name="new_job_color" value="#EAB308" disabled
+        onclick="if(this.disabled){this.disabled=false;document.getElementById('nj_color_override').checked=true;this.click();}">
       <label class="color-override-label" for="nj_color_override">
         <input type="checkbox" id="nj_color_override" onchange="document.getElementById('nj_color').disabled = !this.checked">
         Custom color
@@ -483,10 +487,11 @@ function openBookingDialog(assetId, assetKind, assetLabel, startDate, endDate) {
   document.getElementById("f_asset_kind").value = assetKind;
   document.getElementById("f_start_date").value = startDate;
   document.getElementById("f_end_date").value = endDate;
-  document.getElementById("f_start_display").value = startDate;
-  document.getElementById("f_end_display").value = endDate;
+  document.getElementById("f_start_display").value = fmtDate(startDate);
+  document.getElementById("f_end_display").value = fmtDate(endDate);
   document.getElementById("bookingDialogSubtitle").textContent = assetLabel + "  " + fmtDate(startDate) + (startDate !== endDate ? " - " + fmtDate(endDate) : "");
-  document.getElementById("bookingError").textContent = "";
+  const bErr = document.getElementById("bookingError");
+  bErr.textContent = ""; bErr.style.display = "none";
   document.getElementById("f_job").value = "";
   document.getElementById("f_new_name").value = "";
   switchTab("existing");
@@ -513,7 +518,7 @@ async function submitBooking() {
   data.delete("asset_kind");
   const r = await fetch(url, { method: "POST", headers: { "X-CSRFToken": CSRF }, body: data });
   const json = await r.json();
-  if (!r.ok) { errEl.textContent = json.error || "Something went wrong."; return; }
+  if (!r.ok) { errEl.textContent = json.error || "Something went wrong."; errEl.style.display = "block"; return; }
   document.getElementById("bookingDialog").close();
   location.reload();
 }

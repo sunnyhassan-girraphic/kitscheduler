@@ -8,13 +8,13 @@
   <dialog id="newAssetChoiceDialog" class="dialog-panel" style="max-width:340px;">
     <button type="button" class="dialog-close-x" onclick="document.getElementById('newAssetChoiceDialog').close()" aria-label="Close">&times;</button>
     <h3>Add asset</h3>
-    <p style="font-size:13px; color:var(--text-dim); margin-bottom:18px;">Are you adding one asset or multiple identical ones?</p>
-    <div style="display:flex; flex-direction:column; gap:10px;">
-      <a href="/assets/new/" class="btn btn-primary" style="text-align:center; padding:12px;">
+    <p style="font-size:13px; color:var(--text-dim); margin:14px 0 0; padding:0 18px;">Are you adding one asset or multiple identical ones?</p>
+    <div style="display:flex; flex-direction:column; gap:10px; padding:14px 18px 18px;">
+      <a href="/assets/new/" class="btn btn-primary" style="text-align:center; padding:12px; justify-content:center; flex-direction:column;">
         Single asset
-        <span style="display:block; font-size:11px; font-weight:400; color:var(--accent-dim); margin-top:2px;">Fill in one asset form</span>
+        <span style="display:block; font-size:11px; font-weight:400; color:var(--accent-on); opacity:0.7; margin-top:2px;">Fill in one asset form</span>
       </a>
-      <a href="/assets/bulk-add/" class="btn" style="text-align:center; padding:12px;">
+      <a href="/assets/bulk-add/" class="btn" style="text-align:center; padding:12px; justify-content:center; flex-direction:column;">
         Bulk assets
         <span style="display:block; font-size:11px; font-weight:400; color:var(--text-faint); margin-top:2px;">Add multiple identical assets at once</span>
       </a>
@@ -88,10 +88,12 @@
     <button class="btn" onclick="shiftWeek(-1)">&larr;</button>
     <button class="btn {% if is_this_week %}btn-active{% endif %}" onclick="goThisWeek()">This week</button>
     <button class="btn" onclick="shiftWeek(1)">&rarr;</button>
-    <button class="btn" onclick="document.getElementById('calPicker').showPicker ? document.getElementById('calPicker').showPicker() : document.getElementById('calPicker').click()" title="Jump to week">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-    </button>
-    <input type="date" id="calPicker" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;" onchange="jumpToWeek(this.value)">
+    <div style="position:relative; display:inline-flex;">
+      <button class="btn" onclick="document.getElementById('calPicker').showPicker ? document.getElementById('calPicker').showPicker() : document.getElementById('calPicker').click()" title="Jump to week">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </button>
+      <input type="date" id="calPicker" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none;" onchange="jumpToWeek(this.value)">
+    </div>
   </div>
 </div>
 

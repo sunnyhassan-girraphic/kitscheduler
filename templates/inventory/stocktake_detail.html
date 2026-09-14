@@ -515,17 +515,16 @@
 </div>
 
 <!-- Close session dialog -->
-<dialog id="close-dialog">
-  <div style="padding:24px;max-width:380px;">
-    <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Finish stock take?</div>
-    <div style="font-size:13px;color:var(--text-dim);margin-bottom:20px;" id="close-summary"></div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <button type="button" class="btn" onclick="document.getElementById('close-dialog').close()">Cancel</button>
-      <form method="post" action="/stocktake/{{ session.pk }}/close/" style="display:inline;">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary">Finish</button>
-      </form>
-    </div>
+<dialog id="close-dialog" class="dialog-panel" style="max-width:400px;">
+  <button type="button" class="dialog-close-x" onclick="document.getElementById('close-dialog').close()" aria-label="Close">&times;</button>
+  <h3>Finish stock take?</h3>
+  <p id="close-summary" style="font-size:13px; color:var(--text-dim); margin:12px 0 0; padding:0 18px;"></p>
+  <div class="dialog-actions">
+    <button type="button" class="btn" onclick="document.getElementById('close-dialog').close()">Cancel</button>
+    <form method="post" action="/stocktake/{{ session.pk }}/close/" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">Finish</button>
+    </form>
   </div>
 </dialog>
 

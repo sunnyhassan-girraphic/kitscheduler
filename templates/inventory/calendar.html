@@ -314,13 +314,14 @@
 </div>
 {% endif %}
 
-<dialog id="bookingDialog">
+<dialog id="bookingDialog" class="dialog-panel">
+  <button type="button" class="dialog-close-x" onclick="closeBookingDialog()" aria-label="Close">&times;</button>
   <h3 id="dialogTitle">Book</h3>
-  <form id="bookingForm" method="dialog">
+  <form id="bookingForm">
     <input type="hidden" id="f_kind" name="kind">
     <input type="hidden" id="f_item_id" name="item_id">
 
-    <div style="display:flex; gap:4px; margin-top:10px;">
+    <div style="display:flex; gap:4px; margin:14px 18px 0;">
       <button type="button" class="btn" id="tabExisting" onclick="switchJobTab('existing')">Existing job</button>
       <button type="button" class="btn" id="tabNew" onclick="switchJobTab('new')">New job</button>
     </div>
@@ -345,7 +346,8 @@
         {% endfor %}
       </select>
       <div class="color-override-row">
-        <input type="color" id="f_new_color" name="new_job_color" value="#EAB308" disabled class="color-swatch-input">
+        <input type="color" id="f_new_color" name="new_job_color" value="#EAB308" disabled class="color-swatch-input"
+          onclick="if(this.disabled){this.disabled=false;document.getElementById('f_new_color_override').checked=true;this.click();}">
         <label for="f_new_color_override" class="color-override-label">
           <input type="checkbox" id="f_new_color_override" onchange="document.getElementById('f_new_color').disabled = !this.checked;">
           Override this job's color
@@ -353,7 +355,7 @@
       </div>
       <div class="dialog-hint">Leave unticked to use the category's default color.</div>
       <label for="f_new_notes">Notes (optional)</label>
-      <textarea id="f_new_notes" name="new_job_notes" rows="2" style="width:100%; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--text); border-radius:6px; padding:7px 8px; font-size:13px; font-family:inherit; resize:vertical;"></textarea>
+      <textarea id="f_new_notes" name="new_job_notes" rows="2" style="resize:vertical;"></textarea>
     </div>
 
     <label for="f_start">Start date</label>

@@ -262,17 +262,17 @@
   }
   dialog.dialog-panel::backdrop { background: rgba(0,0,0,0.55); }
   dialog.dialog-panel h3 { font-size: 15px; font-weight: 600; margin: 0; padding: 16px 48px 14px 18px; border-bottom: 1px solid var(--border); }
-  dialog.dialog-panel label { display: block; font-size: 12px; font-weight: 500; color: var(--text-dim); margin: 12px 0 5px; padding: 0 18px; }
-  dialog.dialog-panel label:first-of-type { margin-top: 16px; }
-  dialog.dialog-panel input, dialog.dialog-panel select, dialog.dialog-panel textarea {
+  dialog.dialog-panel label:not(.color-override-label) { display: block; font-size: 12px; font-weight: 500; color: var(--text-dim); margin: 12px 0 5px; padding: 0 18px; }
+  dialog.dialog-panel label:not(.color-override-label):first-of-type { margin-top: 16px; }
+  dialog.dialog-panel input:not([type="color"]):not([type="checkbox"]), dialog.dialog-panel select, dialog.dialog-panel textarea {
     display: block; width: calc(100% - 36px); margin: 0 18px;
     background: var(--surface-2); border: 1px solid var(--border-strong);
     color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 13px;
     font-family: inherit;
   }
-  dialog.dialog-panel select:focus, dialog.dialog-panel input:focus { outline: none; border-color: var(--accent); }
+  dialog.dialog-panel select:focus, dialog.dialog-panel input:not([type="color"]):not([type="checkbox"]):focus { outline: none; border-color: var(--accent); }
   dialog.dialog-panel .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--border); margin-top: 14px; }
-  dialog.dialog-panel .dialog-error { color: var(--red); font-size: 12px; padding: 8px 18px 0; min-height: 0; }
+  dialog.dialog-panel .dialog-error { display: none; color: var(--red); font-size: 12px; padding: 8px 18px 0; min-height: 0; }
   dialog.dialog-panel .dialog-hint { color: var(--text-faint); font-size: 12px; padding: 8px 18px 0; line-height: 1.5; }
   dialog.dialog-edit-icon {
     position: absolute; top: 10px; right: 46px;
