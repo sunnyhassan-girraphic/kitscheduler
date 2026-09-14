@@ -1,6 +1,6 @@
 {% extends "inventory/base.html" %}
 {% block title %}G.R.E.G - {% if asset_obj %}Edit {{ asset_obj.asset_id }}{% else %}New asset{% endif %}{% endblock %}
-{% block brand_sub %}{% if asset_obj %}Editing asset{% else %}New asset{% endif %}{% endblock %}
+{% block page_title %}{% if asset %}Edit {{ asset.asset_id }}{% else %}New asset{% endif %}{% endblock %}
 
 {% block header_actions %}
   <a class="btn" href="/assets/" id="cancel-link">Cancel</a>

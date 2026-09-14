@@ -366,11 +366,14 @@ def _container_create_view(request, kind):
         actual_nested_ids = list(container.nested_assets.values_list("id", flat=True))
         AssetHistory.record_component_changes(container, [], actual_nested_ids, last_updated_by)
 
-        return redirect(meta["list_url"])
+        next_url = request.POST.get("next") or request.GET.get("next") or meta["list_url"]
+        return redirect(next_url)
 
     form_ctx = _container_form_context(kind)
     current_staff = StaffMember.for_user(request.user)
+    next_url = request.GET.get("next", "")
     form_ctx.update({
+        "next_url": next_url,
         "selected_ids": [], "qty": "1", "status": Asset.Status.AVAILABLE,
         "container_child_pairs": [],
         "last_updated_by_id": str(current_staff.id) if current_staff else "",
@@ -478,11 +481,14 @@ def _container_edit_view(request, kind, container_id):
                 kit_membership.tag_id = new_tag_id
                 kit_membership.save(update_fields=["tag"])
 
-        return redirect(meta["list_url"])
+        next_url = request.POST.get("next") or request.GET.get("next") or meta["list_url"]
+        return redirect(next_url)
 
     form_ctx = _container_form_context(kind, container=container)
     current_staff = StaffMember.for_user(request.user)
+    next_url = request.GET.get("next", "")
     form_ctx.update({
+        "next_url": next_url,
         "engine": container,
         "asset_id": container.asset_id,
         "make_model": container.make_model,

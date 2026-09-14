@@ -1,6 +1,6 @@
 {% extends "inventory/base.html" %}
 {% block title %}G.R.E.G - {{ vehicle.name }}{% endblock %}
-{% block brand_sub %}{{ vehicle.name }}{% if vehicle.registration %} &middot; {{ vehicle.registration }}{% endif %}{% endblock %}
+{% block page_title %}{{ vehicle.name }}{% endblock %}
 {% block header_actions %}
   <a class="btn" href="/vans/{{ vehicle.id }}/edit/">Edit van</a>
 {% endblock %}

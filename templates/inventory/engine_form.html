@@ -1,6 +1,6 @@
 {% extends "inventory/base.html" %}
 {% block title %}G.R.E.G - {% if engine %}Edit {{ engine.asset_id }}{% else %}New {{ kind_label }}{% endif %}{% endblock %}
-{% block brand_sub %}{% if engine %}Editing {{ kind_label|lower }}{% else %}New {{ kind_label|lower }}{% endif %}{% endblock %}
+{% block page_title %}{% if engine %}Edit {{ engine.asset_id }}{% else %}New engine{% endif %}{% endblock %}
 
 {% block header_actions %}
   <a class="btn" href="{{ list_url }}" id="cancel-link">Cancel</a>
@@ -265,6 +265,7 @@
 
   <form method="post" id="engine-form">
     {% csrf_token %}
+    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
 
     <div class="form-section collapsed" id="section-details">
       <div class="form-section-head" onclick="toggleSection('section-details')" style="display:flex;align-items:center;justify-content:space-between;">{{ kind_label }} details <button type="button" class="collapse-btn" tabindex="-1" aria-label="Toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>

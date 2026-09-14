@@ -1,6 +1,6 @@
 {% extends "inventory/base.html" %}
 {% block title %}G.R.E.G - {% if license %}Edit {{ license.asset_id }}{% else %}New License{% endif %}{% endblock %}
-{% block brand_sub %}{% if license %}Editing license{% else %}New license{% endif %}{% endblock %}
+{% block page_title %}{% if license %}Edit license{% else %}New license{% endif %}{% endblock %}
 
 {% block header_actions %}
   <a class="btn" href="/licenses/">Cancel</a>

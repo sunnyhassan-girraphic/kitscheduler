@@ -737,6 +737,6 @@ def kit_archive_view(request):
     context = {
         "rows":           rows,
         "archived_count": archived_count,
-        "active_nav":     "kits",
+        "active_nav":     "kitarchive",
     }
     return render(request, "inventory/kit_archive.html", context)

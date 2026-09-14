@@ -143,16 +143,23 @@ def timeline_view(request):
         return rows
 
     def _group_by_make_model(rows):
-        """Group strip rows by make_model, preserving asset_id order within each group."""
+        """Group strip rows by make_model. Assets with no make_model go last under 'No model set'."""
         seen = {}
         order = []
+        ungrouped = []
         for row in rows:
-            key = row["asset"].make_model.strip() if row["asset"].make_model else "Other"
-            if key not in seen:
-                seen[key] = []
-                order.append(key)
-            seen[key].append(row)
-        return [{"make_model": k, "rows": seen[k]} for k in order]
+            key = row["asset"].make_model.strip() if row["asset"].make_model and row["asset"].make_model.strip() else None
+            if key is None:
+                ungrouped.append(row)
+            else:
+                if key not in seen:
+                    seen[key] = []
+                    order.append(key)
+                seen[key].append(row)
+        result = [{"make_model": k, "rows": seen[k]} for k in order]
+        if ungrouped:
+            result.append({"make_model": "No model set", "rows": ungrouped})
+        return result
 
     engine_rows = _build_strip_rows(engines, bookings_by_engine, days)
     laptop_rows = _build_strip_rows(laptops, bookings_by_laptop, days)

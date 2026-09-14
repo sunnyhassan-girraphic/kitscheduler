@@ -1,7 +1,7 @@
 {% extends "inventory/base.html" %}
 
 {% block title %}G.R.E.G - Calendar{% endblock %}
-{% block brand_sub %}{{ total_kits }} kit{{ total_kits|pluralize }}, {{ total_staff }} staff{% endblock %}
+{% block page_title %}Calendar{% endblock %}
 
 {% block header_actions %}
   <a class="btn" href="?range={{ range_mode }}&start={{ prev_anchor|date:'Y-m-d' }}" title="Back one week">&larr;</a>

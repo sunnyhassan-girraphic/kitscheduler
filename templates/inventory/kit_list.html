@@ -1,9 +1,8 @@
 {% extends "inventory/base.html" %}
 {% load inventory_extras %}
 {% block title %}G.R.E.G - Kits{% endblock %}
-{% block brand_sub %}{{ total_kits }} kit{{ total_kits|pluralize }}{% endblock %}
+{% block page_title %}Kits{% endblock %}
 {% block header_actions %}
-  <a class="btn" href="/kits/archive/">Archive</a>
   <a class="btn btn-primary" href="/kits/new/">+ New kit</a>
 {% endblock %}
 {% block extra_style %}

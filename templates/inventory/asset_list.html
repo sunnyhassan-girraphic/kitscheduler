@@ -1,9 +1,8 @@
 {% extends "inventory/base.html" %}
 {% load inventory_extras %}
 {% block title %}G.R.E.G - Inventory{% endblock %}
-{% block brand_sub %}{{ total_active }} asset{{ total_active|pluralize }} tracked{% endblock %}
+{% block page_title %}Inventory{% endblock %}
 {% block header_actions %}
-  <a class="btn" href="/stocktake/">Stock Take</a>
   <button class="btn btn-primary" onclick="document.getElementById('newAssetChoiceDialog').showModal()">+ New asset</button>
 
   <dialog id="newAssetChoiceDialog" class="dialog-panel" style="max-width:340px;">
@@ -163,10 +162,10 @@
     <tr class="{% if asset.is_nested %}nested{% endif %}">
       <td style="white-space:nowrap;">
         {% if asset.asset_type == "ENGINE" %}
-          <a href="/engines/{{ asset.id }}/edit/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
+          <a href="/engines/{{ asset.id }}/edit/?next=/assets/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
         {% elif asset.asset_type == "IO_DEVICE" %}
           {% if asset.parent_engine_id and asset.parent_engine.asset_type == "ENGINE" %}
-            <a href="/engines/{{ asset.parent_engine_id }}/edit/" style="color:var(--text); text-decoration:none;" title="Edit its contents on the parent Engine">{{ asset.asset_id }}</a>
+            <a href="/engines/{{ asset.parent_engine_id }}/edit/?next=/assets/" style="color:var(--text); text-decoration:none;" title="Edit its contents on the parent Engine">{{ asset.asset_id }}</a>
           {% else %}
             <a href="/io-devices/{{ asset.id }}/edit/" style="color:var(--text); text-decoration:none;">{{ asset.asset_id }}</a>
           {% endif %}

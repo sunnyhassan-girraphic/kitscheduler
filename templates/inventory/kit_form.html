@@ -1,6 +1,6 @@
 {% extends "inventory/base.html" %}
 {% block title %}G.R.E.G - {% if kit %}Edit {{ kit.name }}{% else %}New Kit{% endif %}{% endblock %}
-{% block brand_sub %}{% if kit %}Editing kit{% else %}New kit{% endif %}{% endblock %}
+{% block page_title %}{% if kit %}Edit {{ kit.name }}{% else %}New kit{% endif %}{% endblock %}
 
 {% block header_actions %}
   {% if kit %}
