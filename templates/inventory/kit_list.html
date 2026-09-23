@@ -152,6 +152,21 @@
   </div>
 </dialog>
 
+<!-- Unarchive conflict warning dialog -->
+<dialog id="kit-unarchive-conflict-dialog" style="background:var(--surface-2);border:1px solid var(--border-strong);border-radius:10px;padding:20px 24px;max-width:420px;color:var(--text);margin:auto;">
+  <h2 style="font-size:15px;margin:0 0 6px;font-weight:600;display:flex;align-items:center;gap:7px;">
+    <i class="ti ti-alert-triangle" style="color:var(--color-amber,#d97706);font-size:17px;" aria-hidden="true"></i>
+    Assets now in other kits
+  </h2>
+  <p id="kit-unarchive-conflict-msg" style="font-size:13px;color:var(--text-dim);margin:0 0 12px;line-height:1.5;"></p>
+  <div id="kit-unarchive-conflict-list" style="background:var(--surface-1);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin-bottom:12px;font-size:13px;"></div>
+  <p style="font-size:12px;color:var(--text-dim);margin:0 0 18px;line-height:1.5;">Unarchiving won't remove them from those kits. They'll appear as conflicts on the kit card until resolved.</p>
+  <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <button id="kit-unarchive-conflict-cancel" class="btn" type="button">Cancel</button>
+    <button id="kit-unarchive-conflict-confirm" class="btn btn-primary" type="button">Unarchive anyway</button>
+  </div>
+</dialog>
+
 <form id="csrf-holder" style="display:none;">{% csrf_token %}</form>
 <div class="filter-bar">
   <div class="filter-bar-left">
@@ -395,6 +410,11 @@ function toggleNested(wrapId, headerEl) {
   };
 
   async function applyStatus(kitId, opt, pill) {
+    // Snapshot current pill state so we can restore it if the user cancels
+    // a conflict warning or booking dialog.
+    pill._prevStatus = pill.dataset.status;
+    pill._prevLabel = pill.querySelector(".kit-status-label").textContent;
+    pill._prevDot = pill.querySelector(".kit-status-dot").style.background;
     if (opt.value !== "READY") {
       let bookingInfo = null;
       try {
@@ -422,7 +442,7 @@ function toggleNested(wrapId, headerEl) {
     await commitStatus(kitId, opt, pill, false);
   }
 
-  async function commitStatus(kitId, opt, pill, removeBooking) {
+  async function commitStatus(kitId, opt, pill, removeBooking, force) {
     const csrf = document.querySelector("[name=csrfmiddlewaretoken]");
     const csrfToken = csrf ? csrf.value : "";
     pill.dataset.status = opt.value;
@@ -430,7 +450,7 @@ function toggleNested(wrapId, headerEl) {
     pill.querySelector(".kit-status-label").textContent = opt.label;
     pill.querySelector(".kit-status-dot").style.background = opt.dot;
     try {
-      const body = `status=${encodeURIComponent(opt.value)}${removeBooking ? "&remove_booking=1" : ""}`;
+      let body = `status=${encodeURIComponent(opt.value)}${removeBooking ? "&remove_booking=1" : ""}${force ? "&force=1" : ""}`;
       const resp = await fetch(`/kits/${kitId}/set-status/`, {
         method: "POST",
         headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/x-www-form-urlencoded" },
@@ -438,6 +458,29 @@ function toggleNested(wrapId, headerEl) {
       });
       if (!resp.ok) { alert("Could not update status."); location.reload(); return; }
       const data = await resp.json().catch(() => ({}));
+      if (data.conflicts && data.conflicts.length) {
+        // Restore pill to its previous state while user decides
+        pill.dataset.status = pill._prevStatus || "ARCHIVED";
+        pill.className = `kit-status-pill kit-status-${(pill._prevStatus || "ARCHIVED").toLowerCase()}`;
+        pill.querySelector(".kit-status-label").textContent = pill._prevLabel || "Archived";
+        pill.querySelector(".kit-status-dot").style.background = pill._prevDot || "#888";
+        // Build conflict list
+        const listEl = document.getElementById("kit-unarchive-conflict-list");
+        listEl.innerHTML = data.conflicts.map((c, i) =>
+          `<div style="padding:4px 0;display:flex;gap:6px;align-items:center;${i < data.conflicts.length - 1 ? "border-bottom:1px solid var(--border);" : ""}">
+            <span style="font-family:monospace;font-weight:500;">${c.assetId}</span>
+            <span style="color:var(--text-dim);">-&gt; ${c.kitName}</span>
+          </div>`
+        ).join("");
+        const msgEl = document.getElementById("kit-unarchive-conflict-msg");
+        msgEl.textContent = `These assets from this kit have been added to other kits since it was archived:`;
+        const conflictDialog = document.getElementById("kit-unarchive-conflict-dialog");
+        conflictDialog.dataset.kitId = kitId;
+        conflictDialog._pill = pill;
+        conflictDialog._opt = opt;
+        conflictDialog.showModal();
+        return;
+      }
       if (data.isBooked) {
         pill.dataset.status = "BOOKED";
         pill.className = "kit-status-pill kit-status-booked";
@@ -452,10 +495,19 @@ function toggleNested(wrapId, headerEl) {
   document.getElementById("kit-status-dialog-confirm").addEventListener("click", async () => {
     const removeBooking = statusDialog.querySelector("[name=booking-action]:checked")?.value === "remove";
     statusDialog.close();
-    await commitStatus(statusDialog.dataset.kitId, statusDialog._opt, statusDialog._pill, removeBooking);
+    await commitStatus(statusDialog.dataset.kitId, statusDialog._opt, statusDialog._pill, removeBooking, false);
   });
   document.getElementById("kit-status-dialog-cancel").addEventListener("click", () => {
     statusDialog.close();
+  });
+
+  const conflictDialog = document.getElementById("kit-unarchive-conflict-dialog");
+  document.getElementById("kit-unarchive-conflict-confirm").addEventListener("click", async () => {
+    conflictDialog.close();
+    await commitStatus(conflictDialog.dataset.kitId, conflictDialog._opt, conflictDialog._pill, false, true);
+  });
+  document.getElementById("kit-unarchive-conflict-cancel").addEventListener("click", () => {
+    conflictDialog.close();
   });
 
   window.dismissCard = async function(btn, kitId, kitName) {

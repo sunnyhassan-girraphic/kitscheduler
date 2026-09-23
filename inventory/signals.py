@@ -6,7 +6,7 @@ InventoryConfig.ready().
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from .models import Asset, AssetBooking, KitAssetTag, KitBooking
+from .models import Asset, AssetBooking, Kit, KitAssetTag, KitBooking
 from .status_sync import recompute_for_asset_ids
 
 
@@ -58,6 +58,18 @@ def _kit_booking_deleted(sender, instance, **kwargs):
     member_ids = list(KitAssetTag.objects.filter(kit_id=instance.kit_id).values_list("asset_id", flat=True))
     recompute_for_asset_ids(member_ids)
     _recompute_kit_status(instance.kit_id)
+
+
+@receiver(post_save, sender=Kit)
+def _kit_saved(sender, instance, created, **kwargs):
+    """Archiving a kit releases its assets; unarchiving claims them again.
+    Recompute members on every kit save (cheap - a handful of queries) so
+    the change is picked up whether it came from the status dropdown, the
+    kit edit form, or Django Admin."""
+    if created:
+        return
+    member_ids = list(KitAssetTag.objects.filter(kit_id=instance.pk).values_list("asset_id", flat=True))
+    recompute_for_asset_ids(member_ids)
 
 
 @receiver(post_save, sender=AssetBooking)

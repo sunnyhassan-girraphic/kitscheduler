@@ -8,7 +8,14 @@ def recompute_existing_statuses(apps, schema_editor):
     in line with actual kit membership/nesting/bookings, same logic the
     signals will maintain going forward. Uses the real status_sync module
     (not the historical apps.get_model snapshot) since the computation
-    logic itself isn't part of the schema being migrated."""
+    logic itself isn't part of the schema being migrated.
+
+    Skipped on an empty database (fresh installs): the live status_sync
+    code references columns added by later migrations (e.g. Kit.status),
+    and with no assets there is nothing to correct anyway."""
+    Asset = apps.get_model("inventory", "Asset")
+    if not Asset.objects.exists():
+        return
     from inventory.status_sync import recompute_all
     recompute_all()
 

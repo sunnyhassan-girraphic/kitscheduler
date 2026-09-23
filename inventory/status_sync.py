@@ -53,13 +53,15 @@ def _expand_through_nesting(ids):
 def _job_committed_ids(on_date=None):
     """All asset ids (expanded through nesting) currently committed to a
     JOB on the given date (defaults to today)."""
-    from .models import AssetBooking, KitAssetTag, KitBooking
+    from .models import AssetBooking, Kit, KitAssetTag, KitBooking
 
     on_date = on_date or datetime.date.today()
+    # Archived kits are a historical record only - their bookings no longer
+    # commit their (possibly re-used) assets.
     committed_kit_ids = set(
         KitBooking.objects.filter(
             start_date__lte=on_date, end_date__gte=on_date
-        ).values_list("kit_id", flat=True)
+        ).exclude(kit__status=Kit.Status.ARCHIVED).values_list("kit_id", flat=True)
     )
     committed = set(
         KitAssetTag.objects.filter(kit_id__in=committed_kit_ids).values_list("asset_id", flat=True)
@@ -74,10 +76,14 @@ def _job_committed_ids(on_date=None):
 
 def _structural_ids():
     """Every asset id physically claimed by something bigger right now:
-    nested inside a container, or a direct member of ANY kit."""
-    from .models import Asset, KitAssetTag
+    nested inside a container, or a direct member of any non-archived kit.
+    Archiving a kit releases its members."""
+    from .models import Asset, Kit, KitAssetTag
 
-    direct_kit_member_ids = set(KitAssetTag.objects.values_list("asset_id", flat=True))
+    direct_kit_member_ids = set(
+        KitAssetTag.objects.exclude(kit__status=Kit.Status.ARCHIVED)
+        .values_list("asset_id", flat=True)
+    )
     nested_ids = _expand_through_nesting(
         set(Asset.objects.filter(parent_engine__isnull=False).values_list("id", flat=True))
     )

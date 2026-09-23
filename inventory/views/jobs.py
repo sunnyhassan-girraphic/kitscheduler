@@ -32,7 +32,7 @@ def _job_edit_context(job):
         })
 
     all_kits = []
-    for k in Kit.objects.prefetch_related("assets", "kit_asset_tags__tag", "assets__nested_assets").order_by("name"):
+    for k in Kit.objects.active().prefetch_related("assets", "kit_asset_tags__tag", "assets__nested_assets").order_by("name"):
         member_count = k.assets.count()
         nested_count = sum(
             m.nested_assets.count() for m in k.assets.all()

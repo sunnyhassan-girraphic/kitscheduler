@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from ..models import Asset, LicenseFunctionality, StaffMember, AssetHistory
+from .assets import ACTIVE_KITS_PREFETCH
 from ..models.assets import ASSET_HISTORY_SHARED_FIELDS, ASSET_HISTORY_LICENSE_FIELDS
 
 
@@ -18,7 +19,7 @@ def license_list_view(request):
 
     licenses = Asset.objects.filter(
         asset_type=Asset.AssetType.LICENSE
-    ).select_related("last_updated_by").prefetch_related("kits", "functionalities")
+    ).select_related("last_updated_by").prefetch_related(ACTIVE_KITS_PREFETCH, "functionalities")
     if not show_archived:
         licenses = licenses.filter(archived=False)
     if license_type:

@@ -5,7 +5,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from ..models import Asset, AssetHistory, KitAssetTag, StaffMember, StockTakeEntry, StockTakeSession
+from ..models import Asset, AssetHistory, Kit, KitAssetTag, StaffMember, StockTakeEntry, StockTakeSession
 from ..pdf_utils import build_stocktake_pdf
 
 
@@ -174,7 +174,9 @@ def stocktake_detail_view(request, session_id):
     bulk_asset_ids = [e.asset_id for e in session.entries.all() if e.asset.qty > 1]
     committed_map = {}
     if bulk_asset_ids:
-        for kat in KitAssetTag.objects.filter(asset_id__in=bulk_asset_ids).values("asset_id", "quantity"):
+        for kat in KitAssetTag.objects.filter(asset_id__in=bulk_asset_ids).exclude(
+            kit__status=Kit.Status.ARCHIVED
+        ).values("asset_id", "quantity"):
             committed_map[kat["asset_id"]] = committed_map.get(kat["asset_id"], 0) + kat["quantity"]
 
     for e in session.entries.all():

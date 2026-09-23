@@ -3,12 +3,15 @@ import json
 
 from django.contrib.auth.decorators import login_required
 from django.db import models
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from ..models import Asset, AssetBooking, KitBooking, StaffMember, Tag, AssetHistory, LicenseFunctionality
+from ..models import Asset, AssetBooking, Kit, KitBooking, StaffMember, Tag, AssetHistory, LicenseFunctionality
+
+# 'In kit X' labels only list kits that still hold the asset (not archived).
+ACTIVE_KITS_PREFETCH = Prefetch("kits", queryset=Kit.objects.active())
 from ..models.assets import ASSET_HISTORY_SHARED_FIELDS
 from .common import _date_range
 
@@ -35,7 +38,7 @@ def asset_list_view(request):
     show_archived = request.GET.get("archived") == "1"
     query = request.GET.get("q", "").strip()
 
-    assets = Asset.objects.select_related("parent_engine", "last_updated_by").prefetch_related("kits")
+    assets = Asset.objects.select_related("parent_engine", "last_updated_by").prefetch_related(ACTIVE_KITS_PREFETCH)
 
     if not show_archived:
         assets = assets.filter(archived=False)
@@ -474,7 +477,7 @@ def _container_edit_view(request, kind, container_id):
         after_component_ids = list(container.nested_assets.values_list("id", flat=True))
         AssetHistory.record_component_changes(container, before_component_ids, after_component_ids, last_updated_by)
 
-        kit_membership = container.kit_asset_tags.first()
+        kit_membership = container.kit_asset_tags.exclude(kit__status=Kit.Status.ARCHIVED).first()
         if kit_membership:
             new_tag_id = int(kit_tag_id) if kit_tag_id.isdigit() else None
             if new_tag_id != kit_membership.tag_id:
@@ -506,7 +509,7 @@ def _container_edit_view(request, kind, container_id):
         "selected_ids": list(container.nested_assets.values_list("id", flat=True)),
         "container_child_pairs": [],
         "tags": list(Tag.objects.all()),
-        "kit_membership": container.kit_asset_tags.select_related("kit", "tag").first(),
+        "kit_membership": container.kit_asset_tags.exclude(kit__status=Kit.Status.ARCHIVED).select_related("kit", "tag").first(),
         "history_mode": history_mode,
         "history_page": AssetHistory.filtered_for(container, mode=history_mode, page=history_page),
     })
@@ -530,7 +533,7 @@ def _container_list_view(request, kind):
 
     items = Asset.objects.filter(
         asset_type=effective_type
-    ).select_related("last_updated_by").prefetch_related("nested_assets", "kits")
+    ).select_related("last_updated_by").prefetch_related("nested_assets", ACTIVE_KITS_PREFETCH)
 
     if not show_archived:
         items = items.filter(archived=False)

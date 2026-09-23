@@ -33,10 +33,10 @@ def dashboard_view(request):
     week_days  = _date_range(week_start, days=7)
 
     # ── Kit availability this week ───────────────────────────────────────────
-    kits = list(Kit.objects.all())
+    kits = list(Kit.objects.active())
     kit_bookings_week = list(KitBooking.objects.select_related("job", "kit").filter(
         start_date__lte=week_days[-1], end_date__gte=week_days[0]
-    ))
+    ).exclude(kit__status=Kit.Status.ARCHIVED))
     bookings_by_kit = {}
     for b in kit_bookings_week:
         bookings_by_kit.setdefault(b.kit_id, []).append(b)

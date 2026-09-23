@@ -127,7 +127,10 @@ def _other_kit_asset_info(current_kit=None, date_from=None, date_to=None):
     import datetime as _dt
     from ..models import KitBooking
 
-    kat_qs = KitAssetTag.objects.select_related("kit", "asset").filter(asset__qty=1)
+    # Archived kits have released their assets - never a conflict.
+    kat_qs = KitAssetTag.objects.select_related("kit", "asset").filter(
+        asset__qty=1
+    ).exclude(kit__status=Kit.Status.ARCHIVED)
     if current_kit is not None:
         kat_qs = kat_qs.exclude(kit=current_kit)
 
@@ -165,8 +168,8 @@ def _other_kit_asset_info(current_kit=None, date_from=None, date_to=None):
 
 def _bulk_committed_elsewhere(current_kit=None):
     """For bulk/stock assets (qty > 1), how many units are already
-    committed to OTHER kits. Keyed by asset id."""
-    qs = KitAssetTag.objects.filter(asset__qty__gt=1)
+    committed to OTHER non-archived kits. Keyed by asset id."""
+    qs = KitAssetTag.objects.filter(asset__qty__gt=1).exclude(kit__status=Kit.Status.ARCHIVED)
     if current_kit is not None:
         qs = qs.exclude(kit=current_kit)
     committed = {}
@@ -619,6 +622,34 @@ def kit_set_status_view(request, kit_id):
     if new_status not in allowed:
         return JsonResponse({"error": f"Invalid status '{new_status}'."}, status=400)
     old_status = kit.status
+
+    # When unarchiving: check if any of this kit's assets are now in other
+    # active kits. Return a conflict list so the frontend can warn the user
+    # before committing. Pass force=1 to skip this check and proceed anyway.
+    is_unarchiving = (
+        old_status == Kit.Status.ARCHIVED
+        and new_status != Kit.Status.ARCHIVED
+    )
+    if is_unarchiving and request.POST.get("force") != "1":
+        member_ids = list(
+            KitAssetTag.objects.filter(kit=kit).values_list("asset_id", flat=True)
+        )
+        conflicts = []
+        for kat in (
+            KitAssetTag.objects
+            .filter(asset_id__in=member_ids)
+            .exclude(kit=kit)
+            .exclude(kit__status=Kit.Status.ARCHIVED)
+            .select_related("asset", "kit")
+            .order_by("asset__asset_id")
+        ):
+            conflicts.append({
+                "assetId": kat.asset.asset_id,
+                "kitName": kat.kit.name,
+            })
+        if conflicts:
+            return JsonResponse({"conflicts": conflicts}, status=200)
+
     kit.status = new_status
     # Track when a kit is archived / unarchived
     import django.utils.timezone as _tz

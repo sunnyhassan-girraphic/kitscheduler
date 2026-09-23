@@ -123,7 +123,19 @@ class KitHistory(models.Model):
             )
 
 
+class KitQuerySet(models.QuerySet):
+    def active(self):
+        """Every kit that still holds its assets - i.e. not Archived.
+        Archived kits keep their KitAssetTag rows as a historical record of
+        what went to a job, but those rows no longer claim the assets:
+        status recompute, picker conflicts, bulk qty and 'in kit X' labels
+        all ignore archived kits."""
+        return self.exclude(status=Kit.Status.ARCHIVED)
+
+
 class Kit(models.Model):
+    objects = KitQuerySet.as_manager()
+
     class Status(models.TextChoices):
         READY = "READY", "Ready"
         PREP = "PREP", "Prep / in progress"
